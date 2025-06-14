@@ -8,8 +8,8 @@
 - [x] Create project directory structure
 - [x] Set up C++ development environment and build system (CMake)
 - [x] Initialize Python virtual environment for FastAPI
-- [ ] Set up React project with TypeScript template
-- [ ] Configure development containers (Docker) for consistent environments
+- [x] Set up React project with TypeScript template
+- [x] Configure development containers (Docker) for consistent environments
 
 ### Database Setup
 
@@ -35,12 +35,12 @@
 ### Historical Data Loading
 
 - [x] Download sample dataset (start with 10-20 stocks, 5 years history)
-- [ ] Implement data cleaning routines:
-  - [ ] Handle stock splits and dividends
-  - [ ] Adjust for missing trading days
-  - [ ] Normalize price data
+- [x] Implement data cleaning routines:
+  - [x] Handle stock splits and dividends
+  - [x] Adjust for missing trading days
+  - [x] Normalize price data
 - [ ] Create batch import process to PostgreSQL
-- [ ] Verify data integrity with test queries
+- [x] Verify data integrity with test queries
 - [ ] Set up automated daily data updates
 
 ## Core Simulation Engine (C++)
