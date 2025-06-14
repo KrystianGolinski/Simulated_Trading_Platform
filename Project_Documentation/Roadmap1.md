@@ -28,9 +28,9 @@
 ### Data Source Integration
 
 - [ ] Register for API access (Polygon.io/Alpaca/Yahoo Finance)
-- [ ] Create Python scripts for data fetching
+- [x] Create Python scripts for data fetching
 - [ ] Implement rate limiting to respect API constraints
-- [ ] Build data validation functions (check for missing data, outliers)
+- [x] Build data validation functions (check for missing data, outliers)
 
 ### Historical Data Loading
 

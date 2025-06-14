@@ -70,7 +70,7 @@ docker compose -f Docker/docker-compose.yml down
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` in the project root and configure:
+Configure '.env' in project root:
 
 ```bash
 POSTGRES_PASSWORD=your_secure_password
