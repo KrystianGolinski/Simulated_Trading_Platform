@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: timescale/timescaledb:latest-pg15
@@ -26,7 +24,7 @@ services:
 
   fastapi:
     build:
-      context: ./Backend/api
+      context: ../Backend/api
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
@@ -37,34 +35,34 @@ services:
       DATABASE_URL: postgresql://trader:dev_password@postgres:5432/trading_platform
       REDIS_URL: redis://redis:6379
     volumes:
-      - ./Backend/api:/app
+      - ../Backend/api:/app
     networks:
       - trading_network
     command: ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
   cpp-engine:
     build:
-      context: ./Backend/cpp-engine
+      context: ../Backend/cpp-engine
       dockerfile: Dockerfile
     depends_on:
       - postgres
     environment:
       DATABASE_URL: postgresql://trader:dev_password@postgres:5432/trading_platform
     volumes:
-      - ./Backend/cpp-engine:/app
+      - ../Backend/cpp-engine:/app
     networks:
       - trading_network
 
   frontend:
     build:
-      context: ./Frontend/trading-platform-ui
+      context: ../Frontend/trading-platform-ui
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
     depends_on:
       - fastapi
     volumes:
-      - ./Frontend/trading-platform-ui:/app
+      - ../Frontend/trading-platform-ui:/app
       - /app/node_modules
     networks:
       - trading_network

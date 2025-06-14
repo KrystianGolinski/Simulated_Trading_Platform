@@ -2,10 +2,17 @@
 
 echo "Setting up Trading Platform Development Environment with Docker..."
 
-# Change to project root directory if running from Docker folder
-if [[ $(basename "$PWD") == "Docker" ]]; then
-    cd ..
-fi
+# Debug: Show current working directory
+echo "DEBUG: Current directory: $(pwd)"
+echo "DEBUG: Script location: $0"
+echo "DEBUG: Script directory: $(dirname "$0")"
+
+# Always change to project root directory (parent of script's directory)
+cd "$(dirname "$0")/.."
+
+# Debug: Show new working directory
+echo "DEBUG: After cd, current directory: $(pwd)"
+echo "DEBUG: Backend directory exists: $(ls -la | grep Backend || echo 'NOT FOUND')"
 
 # Check if Docker is installed
 if ! command -v docker &> /dev/null; then
@@ -35,7 +42,9 @@ fi
 
 # Build and start development containers
 echo "Building and starting development containers..."
-$COMPOSE_CMD -f Docker/docker-compose.dev.yml up --build -d
+echo "DEBUG: About to run from Docker folder: $COMPOSE_CMD -f docker-compose.dev.yml up --build -d"
+cd Docker
+$COMPOSE_CMD -f docker-compose.dev.yml up --build -d
 
 echo "Development environment started!"
 echo "Services:"
