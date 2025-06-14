@@ -6,8 +6,8 @@
 
 - [x] Set up version control (Git repository)
 - [x] Create project directory structure
-- [ ] Set up C++ development environment and build system (CMake)
-- [ ] Initialize Python virtual environment for FastAPI
+- [x] Set up C++ development environment and build system (CMake)
+- [x] Initialize Python virtual environment for FastAPI
 - [ ] Set up React project with TypeScript template
 - [ ] Configure development containers (Docker) for consistent environments
 

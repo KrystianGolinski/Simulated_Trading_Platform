@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    environment:
+      POSTGRES_DB: trading_platform
+      POSTGRES_USER: trader
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - trading_network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - trading_network
+    restart: unless-stopped
+
+  fastapi:
+    build:
+      context: ./Backend/api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      DATABASE_URL: postgresql://trader:${POSTGRES_PASSWORD}@postgres:5432/trading_platform
+      REDIS_URL: redis://redis:6379
+    networks:
+      - trading_network
+    restart: unless-stopped
+
+  cpp-engine:
+    build:
+      context: ./Backend/cpp-engine
+      dockerfile: Dockerfile
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgresql://trader:${POSTGRES_PASSWORD}@postgres:5432/trading_platform
+    networks:
+      - trading_network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./Frontend/trading-platform-ui
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "80:80"
+    depends_on:
+      - fastapi
+    networks:
+      - trading_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  trading_network:
+    driver: bridge
