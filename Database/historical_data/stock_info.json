@@ -138,5 +138,40 @@
     "exchange": "NMS",
     "currency": "USD",
     "market_cap": 515855908864
+  },
+  "X": {
+    "name": "United States Steel Corporation",
+    "sector": "Basic Materials",
+    "exchange": "NYQ",
+    "currency": "USD",
+    "market_cap": 11816807424
+  },
+  "T": {
+    "name": "AT&T Inc.",
+    "sector": "Communication Services",
+    "exchange": "NYQ",
+    "currency": "USD",
+    "market_cap": 202988863488
+  },
+  "QCOM": {
+    "name": "QUALCOMM Incorporated",
+    "sector": "Technology",
+    "exchange": "NMS",
+    "currency": "USD",
+    "market_cap": 169882566656
+  },
+  "^SPX": {
+    "name": "S&P 500 INDEX",
+    "sector": "",
+    "exchange": "WCB",
+    "currency": "USD",
+    "market_cap": 0
+  },
+  "^NYA": {
+    "name": "NYSE Composite Index",
+    "sector": "",
+    "exchange": "NYS",
+    "currency": "USD",
+    "market_cap": 0
   }
 }

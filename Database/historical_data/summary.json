@@ -1,103 +1,128 @@
 {
   "daily": {
     "AAPL": {
-      "records": 1257,
-      "start_date": "2020-06-15",
+      "records": 2514,
+      "start_date": "2015-06-17",
       "end_date": "2025-06-13"
     },
     "ADBE": {
-      "records": 1257,
-      "start_date": "2020-06-15",
+      "records": 2514,
+      "start_date": "2015-06-17",
       "end_date": "2025-06-13"
     },
     "AMZN": {
-      "records": 1257,
-      "start_date": "2020-06-15",
+      "records": 2514,
+      "start_date": "2015-06-17",
       "end_date": "2025-06-13"
     },
     "BAC": {
-      "records": 1257,
-      "start_date": "2020-06-15",
+      "records": 2514,
+      "start_date": "2015-06-17",
       "end_date": "2025-06-13"
     },
     "CRM": {
-      "records": 1257,
-      "start_date": "2020-06-15",
+      "records": 2514,
+      "start_date": "2015-06-17",
       "end_date": "2025-06-13"
     },
     "DIS": {
-      "records": 1257,
-      "start_date": "2020-06-15",
+      "records": 2514,
+      "start_date": "2015-06-17",
       "end_date": "2025-06-13"
     },
     "GOOGL": {
-      "records": 1257,
-      "start_date": "2020-06-15",
+      "records": 2514,
+      "start_date": "2015-06-17",
       "end_date": "2025-06-13"
     },
     "HD": {
-      "records": 1257,
-      "start_date": "2020-06-15",
+      "records": 2514,
+      "start_date": "2015-06-17",
       "end_date": "2025-06-13"
     },
     "JNJ": {
-      "records": 1257,
-      "start_date": "2020-06-15",
+      "records": 2514,
+      "start_date": "2015-06-17",
       "end_date": "2025-06-13"
     },
     "JPM": {
-      "records": 1257,
-      "start_date": "2020-06-15",
+      "records": 2514,
+      "start_date": "2015-06-17",
       "end_date": "2025-06-13"
     },
     "MA": {
-      "records": 1257,
-      "start_date": "2020-06-15",
+      "records": 2514,
+      "start_date": "2015-06-17",
       "end_date": "2025-06-13"
     },
     "META": {
-      "records": 1257,
-      "start_date": "2020-06-15",
+      "records": 2514,
+      "start_date": "2015-06-17",
       "end_date": "2025-06-13"
     },
     "MSFT": {
-      "records": 1257,
-      "start_date": "2020-06-15",
+      "records": 2514,
+      "start_date": "2015-06-17",
       "end_date": "2025-06-13"
     },
     "NFLX": {
-      "records": 1257,
-      "start_date": "2020-06-15",
+      "records": 2514,
+      "start_date": "2015-06-17",
       "end_date": "2025-06-13"
     },
     "NVDA": {
-      "records": 1257,
-      "start_date": "2020-06-15",
+      "records": 2514,
+      "start_date": "2015-06-17",
       "end_date": "2025-06-13"
     },
     "PG": {
-      "records": 1257,
-      "start_date": "2020-06-15",
+      "records": 2514,
+      "start_date": "2015-06-17",
+      "end_date": "2025-06-13"
+    },
+    "QCOM": {
+      "records": 2514,
+      "start_date": "2015-06-17",
       "end_date": "2025-06-13"
     },
     "TSLA": {
-      "records": 1257,
-      "start_date": "2020-06-15",
+      "records": 2514,
+      "start_date": "2015-06-17",
+      "end_date": "2025-06-13"
+    },
+    "T": {
+      "records": 2514,
+      "start_date": "2015-06-17",
       "end_date": "2025-06-13"
     },
     "UNH": {
-      "records": 1257,
-      "start_date": "2020-06-15",
+      "records": 2514,
+      "start_date": "2015-06-17",
       "end_date": "2025-06-13"
     },
     "V": {
-      "records": 1257,
-      "start_date": "2020-06-15",
+      "records": 2514,
+      "start_date": "2015-06-17",
       "end_date": "2025-06-13"
     },
     "WMT": {
-      "records": 1257,
-      "start_date": "2020-06-15",
+      "records": 2514,
+      "start_date": "2015-06-17",
+      "end_date": "2025-06-13"
+    },
+    "X": {
+      "records": 2514,
+      "start_date": "2015-06-17",
+      "end_date": "2025-06-13"
+    },
+    "^NYA": {
+      "records": 2514,
+      "start_date": "2015-06-17",
+      "end_date": "2025-06-13"
+    },
+    "^SPX": {
+      "records": 2514,
+      "start_date": "2015-06-17",
       "end_date": "2025-06-13"
     }
   },
@@ -182,8 +207,18 @@
       "start_date": "2025-06-05 09:30:00-04:00",
       "end_date": "2025-06-13 15:59:00-04:00"
     },
+    "QCOM": {
+      "records": 2672,
+      "start_date": "2025-06-05 09:30:00-04:00",
+      "end_date": "2025-06-13 15:59:00-04:00"
+    },
     "TSLA": {
       "records": 2686,
+      "start_date": "2025-06-05 09:30:00-04:00",
+      "end_date": "2025-06-13 15:59:00-04:00"
+    },
+    "T": {
+      "records": 2671,
       "start_date": "2025-06-05 09:30:00-04:00",
       "end_date": "2025-06-13 15:59:00-04:00"
     },
@@ -199,6 +234,21 @@
     },
     "WMT": {
       "records": 2671,
+      "start_date": "2025-06-05 09:30:00-04:00",
+      "end_date": "2025-06-13 15:59:00-04:00"
+    },
+    "X": {
+      "records": 2674,
+      "start_date": "2025-06-05 09:30:00-04:00",
+      "end_date": "2025-06-13 15:59:00-04:00"
+    },
+    "^NYA": {
+      "records": 2644,
+      "start_date": "2025-06-05 09:30:00-04:00",
+      "end_date": "2025-06-13 15:59:00-04:00"
+    },
+    "^SPX": {
+      "records": 2681,
       "start_date": "2025-06-05 09:30:00-04:00",
       "end_date": "2025-06-13 15:59:00-04:00"
     }

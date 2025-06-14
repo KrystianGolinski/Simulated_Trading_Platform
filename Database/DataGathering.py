@@ -49,7 +49,7 @@ class FreeDataCollector:
                 }
                 
                 logger.info(f"Fetched info for {symbol}")
-                time.sleep(0.5)
+                time.sleep(1)
                 
             except Exception as e:
                 logger.error(f"Error fetching info for {symbol}: {e}")
@@ -242,12 +242,13 @@ if __name__ == "__main__":
         "AAPL", "MSFT", "GOOGL", "AMZN", "META",
         "TSLA", "NVDA", "JPM", "V", "JNJ",
         "WMT", "PG", "UNH", "HD", "DIS",
-        "MA", "BAC", "ADBE", "CRM", "NFLX"
+        "MA", "BAC", "ADBE", "CRM", "NFLX",
+        "X", "T","QCOM", "^SPX", "^NYA"
     ]
     
-    # Date range for historical data (5 years)
+    # Date range for historical data (10 years)
     END_DATE = datetime.now().strftime("%Y-%m-%d")
-    START_DATE = (datetime.now() - timedelta(days=5*365)).strftime("%Y-%m-%d")
+    START_DATE = (datetime.now() - timedelta(days=10*365)).strftime("%Y-%m-%d")
     
     print(f"Collecting data from {START_DATE} to {END_DATE}")
     
