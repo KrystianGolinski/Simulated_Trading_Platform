@@ -1,0 +1,142 @@
+{
+  "AAPL": {
+    "name": "Apple Inc.",
+    "sector": "Technology",
+    "exchange": "NMS",
+    "currency": "USD",
+    "market_cap": 2934137946112
+  },
+  "MSFT": {
+    "name": "Microsoft Corporation",
+    "sector": "Technology",
+    "exchange": "NMS",
+    "currency": "USD",
+    "market_cap": 3530159292416
+  },
+  "GOOGL": {
+    "name": "Alphabet Inc.",
+    "sector": "Communication Services",
+    "exchange": "NMS",
+    "currency": "USD",
+    "market_cap": 2126188118016
+  },
+  "AMZN": {
+    "name": "Amazon.com, Inc.",
+    "sector": "Consumer Cyclical",
+    "exchange": "NMS",
+    "currency": "USD",
+    "market_cap": 2251738578944
+  },
+  "META": {
+    "name": "Meta Platforms, Inc.",
+    "sector": "Communication Services",
+    "exchange": "NMS",
+    "currency": "USD",
+    "market_cap": 1716960624640
+  },
+  "TSLA": {
+    "name": "Tesla, Inc.",
+    "sector": "Consumer Cyclical",
+    "exchange": "NMS",
+    "currency": "USD",
+    "market_cap": 1047810473984
+  },
+  "NVDA": {
+    "name": "NVIDIA Corporation",
+    "sector": "Technology",
+    "exchange": "NMS",
+    "currency": "USD",
+    "market_cap": 3462307774464
+  },
+  "JPM": {
+    "name": "JPMorgan Chase & Co.",
+    "sector": "Financial Services",
+    "exchange": "NYQ",
+    "currency": "USD",
+    "market_cap": 736319897600
+  },
+  "V": {
+    "name": "Visa Inc.",
+    "sector": "Financial Services",
+    "exchange": "NYQ",
+    "currency": "USD",
+    "market_cap": 675944202240
+  },
+  "JNJ": {
+    "name": "Johnson & Johnson",
+    "sector": "Healthcare",
+    "exchange": "NYQ",
+    "currency": "USD",
+    "market_cap": 377993625600
+  },
+  "WMT": {
+    "name": "Walmart Inc.",
+    "sector": "Consumer Defensive",
+    "exchange": "NYQ",
+    "currency": "USD",
+    "market_cap": 753670881280
+  },
+  "PG": {
+    "name": "The Procter & Gamble Company",
+    "sector": "Consumer Defensive",
+    "exchange": "NYQ",
+    "currency": "USD",
+    "market_cap": 375782866944
+  },
+  "UNH": {
+    "name": "UnitedHealth Group Incorporated",
+    "sector": "Healthcare",
+    "exchange": "NYQ",
+    "currency": "USD",
+    "market_cap": 284415590400
+  },
+  "HD": {
+    "name": "The Home Depot, Inc.",
+    "sector": "Consumer Cyclical",
+    "exchange": "NYQ",
+    "currency": "USD",
+    "market_cap": 352861159424
+  },
+  "DIS": {
+    "name": "The Walt Disney Company",
+    "sector": "Communication Services",
+    "exchange": "NYQ",
+    "currency": "USD",
+    "market_cap": 212026638336
+  },
+  "MA": {
+    "name": "Mastercard Incorporated",
+    "sector": "Financial Services",
+    "exchange": "NYQ",
+    "currency": "USD",
+    "market_cap": 510369333248
+  },
+  "BAC": {
+    "name": "Bank of America Corporation",
+    "sector": "Financial Services",
+    "exchange": "NYQ",
+    "currency": "USD",
+    "market_cap": 332080578560
+  },
+  "ADBE": {
+    "name": "Adobe Inc.",
+    "sector": "Technology",
+    "exchange": "NMS",
+    "currency": "USD",
+    "market_cap": 166934020096
+  },
+  "CRM": {
+    "name": "Salesforce, Inc.",
+    "sector": "Technology",
+    "exchange": "NYQ",
+    "currency": "USD",
+    "market_cap": 247030398976
+  },
+  "NFLX": {
+    "name": "Netflix, Inc.",
+    "sector": "Communication Services",
+    "exchange": "NMS",
+    "currency": "USD",
+    "market_cap": 515855908864
+  }
+}
