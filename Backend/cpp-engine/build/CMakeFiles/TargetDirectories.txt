@@ -1,3 +1,0 @@
-/home/krystian/Desktop/Simulated_Trading_Platform/Backend/cpp-engine/build/CMakeFiles/trading_engine.dir
-/home/krystian/Desktop/Simulated_Trading_Platform/Backend/cpp-engine/build/CMakeFiles/edit_cache.dir
-/home/krystian/Desktop/Simulated_Trading_Platform/Backend/cpp-engine/build/CMakeFiles/rebuild_cache.dir
