@@ -417,9 +417,9 @@ class CSVToPostgreSQLLoader:
 # Example usage
 if __name__ == "__main__":
     # Database configuration matching your architecture
-    DBName = input("Enter DB name: ")
-    DBUsername = input("\nEnter DB username: ")
-    DBPassword = input("\nEnter DB password: ")
+    DBName = input("Enter DB name (default: simulated_trading_platform): ") or "simulated_trading_platform"
+    DBUsername = input("\nEnter DB username (default: trading_user): ") or "trading_user"
+    DBPassword = input("\nEnter DB password (default: trading_password): ") or "trading_password"
     DB_CONFIG = {
         "host": "localhost",
         "database": DBName,
