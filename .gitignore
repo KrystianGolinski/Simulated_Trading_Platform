@@ -110,3 +110,7 @@ Thumbs.db
 htmlcov/
 .pytest_cache/
 .tox/
+
+# Initial documentation
+Project_Documentation/Diagrams/
+Project_Documentation/DOCX files/

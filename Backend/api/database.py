@@ -17,11 +17,11 @@ class DatabaseManager:
         # Get credentials from environment
         self.database_url = os.getenv(
             "DATABASE_URL", 
-            f"postgresql://{os.getenv('DB_USER', 'krystian')}:{os.getenv('DB_PASSWORD', 'your_password')}@localhost:5432/simulated_trading_platform"
+            f"postgresql://{os.getenv('DB_USER', 'trading_user')}:{os.getenv('DB_PASSWORD', 'trading_password')}@localhost:5433/simulated_trading_platform"
         )
     
     async def connect(self):
-        """Initialize database connection pool"""
+        # Initialize database connection pool
         try:
             self.pool = await asyncpg.create_pool(
                 self.database_url,
@@ -37,13 +37,13 @@ class DatabaseManager:
             raise
 
     async def disconnect(self):
-        """Close database connection pool"""
+        # Close database connection pool
         if self.pool:
             await self.pool.close()
             logger.info("Database connection pool closed")
 
     async def execute_query(self, query: str, *args) -> List[Dict[str, Any]]:
-        """Execute a SELECT query and return results as list of dicts"""
+        # Execute a SELECT query and return results as list of dicts
         if not self.pool:
             raise RuntimeError("Database not connected")
         
@@ -52,7 +52,7 @@ class DatabaseManager:
             return [dict(row) for row in rows]
 
     async def execute_command(self, query: str, *args) -> str:
-        """Execute INSERT/UPDATE/DELETE command"""
+        # Execute INSERT/UPDATE/DELETE command
         if not self.pool:
             raise RuntimeError("Database not connected")
         
@@ -61,7 +61,7 @@ class DatabaseManager:
             return result
 
     async def get_available_stocks(self) -> List[str]:
-        """Get list of available stock symbols from price data"""
+        # Get list of available stock symbols from price data
         query = """
             SELECT DISTINCT symbol 
             FROM stock_prices_daily 
@@ -70,9 +70,8 @@ class DatabaseManager:
         results = await self.execute_query(query)
         return [row['symbol'] for row in results]
 
-    async def get_stock_data(self, symbol: str, start_date: date, end_date: date, 
-                           timeframe: str = 'daily') -> List[Dict[str, Any]]:
-        """Get historical stock data for backtesting"""
+    async def get_stock_data(self, symbol: str, start_date: date, end_date: date, timeframe: str = 'daily') -> List[Dict[str, Any]]:
+        # Get historical stock data for backtesting
         
         if timeframe == 'daily':
             table = 'stock_prices_daily'
@@ -96,7 +95,7 @@ class DatabaseManager:
                                    initial_capital: float, start_date: date,
                                    end_date: date, symbols: List[str],
                                    parameters: Dict[str, Any]) -> int:
-        """Create a new trading session and return session ID"""
+        # Create a new trading session and return session ID
         
         query = """
             INSERT INTO trading_sessions 
@@ -118,7 +117,7 @@ class DatabaseManager:
     async def log_trade(self, session_id: int, symbol: str, action: str,
                        quantity: int, price: float, timestamp: datetime,
                        commission: float = 0.0) -> int:
-        """Log a trade execution"""
+        # Log a trade execution
         
         query = """
             INSERT INTO trades_log 
@@ -138,7 +137,7 @@ class DatabaseManager:
             return trade_id
 
     async def get_session_trades(self, session_id: int) -> List[Dict[str, Any]]:
-        """Get all trades for a session"""
+        # Get all trades for a session
         
         query = """
             SELECT symbol, action, quantity, price, commission, trade_time
@@ -150,7 +149,7 @@ class DatabaseManager:
         return await self.execute_query(query, session_id)
 
     async def get_session_results(self, session_id: int) -> Optional[Dict[str, Any]]:
-        """Get session results"""
+        # Get session results
         
         query = """
             SELECT id, start_date, end_date, initial_capital, 
@@ -172,7 +171,7 @@ class DatabaseManager:
         return session
 
     async def health_check(self) -> Dict[str, Any]:
-        """Check database health and return stats"""
+        # Check database health and return stats
         if not self.pool:
             return {"status": "disconnected"}
         
@@ -210,7 +209,7 @@ class DatabaseManager:
 db_manager = DatabaseManager()
 
 async def get_database() -> DatabaseManager:
-    """Dependency injection for FastAPI"""
+    # Dependency injection for FastAPI
     if not db_manager.pool:
         await db_manager.connect()
     return db_manager
