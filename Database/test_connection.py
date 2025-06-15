@@ -32,7 +32,7 @@ def test_database_connection():
         },
         {
             "name": "Docker container IP",
-            "host": "172.17.0.1",
+            "host": "172.18.0.3",
             "database": "simulated_trading_platform",
             "user": "trading_user",
             "password": "trading_password",
