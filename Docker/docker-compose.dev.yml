@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: trading_user
       POSTGRES_PASSWORD: trading_password
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./Database:/docker-entrypoint-initdb.d
@@ -32,7 +32,7 @@ services:
       - postgres
       - redis
     environment:
-      DATABASE_URL: postgresql://trader:dev_password@postgres:5432/trading_platform
+      DATABASE_URL: postgresql://trading_user:trading_password@postgres:5432/simulated_trading_platform
       REDIS_URL: redis://redis:6379
     volumes:
       - ../Backend/api:/app
