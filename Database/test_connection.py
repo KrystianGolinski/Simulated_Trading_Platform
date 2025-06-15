@@ -21,6 +21,22 @@ def test_database_connection():
             "user": "trading_user",
             "password": "trading_password",
             "port": 5433
+        },
+        {
+            "name": "127.0.0.1 (Windows alternative)",
+            "host": "127.0.0.1",
+            "database": "simulated_trading_platform",
+            "user": "trading_user",
+            "password": "trading_password",
+            "port": 5433
+        },
+        {
+            "name": "Docker container IP",
+            "host": "172.17.0.1",
+            "database": "simulated_trading_platform",
+            "user": "trading_user",
+            "password": "trading_password",
+            "port": 5433
         }
     ]
     
