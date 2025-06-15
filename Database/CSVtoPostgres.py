@@ -425,7 +425,7 @@ if __name__ == "__main__":
         "database": DBName,
         "user": DBUsername,
         "password": DBPassword,
-        "port": 5432
+        "port": 5433
     }
     
     # Initialize loader
