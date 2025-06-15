@@ -13,7 +13,7 @@ The trading platform consists of multiple services working together:
 
 ## Environment Setup Completed
 
-### ✅ C++ Development Environment
+### C++ Development Environment
 
 **Location**: `Backend/cpp-engine/`
 
@@ -30,15 +30,7 @@ project(TradingEngine VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 ```
 
-**Testing**:
-```bash
-cd Backend/cpp-engine/build
-make clean && make && ./trading_engine
-```
-
-**Output**: "Trading Engine C++ Backend - Development Environment Ready"
-
-### ✅ Python Virtual Environment & FastAPI
+### Python Virtual Environment & FastAPI
 
 **Location**: `Backend/api/`
 
@@ -58,18 +50,9 @@ make clean && make && ./trading_engine
 - `GET /health` - Health check
 - `GET /docs` - Auto-generated API documentation
 
-**Setup Script**: `setup_env.sh` for easy virtual environment creation
-
-**Testing**:
-```bash
-cd Backend/api
-source venv/bin/activate
-python main.py
-```
-
 **Access**: http://localhost:8000
 
-### ✅ React Frontend with TypeScript
+### React Frontend with TypeScript
 
 **Location**: `Frontend/trading-platform-ui/`
 
@@ -80,25 +63,9 @@ python main.py
   - `chart.js` and `react-chartjs-2` for data visualization
   - Tailwind CSS framework (configured but not active due to compatibility)
 
-**Project Structure**:
-```
-trading-platform-ui/
-├── src/
-├── public/
-├── package.json
-├── tsconfig.json
-└── Dockerfile (multi-stage build)
-```
-
-**Testing**:
-```bash
-cd Frontend/trading-platform-ui
-npm run build
-```
-
 **Access**: http://localhost:3000
 
-### ✅ Docker Development Containers
+### Docker Development Containers
 
 **Configuration Files**:
 - `Docker/docker-compose.dev.yml` - Development environment
@@ -140,142 +107,37 @@ npm run build
 - All services can communicate internally
 - External access via mapped ports
 
-## Environment Files
-
-**`.env.example`** - Template for environment variables:
-```bash
-POSTGRES_PASSWORD=your_secure_password_here
-DATABASE_URL=postgresql://trader:password@localhost:5432/trading_platform
-REDIS_URL=redis://localhost:6379
-NODE_ENV=development
-```
-
 ## Setup Instructions
 
 ### Prerequisites
 - Docker and Docker Compose V2
 - Git (already configured)
 
-### Quick Start
-```bash
-# Clone and navigate to project
-cd /path/to/Simulated_Trading_Platform
-
-# Run automated setup
-./setup.sh
-
-# Services will be available at:
-# Frontend: http://localhost:3000
-# API: http://localhost:8000
-# API Docs: http://localhost:8000/docs
-```
-
-### Manual Setup (Alternative)
-
-1. **C++ Engine**:
-   ```bash
-   cd Backend/cpp-engine/build
-   cmake .. && make
-   ```
-
-2. **FastAPI**:
-   ```bash
-   cd Backend/api
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   python main.py
-   ```
-
-3. **React Frontend**:
-   ```bash
-   cd Frontend/trading-platform-ui
-   npm install
-   npm start
-   ```
-
 ## Testing & Verification
 
 All components have been tested and verified working:
 
-### ✅ C++ Engine
+### C++ Engine
 - Compiles without errors
 - Executable runs successfully
 - CMake build system functional
 
-### ✅ FastAPI Backend  
+### FastAPI Backend  
 - All dependencies install correctly
 - Application starts without errors
 - API endpoints accessible
 - Auto-documentation generated
 
-### ✅ React Frontend
+### React Frontend
 - TypeScript compilation successful
 - Production build completes
 - Development server starts correctly
 
-### ✅ Docker Integration
+### Docker Integration
 - All containers build successfully
 - Services communicate properly
 - Port mapping works correctly
 - Volume persistence configured
-
-## Docker Commands Reference
-
-**Start all services**:
-```bash
-docker compose -f Docker/docker-compose.dev.yml up -d
-```
-
-**Stop all services**:
-```bash
-docker compose -f Docker/docker-compose.dev.yml down
-```
-
-**View logs**:
-```bash
-docker compose -f Docker/docker-compose.dev.yml logs -f [service_name]
-```
-
-**Rebuild specific service**:
-```bash
-docker compose -f Docker/docker-compose.dev.yml up --build [service_name]
-```
-
-## Project Structure Summary
-
-```
-Simulated_Trading_Platform/
-├── Backend/
-│   ├── cpp-engine/          # C++ trading engine
-│   │   ├── src/main.cpp
-│   │   ├── CMakeLists.txt
-│   │   ├── build/           # Compiled binaries
-│   │   └── Dockerfile
-│   └── api/                 # FastAPI backend
-│       ├── main.py
-│       ├── requirements.txt
-│       ├── venv/            # Python virtual environment
-│       ├── setup_env.sh
-│       └── Dockerfile
-├── Frontend/
-│   └── trading-platform-ui/ # React TypeScript app
-│       ├── src/
-│       ├── package.json
-│       └── Dockerfile
-├── Database/
-│   └── historical_data/     # CSV data files
-├── Project_Documentation/
-│   ├── Environment.md       # This file
-│   └── Roadmap1.md         # Implementation roadmap
-├── Docker/                  # Docker configuration
-│   ├── docker-compose.dev.yml # Development containers
-│   ├── docker-compose.yml     # Production containers
-│   ├── docker-setup.sh        # Automated setup script
-│   ├── .env.example           # Environment template
-│   └── README.md              # Docker documentation
-└── setup.sh                # Quick setup script
-```
 
 ## Next Steps
 

@@ -15,14 +15,14 @@
 ### Database Setup
 
 - [x] Install PostgreSQL locally with TimescaleDB extension
-- [x] Create TimescaleDB database: `simulated_trading_platform`
+- [x] Create TimescaleDB database
 - [x] Create database schema for:
-  - [x] Stock metadata table (stocks) - created but empty
-  - [x] Historical price data tables (stock_prices_daily, stock_prices_1min) - populated
-  - [x] Trading sessions table - created but empty
-  - [x] Trades log table - created but empty
+  - [x] Stock metadata table (stocks)
+  - [x] Historical price data tables
+  - [x] Trading sessions table
+  - [x] Trades log table
 - [x] Set up hypertables and indexes for time-series optimization
-- [x] Create database connection utilities in Python (asyncpg with connection pooling)
+- [x] Create database connection utilities in Python
 - [ ] Set up Redis for caching layer
 
 ## Data Pipeline & Storage
@@ -30,19 +30,18 @@
 ### Data Source Integration
 
 - [x] Use Yahoo Finance API for data collection
-- [x] Create Python scripts for data fetching (DataGathering.py)
-- [x] Implement data validation functions (data_integrity_verification.py)
-- [x] Build comprehensive data cleaning pipeline (data_cleaning.py)
+- [x] Create Python scripts for data fetching
+- [x] Implement data validation functions
+- [x] Build comprehensive data cleaning pipeline
 
 ### Historical Data Loading
 
-- [x] Download 10-year dataset for 25 stocks (AAPL, MSFT, GOOGL, etc.)
+- [x] Download 10-year dataset for 25 stocks
 - [x] Implement data cleaning routines:
   - [x] Handle stock splits and dividends
   - [x] Adjust for missing trading days
   - [x] Normalize price data
-- [x] Create batch import process to PostgreSQL (CSVtoPostgres.py)
-- [x] Successfully loaded 62,850 daily records + 13,342 intraday records
+- [x] Create batch import process to PostgreSQL
 - [x] Verify data integrity with test queries
 - [ ] Set up automated daily data updates
 
@@ -121,11 +120,11 @@
 
 ### Project Setup
 
-- [ ] Configure React Router for navigation
-- [ ] Set up Axios for API communication
-- [ ] Install charting library (Chart.js or Recharts)
-- [ ] Configure Tailwind CSS
-- [ ] Set up basic component structure
+- [x] Configure React Router for navigation
+- [x] Set up Axios for API communication
+- [x] Install charting library (Chart.js or Recharts)
+- [x] Configure Tailwind CSS
+- [x] Set up basic component structure
 
 ### Core Components
 

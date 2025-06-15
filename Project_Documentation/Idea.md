@@ -121,7 +121,7 @@ A website application featuring simulated stock market trading that allows users
 
 ## Implementation Roadmap
 
-### Phase 1: Foundation (Months 1–2)
+### Phase 1: Foundation
 
 - Set up database schema and data pipeline  
 - Implement core simulation engine in C++  
@@ -129,7 +129,7 @@ A website application featuring simulated stock market trading that allows users
 - Build simple React frontend with basic charts  
 - Implement first trading algorithm (MA Crossover)  
 
-### Phase 2: Core Features (Months 3–4)
+### Phase 2: Core Features
 
 - Add transaction cost modeling  
 - Implement 2–3 additional basic strategies  
@@ -137,7 +137,7 @@ A website application featuring simulated stock market trading that allows users
 - Add portfolio-level risk management  
 - Develop trade visualization components  
 
-### Phase 3: Advanced Features (Months 5–6)
+### Phase 3: Advanced Features
 
 - Implement advanced trading strategies  
 - Add Monte Carlo analysis for strategy robustness  
@@ -145,7 +145,7 @@ A website application featuring simulated stock market trading that allows users
 - Implement real-time simulation progress  
 - Add export functionality for results  
 
-### Phase 4: Polish & Optimization (Month 7+)
+### Phase 4: Polish & Optimization
 
 - Performance optimization for large-scale backtests  
 - Advanced caching strategies  

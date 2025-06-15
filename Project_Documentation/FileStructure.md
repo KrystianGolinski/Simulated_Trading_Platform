@@ -3,8 +3,6 @@
 ```
 Simulated_Trading_Platform/
 ├── .git/
-├── .github/
-│   └── workflows/
 ├── Backend/
 │   ├── api/
 │   │   ├── __pycache__/
@@ -12,11 +10,10 @@ Simulated_Trading_Platform/
 │   │   ├── .dockerignore
 │   │   ├── Dockerfile
 │   │   ├── main.py
-│   │   ├── README.md
+        ├── database.py
 │   │   ├── requirements.txt
 │   │   └── setup_env.sh
 │   ├── cpp-engine/
-│   │   ├── build/
 │   │   ├── include/
 │   │   └── src/
 │            ├── main.cpp
@@ -32,13 +29,16 @@ Simulated_Trading_Platform/
 │        ├── stock_info.json
 │        └── summary.json
 │   ├── CSVtoPostgres.py
-│   └── DataGathering.py
+    ├── data_cleaning.py
+    ├── data_integrity_verification.py
+    ├── data_utils.py
+    ├── DataGathering.py
+    ├── test_connection.py
+│   └── init.sql
 ├── Docker/
-│   ├── .env.example
 │   ├── docker-compose.dev.yaml
 │   ├── docker-compose.yaml
-│   ├── docker-setup.sh
-│   └── README.md
+│   └── docker-setup.sh
 ├── Frontend/
 │   └── trading-platform-ui/
 │       ├── node_modules/
@@ -49,31 +49,16 @@ Simulated_Trading_Platform/
 │       ├── Dockerfile
 │       ├── package.json
 │       ├── package-lock.json
-│       ├── README.md
 │       └── tsconfig.json
 ├── Project_Documentation/
-│   ├── Diagrams/
-│   │   ├── DataFlowDiagram.png
-│   │   ├── ErrorHandlingAndRecoveryDiagram.png
-│   │   ├── MemoryLayoutDiagram.png
-│   │   ├── MonitoringAndMetricsDiagram.png
-│        ├── PartialDatabaseDesignDiagram.png
-│   │   ├── StrategyGenerationPipelineDiagram.png
-│   │   └── TestingDiagram.png
-│   ├── DOCX files/
-│       ├── Directory_Structure.docx
-│        ├── KnowledgeGuide.docx
-│        ├── OptimisationsGuide.docx
-│        ├── Phase1_RoadMap.docx
-│        └── Project_Idea.docx
 │   ├── Environment.md
-│    ├── FileStructure.md
+│   ├── FileStructure.md
 │   ├── Idea.md
 │   ├── Knowledge.md
 │   ├── Optimisations.md
 │   └── Roadmap1.md
-├── Scripts/
 ├── .env
+├── .env.example
 ├── .gitignore
 ├── README.md
 └── setup.sh
