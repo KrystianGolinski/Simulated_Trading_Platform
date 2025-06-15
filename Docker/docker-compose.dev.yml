@@ -48,8 +48,6 @@ services:
       - postgres
     environment:
       DATABASE_URL: postgresql://trader:dev_password@postgres:5432/trading_platform
-    volumes:
-      - ../Backend/cpp-engine:/app
     networks:
       - trading_network
 
