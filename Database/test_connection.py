@@ -2,9 +2,8 @@
 import psycopg2
 
 def test_database_connection():
-    """Test PostgreSQL connection with current configuration"""
+    # Test PostgreSQL connection using various configurations
     
-    # Test with localhost (Linux/standard Docker)
     configs = [
         {
             "name": "localhost",
@@ -72,10 +71,7 @@ if __name__ == "__main__":
     successful_config = test_database_connection()
     
     if successful_config:
-        print(f"\nUse this configuration in CSVtoPostgres.py:")
+        print(f"\nUse this configuration:")
         print(f"   host: '{successful_config['host']}'")
     else:
         print("\nAll connection attempts failed. Check:")
-        print("   1. Docker containers are running: docker ps")
-        print("   2. Port 5433 is accessible")
-        print("   3. Database credentials are correct")

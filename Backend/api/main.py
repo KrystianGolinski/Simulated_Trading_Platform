@@ -19,12 +19,12 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database connection on startup"""
+    # Initialize database connection on startup
     await get_database()
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Close database connection on shutdown"""
+    # Close database connection on shutdown
     from database import db_manager
     await db_manager.disconnect()
 
@@ -34,7 +34,7 @@ async def root():
 
 @app.get("/health")
 async def health_check(db: DatabaseManager = Depends(get_database)):
-    """Enhanced health check with database status"""
+    # Enhanced health check with database status
     db_health = await db.health_check()
     return {
         "status": "healthy" if db_health["status"] == "healthy" else "degraded",
@@ -44,7 +44,7 @@ async def health_check(db: DatabaseManager = Depends(get_database)):
 
 @app.get("/stocks")
 async def get_stocks(db: DatabaseManager = Depends(get_database)) -> List[str]:
-    """Get list of available stock symbols"""
+    # Get list of available stock symbols
     return await db.get_available_stocks()
 
 @app.get("/stocks/{symbol}/data")
@@ -55,7 +55,7 @@ async def get_stock_data(
     timeframe: str = "daily",
     db: DatabaseManager = Depends(get_database)
 ) -> List[Dict[str, Any]]:
-    """Get historical stock data"""
+    # Get historical stock data
     from datetime import datetime
     
     start = datetime.fromisoformat(start_date).date()

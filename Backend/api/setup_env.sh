@@ -1,8 +1,6 @@
 #!/bin/bash
 
 # Setup script for FastAPI development environment
-# Run this script after installing python3-venv package
-
 echo "Setting up Python virtual environment for FastAPI..."
 
 # Create virtual environment
@@ -18,5 +16,3 @@ pip install --upgrade pip
 pip install -r requirements.txt
 
 echo "Virtual environment setup complete!"
-echo "To activate: source venv/bin/activate"
-echo "To run the API: python main.py"

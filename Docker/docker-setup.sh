@@ -34,9 +34,6 @@ echo "Building and starting containers..."
 cd Docker
 $COMPOSE_CMD -f docker-compose.dev.yml up --build -d
 
-echo ""
-echo "Development environment ready!"
-echo ""
 echo "Services available:"
 echo "Frontend:    http://localhost:3000"
 echo "FastAPI:     http://localhost:8000"
