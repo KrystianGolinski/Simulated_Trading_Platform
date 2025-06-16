@@ -1,5 +1,7 @@
 services:
   postgres:
+    env_file:
+      - ../.env
     container_name: trading-db
     image: timescale/timescaledb:latest-pg15
     environment:
@@ -15,6 +17,8 @@ services:
       - trading_network
 
   redis:
+    env_file:
+      - ../.env
     container_name: trading-cache
     image: redis:7-alpine
     ports:
@@ -25,6 +29,8 @@ services:
       - trading_network
 
   fastapi:
+    env_file:
+      - ../.env
     container_name: trading-api
     build:
       context: ../Backend/api
@@ -44,6 +50,8 @@ services:
     command: ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
   cpp-engine:
+    env_file:
+      - ../.env
     container_name: trading-engine
     build:
       context: ../Backend/cpp-engine
@@ -56,10 +64,13 @@ services:
       - trading_network
 
   frontend:
+    env_file:
+      - ../.env
     container_name: trading-ui
     build:
       context: ../Frontend/trading-platform-ui
       dockerfile: Dockerfile
+      target: development
     ports:
       - "3000:3000"
     depends_on:
@@ -71,6 +82,7 @@ services:
       - trading_network
     environment:
       - CHOKIDAR_USEPOLLING=true
+      - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:8000}
 
 volumes:
   postgres_data:

@@ -2,6 +2,8 @@ version: '3.8'
 
 services:
   postgres:
+    env_file:
+      - ../.env
     container_name: trading-db
     image: timescale/timescaledb:latest-pg15
     environment:
@@ -17,6 +19,8 @@ services:
     restart: unless-stopped
 
   redis:
+    env_file:
+      - ../.env
     container_name: trading-cache
     image: redis:7-alpine
     ports:
@@ -28,6 +32,8 @@ services:
     restart: unless-stopped
 
   fastapi:
+    env_file:
+      - ../.env
     container_name: trading-api
     build:
       context: ./Backend/api
@@ -45,6 +51,8 @@ services:
     restart: unless-stopped
 
   cpp-engine:
+    env_file:
+      - ../.env
     container_name: trading-engine
     build:
       context: ./Backend/cpp-engine
@@ -58,11 +66,15 @@ services:
     restart: unless-stopped
 
   frontend:
+    env_file:
+      - ../.env
     container_name: trading-ui
     build:
       context: ./Frontend/trading-platform-ui
       dockerfile: Dockerfile
       target: production
+      args:
+        - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:8000}
     ports:
       - "80:80"
     depends_on:

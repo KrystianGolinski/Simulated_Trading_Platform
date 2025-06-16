@@ -43,7 +43,6 @@
   - [x] Normalize price data
 - [x] Create batch import process to PostgreSQL
 - [x] Verify data integrity with test queries
-- [ ] Set up automated daily data updates
 
 ## Core Simulation Engine (C++)
 
@@ -128,16 +127,16 @@
 
 ### Core Components
 
-- [ ] Create simulation setup form:
-  - [ ] Starting capital input
-  - [ ] Date range selector
-  - [ ] Stock selection (multi-select)
-  - [ ] Strategy parameters (MA periods)
-- [ ] Build simulation progress indicator
-- [ ] Implement results display page:
-  - [ ] Final portfolio value
-  - [ ] Total return percentage
-  - [ ] Basic equity curve chart
+- [x] Create simulation setup form:
+  - [x] Starting capital input
+  - [x] Date range selector
+  - [x] Stock selection (multi-select)
+  - [x] Strategy parameters (MA periods)
+- [x]Build simulation progress indicator
+- [x] Implement results display page:
+  - [x] Final portfolio value
+  - [x] Total return percentage
+  - [x] Basic equity curve chart
 
 ### API Integration
 
