@@ -1,5 +1,5 @@
 # Multi-stage build for optimized production
-FROM node:20-alpine as build
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
@@ -19,7 +19,7 @@ ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm run build
 
 # Production stage with nginx for better performance
-FROM nginx:alpine as production
+FROM nginx:alpine AS production
 
 # Copy custom nginx config
 COPY --from=build /app/build /usr/share/nginx/html
@@ -44,7 +44,7 @@ EXPOSE 3000
 CMD ["nginx", "-g", "daemon off;"]
 
 # Development stage with hot reload
-FROM node:20-alpine as development
+FROM node:20-alpine AS development
 
 WORKDIR /app
 
