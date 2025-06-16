@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   postgres:
+    container_name: trading-db
     image: timescale/timescaledb:latest-pg15
     environment:
       POSTGRES_DB: simulated_trading_platform
@@ -16,6 +17,7 @@ services:
     restart: unless-stopped
 
   redis:
+    container_name: trading-cache
     image: redis:7-alpine
     ports:
       - "6379:6379"
@@ -26,6 +28,7 @@ services:
     restart: unless-stopped
 
   fastapi:
+    container_name: trading-api
     build:
       context: ./Backend/api
       dockerfile: Dockerfile
@@ -42,6 +45,7 @@ services:
     restart: unless-stopped
 
   cpp-engine:
+    container_name: trading-engine
     build:
       context: ./Backend/cpp-engine
       dockerfile: Dockerfile
@@ -54,6 +58,7 @@ services:
     restart: unless-stopped
 
   frontend:
+    container_name: trading-ui
     build:
       context: ./Frontend/trading-platform-ui
       dockerfile: Dockerfile
