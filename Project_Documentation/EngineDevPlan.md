@@ -1,23 +1,5 @@
 # C++ Simulation Engine Development Plan
 
-## Overview
-This document provides a comprehensive step-by-step plan to build the C++ simulation engine from scratch, integrate it with the existing FastAPI backend, and test throughout development.
-
-## Current State Assessment
-- ✅ Frontend: Complete with mock data integration
-- ✅ Database: TimescaleDB with historical data loaded
-- ✅ FastAPI: Basic endpoints working (`/health`, `/stocks`, `/stocks/{symbol}/data`)
-- ❌ C++ Engine: Only placeholder `main.cpp`
-- ❌ Simulation Logic: No trading algorithms implemented
-- ❌ Integration: Missing simulation endpoints in FastAPI
-
-## Development Strategy: Incremental Build & Test
-
-### Philosophy
-Build the engine in small, testable increments. Each phase should produce a working system that can be tested end-to-end with the frontend.
-
----
-
 ## Phase 1: Core Data Structures
 
 ### Goal
@@ -412,17 +394,23 @@ echo "Build complete. Run ./trading_engine --help for usage."
 
 ### Phase Completion Criteria
 
-**Phase 1:** ✅ Basic classes compile and pass unit tests
+**Phase 1:** 
+Basic classes compile and pass unit tests
 
-**Phase 2:** ✅ Can read stock data from database
+**Phase 2:** 
+Can read stock data from database
 
-**Phase 3:** ✅ Can generate buy/sell signals
+**Phase 3:** 
+Can generate buy/sell signals
 
-**Phase 4:** ✅ Can run complete backtest
+**Phase 4:** 
+Can run complete backtest
 
-**Phase 5:** ✅ FastAPI can call C++ engine
+**Phase 5:** 
+FastAPI can call C++ engine
 
-**Phase 6:** ✅ Frontend displays real simulation results
+**Phase 6:** 
+Frontend displays real simulation results
 
 ### Final Success Criteria
 - [ ] 1-year backtest on 5 stocks completes in < 10 seconds
@@ -447,16 +435,3 @@ echo "Build complete. Run ./trading_engine --help for usage."
 2. **Database Performance:** Optimize queries, add indexing
 3. **Integration Complexity:** Use subprocess for MVP, optimize later
 4. **Memory Management:** Use smart pointers, regular valgrind checks
-
-## Next Steps
-
-### Immediate Actions
-1. Set up C++ project structure and build system
-2. Implement basic Position and Portfolio classes
-3. Create unit tests and verify compilation
-
-### Phase 1 Deliverable
-- C++ classes compile successfully
-- Basic unit tests pass
-- Can create portfolio and add positions
-- Integration test: C++ outputs JSON that frontend can parse

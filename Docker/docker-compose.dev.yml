@@ -59,7 +59,11 @@ services:
     depends_on:
       - postgres
     environment:
-      DATABASE_URL: postgresql://trader:dev_password@postgres:5432/trading_platform
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: simulated_trading_platform
+      DB_USER: trading_user
+      DB_PASSWORD: trading_password
     networks:
       - trading_network
 

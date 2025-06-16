@@ -1,10 +1,95 @@
 #include <iostream>
+#include <string>
+#include <algorithm>
+#include "database_connection.h"
+#include "market_data.h"
 #include "trading_engine.h"
 
-int main(int argc, char* argv[]) {
-    std::cout << "Trading Engine C++ Backend - Phase 1 Implementation" << std::endl;
+// Helper function to parse command line arguments
+void parseArguments(int argc, char* argv[], std::string& symbol, std::string& start_date, std::string& end_date) {
+    for (int i = 1; i < argc - 1; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--symbol" && i + 1 < argc) {
+            symbol = argv[++i];
+        } else if (arg == "--start" && i + 1 < argc) {
+            start_date = argv[++i];
+        } else if (arg == "--end" && i + 1 < argc) {
+            end_date = argv[++i];
+        }
+    }
+}
+
+// Function to test database connectivity
+void testDatabase(const std::string& symbol, const std::string& start_date, const std::string& end_date) {
+    std::cout << "Testing database connectivity..." << std::endl;
     
     try {
+        MarketData market_data;
+        
+        // Test database connection
+        if (!market_data.testDatabaseConnection()) {
+            std::cout << "[FAIL] Database connection failed" << std::endl;
+            return;
+        }
+        std::cout << "[PASS] Database connection successful" << std::endl;
+        
+        // Test symbol existence
+        if (!symbol.empty()) {
+            if (market_data.symbolExists(symbol)) {
+                std::cout << "[PASS] Symbol " << symbol << " exists in database" << std::endl;
+                
+                // Get data summary
+                auto summary = market_data.getDataSummary(symbol, start_date, end_date);
+                std::cout << "Data Summary:" << std::endl;
+                std::cout << summary.dump(2) << std::endl;
+                
+            } else {
+                std::cout << "[FAIL] Symbol " << symbol << " not found in database" << std::endl;
+            }
+        }
+        
+        // Show available symbols
+        auto symbols = market_data.getAvailableSymbols();
+        std::cout << "Available symbols (" << symbols.size() << " total):" << std::endl;
+        for (size_t i = 0; i < std::min(symbols.size(), size_t(10)); ++i) {
+            std::cout << "  - " << symbols[i] << std::endl;
+        }
+        if (symbols.size() > 10) {
+            std::cout << "  ... and " << (symbols.size() - 10) << " more" << std::endl;
+        }
+        
+        // Show database info
+        auto db_info = market_data.getDatabaseInfo();
+        std::cout << "Database Info:" << std::endl;
+        std::cout << db_info.dump(2) << std::endl;
+        
+    } catch (const std::exception& e) {
+        std::cout << "[ERROR] Database test failed: " << e.what() << std::endl;
+    }
+}
+
+int main(int argc, char* argv[]) {
+    std::cout << "Trading Engine C++ Backend - Phase 2 Implementation" << std::endl;
+    
+    try {
+        if (argc > 1) {
+            std::string command = argv[1];
+            
+            if (command == "--test-db") {
+                // Parse additional arguments for database testing
+                std::string symbol, start_date, end_date;
+                parseArguments(argc, argv, symbol, start_date, end_date);
+                
+                // Set defaults if not provided
+                if (symbol.empty()) symbol = "AAPL";
+                if (start_date.empty()) start_date = "2023-01-01";
+                if (end_date.empty()) end_date = "2023-12-31";
+                
+                testDatabase(symbol, start_date, end_date);
+                return 0;
+            }
+        }
+        
         // Create trading engine with $10,000 initial capital
         TradingEngine engine(10000.0);
         
@@ -18,15 +103,25 @@ int main(int argc, char* argv[]) {
         } else {
             // Show help
             std::cout << "\nUsage:" << std::endl;
-            std::cout << "  " << argv[0] << " --simulate    Run simulation and output JSON" << std::endl;
-            std::cout << "  " << argv[0] << " --status      Show portfolio status" << std::endl;
-            std::cout << "  " << argv[0] << " --help        Show this help" << std::endl;
-            std::cout << "\nPhase 1 Features:" << std::endl;
+            std::cout << "  " << argv[0] << " --simulate              Run simulation and output JSON" << std::endl;
+            std::cout << "  " << argv[0] << " --status                Show portfolio status" << std::endl;
+            std::cout << "  " << argv[0] << " --test-db [options]     Test database connectivity" << std::endl;
+            std::cout << "  " << argv[0] << " --help                  Show this help" << std::endl;
+            std::cout << "\nDatabase Test Options:" << std::endl;
+            std::cout << "  --symbol SYMBOL   Test specific symbol (default: AAPL)" << std::endl;
+            std::cout << "  --start DATE      Start date (default: 2023-01-01)" << std::endl;
+            std::cout << "  --end DATE        End date (default: 2023-12-31)" << std::endl;
+            std::cout << "\nPhase 2 Features:" << std::endl;
+            std::cout << "  [DONE] PostgreSQL/TimescaleDB connection" << std::endl;
+            std::cout << "  [DONE] Historical stock data access" << std::endl;
+            std::cout << "  [DONE] Real-time price queries" << std::endl;
+            std::cout << "  [DONE] Data validation and caching" << std::endl;
+            std::cout << "  [DONE] JSON output for frontend integration" << std::endl;
+            std::cout << "\nPrevious Features:" << std::endl;
             std::cout << "  ✓ Position management (buy/sell shares)" << std::endl;
             std::cout << "  ✓ Portfolio tracking (cash + positions)" << std::endl;
             std::cout << "  ✓ Order management (buy/sell orders)" << std::endl;
             std::cout << "  ✓ Basic value calculations" << std::endl;
-            std::cout << "  ✓ JSON output for frontend integration" << std::endl;
         }
         
     } catch (const std::exception& e) {

@@ -17,6 +17,7 @@ set(CORE_SOURCES
     src/order.cpp
     src/market_data.cpp
     src/trading_engine.cpp
+    src/database_connection.cpp
 )
 
 set(CORE_HEADERS
@@ -25,6 +26,7 @@ set(CORE_HEADERS
     include/order.h
     include/market_data.h
     include/trading_engine.h
+    include/database_connection.h
 )
 
 # Main executable
@@ -33,12 +35,36 @@ add_executable(trading_engine src/main.cpp ${CORE_SOURCES} ${CORE_HEADERS})
 # Test executable
 add_executable(test_basic tests/test_basic.cpp ${CORE_SOURCES} ${CORE_HEADERS})
 
-# JSON library (header-only, will be system-installed)
-# target_link_libraries(trading_engine nlohmann_json::nlohmann_json)
+# Phase 2: Database Integration
+# Find required packages
+find_package(PkgConfig REQUIRED)
 
-# Database dependencies will be added in Phase 2
-# find_package(PkgConfig REQUIRED)
-# pkg_check_modules(PQXX REQUIRED libpqxx)
-# target_link_libraries(trading_engine ${PQXX_LIBRARIES})
-# target_include_directories(trading_engine PRIVATE ${PQXX_INCLUDE_DIRS})
-# target_compile_options(trading_engine PRIVATE ${PQXX_CFLAGS_OTHER})
+# PostgreSQL client library
+pkg_check_modules(LIBPQ REQUIRED libpq)
+
+# JSON library (header-only)
+find_package(nlohmann_json 3.2.0 QUIET)
+if(NOT nlohmann_json_FOUND)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(NLOHMANN_JSON REQUIRED nlohmann_json)
+endif()
+
+# Link libraries to main executable
+if(nlohmann_json_FOUND)
+    target_link_libraries(trading_engine ${LIBPQ_LIBRARIES} nlohmann_json::nlohmann_json)
+else()
+    target_link_libraries(trading_engine ${LIBPQ_LIBRARIES})
+    target_include_directories(trading_engine PRIVATE ${NLOHMANN_JSON_INCLUDE_DIRS})
+endif()
+target_include_directories(trading_engine PRIVATE ${LIBPQ_INCLUDE_DIRS})
+target_compile_options(trading_engine PRIVATE ${LIBPQ_CFLAGS_OTHER})
+
+# Link libraries to test executable
+if(nlohmann_json_FOUND)
+    target_link_libraries(test_basic ${LIBPQ_LIBRARIES} nlohmann_json::nlohmann_json)
+else()
+    target_link_libraries(test_basic ${LIBPQ_LIBRARIES})
+    target_include_directories(test_basic PRIVATE ${NLOHMANN_JSON_INCLUDE_DIRS})
+endif()
+target_include_directories(test_basic PRIVATE ${LIBPQ_INCLUDE_DIRS})
+target_compile_options(test_basic PRIVATE ${LIBPQ_CFLAGS_OTHER})
