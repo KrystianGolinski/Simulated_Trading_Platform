@@ -7,28 +7,7 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include "database_connection.h"
-
-/**
- * Represents a single price data point
- */
-struct PriceData {
-    std::string date;
-    std::string symbol;
-    double open;
-    double high;
-    double low;
-    double close;
-    long volume;
-    
-    // Default constructor
-    PriceData() : open(0.0), high(0.0), low(0.0), close(0.0), volume(0) {}
-    
-    // Constructor from database row
-    PriceData(const std::map<std::string, std::string>& row);
-    
-    // JSON conversion
-    nlohmann::json toJson() const;
-};
+#include "technical_indicators.h"
 
 /**
  * MarketData class handles historical price data access from PostgreSQL/TimescaleDB.
@@ -72,27 +51,27 @@ public:
     std::map<std::string, double> getCurrentPrices() const;
     std::map<std::string, double> getCurrentPrices(const std::vector<std::string>& symbols) const;
     
-    // Historical data access
-    std::vector<PriceData> getHistoricalPrices(
+    // Historical data access (returns database format for conversion to PriceData)
+    std::vector<std::map<std::string, std::string>> getHistoricalPrices(
         const std::string& symbol,
         const std::string& start_date,
         const std::string& end_date
     ) const;
     
-    std::map<std::string, std::vector<PriceData>> getHistoricalPrices(
+    std::map<std::string, std::vector<std::map<std::string, std::string>>> getHistoricalPrices(
         const std::vector<std::string>& symbols,
         const std::string& start_date,
         const std::string& end_date
     ) const;
     
     // Date range utilities
-    std::vector<PriceData> getPricesForDateRange(
+    std::vector<std::map<std::string, std::string>> getPricesForDateRange(
         const std::string& symbol,
         const std::string& start_date,
         const std::string& end_date
     ) const;
     
-    PriceData getPriceForDate(const std::string& symbol, const std::string& date) const;
+    std::map<std::string, std::string> getPriceForDate(const std::string& symbol, const std::string& date) const;
     
     // Symbol validation and discovery
     bool symbolExists(const std::string& symbol) const;

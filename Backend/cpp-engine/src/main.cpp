@@ -6,16 +6,66 @@
 #include "trading_engine.h"
 
 // Helper function to parse command line arguments
-void parseArguments(int argc, char* argv[], std::string& symbol, std::string& start_date, std::string& end_date) {
-    for (int i = 1; i < argc - 1; ++i) {
+void parseArguments(int argc, char* argv[], std::string& symbol, std::string& start_date, std::string& end_date, double& capital) {
+    for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
-        if (arg == "--symbol" && i + 1 < argc) {
+        
+        // Handle --key=value format
+        if (arg.find("--symbol=") == 0) {
+            symbol = arg.substr(9); // Remove "--symbol="
+        } else if (arg.find("--start=") == 0) {
+            start_date = arg.substr(8); // Remove "--start="
+        } else if (arg.find("--end=") == 0) {
+            end_date = arg.substr(6); // Remove "--end="
+        } else if (arg.find("--capital=") == 0) {
+            capital = std::stod(arg.substr(10)); // Remove "--capital="
+        }
+        // Handle --key value format
+        else if (arg == "--symbol" && i + 1 < argc) {
             symbol = argv[++i];
         } else if (arg == "--start" && i + 1 < argc) {
             start_date = argv[++i];
         } else if (arg == "--end" && i + 1 < argc) {
             end_date = argv[++i];
+        } else if (arg == "--capital" && i + 1 < argc) {
+            capital = std::stod(argv[++i]);
         }
+    }
+}
+
+// Function to run backtest
+void runBacktest(const std::string& symbol, const std::string& start_date, const std::string& end_date, double capital) {
+    std::cout << "Running backtest..." << std::endl;
+    std::cout << "Symbol: " << symbol << std::endl;
+    std::cout << "Period: " << start_date << " to " << end_date << std::endl;
+    std::cout << "Starting Capital: $" << capital << std::endl;
+    
+    try {
+        TradingEngine engine(capital);
+        
+        // Configure backtest
+        BacktestConfig config;
+        config.symbol = symbol;
+        config.start_date = start_date;
+        config.end_date = end_date;
+        config.starting_capital = capital;
+        config.strategy_name = "ma_crossover";
+        
+        // Set strategy parameters
+        config.strategy_config.setParameter("short_period", 20);
+        config.strategy_config.setParameter("long_period", 50);
+        config.strategy_config.max_position_size = 0.1;
+        config.strategy_config.enable_risk_management = true;
+        
+        // Run backtest
+        BacktestResult result = engine.runBacktest(config);
+        
+        // Output results as JSON
+        nlohmann::json json_result = engine.getBacktestResultsAsJson(result);
+        std::cout << json_result.dump(2) << std::endl;
+        
+    } catch (const std::exception& e) {
+        std::cout << "[ERROR] Backtest failed: " << e.what() << std::endl;
     }
 }
 
@@ -69,7 +119,7 @@ void testDatabase(const std::string& symbol, const std::string& start_date, cons
 }
 
 int main(int argc, char* argv[]) {
-    std::cout << "Trading Engine C++ Backend - Phase 2 Implementation" << std::endl;
+    std::cout << "Trading Engine C++ Backend - Phase 3 Implementation" << std::endl;
     
     try {
         if (argc > 1) {
@@ -78,7 +128,8 @@ int main(int argc, char* argv[]) {
             if (command == "--test-db") {
                 // Parse additional arguments for database testing
                 std::string symbol, start_date, end_date;
-                parseArguments(argc, argv, symbol, start_date, end_date);
+                double capital = 10000.0;
+                parseArguments(argc, argv, symbol, start_date, end_date, capital);
                 
                 // Set defaults if not provided
                 if (symbol.empty()) symbol = "AAPL";
@@ -86,6 +137,19 @@ int main(int argc, char* argv[]) {
                 if (end_date.empty()) end_date = "2023-12-31";
                 
                 testDatabase(symbol, start_date, end_date);
+                return 0;
+            } else if (command == "--backtest") {
+                // Parse additional arguments for backtesting
+                std::string symbol, start_date, end_date;
+                double capital = 10000.0;
+                parseArguments(argc, argv, symbol, start_date, end_date, capital);
+                
+                // Set defaults if not provided
+                if (symbol.empty()) symbol = "AAPL";
+                if (start_date.empty()) start_date = "2023-01-01";
+                if (end_date.empty()) end_date = "2023-12-31";
+                
+                runBacktest(symbol, start_date, end_date, capital);
                 return 0;
             }
         }
@@ -106,11 +170,20 @@ int main(int argc, char* argv[]) {
             std::cout << "  " << argv[0] << " --simulate              Run simulation and output JSON" << std::endl;
             std::cout << "  " << argv[0] << " --status                Show portfolio status" << std::endl;
             std::cout << "  " << argv[0] << " --test-db [options]     Test database connectivity" << std::endl;
+            std::cout << "  " << argv[0] << " --backtest [options]    Run backtest with moving average strategy" << std::endl;
             std::cout << "  " << argv[0] << " --help                  Show this help" << std::endl;
-            std::cout << "\nDatabase Test Options:" << std::endl;
-            std::cout << "  --symbol SYMBOL   Test specific symbol (default: AAPL)" << std::endl;
+            std::cout << "\nOptions:" << std::endl;
+            std::cout << "  --symbol SYMBOL   Stock symbol to analyze (default: AAPL)" << std::endl;
             std::cout << "  --start DATE      Start date (default: 2023-01-01)" << std::endl;
             std::cout << "  --end DATE        End date (default: 2023-12-31)" << std::endl;
+            std::cout << "  --capital AMOUNT  Starting capital (default: 10000)" << std::endl;
+            std::cout << "\nPhase 3 Features:" << std::endl;
+            std::cout << "  [DONE] Technical indicators (SMA, EMA, RSI)" << std::endl;
+            std::cout << "  [DONE] Moving average crossover strategy" << std::endl;
+            std::cout << "  [DONE] RSI-based trading strategy" << std::endl;
+            std::cout << "  [DONE] Backtesting engine with performance metrics" << std::endl;
+            std::cout << "  [DONE] Signal generation and execution" << std::endl;
+            std::cout << "  [DONE] Risk management and position sizing" << std::endl;
             std::cout << "\nPhase 2 Features:" << std::endl;
             std::cout << "  [DONE] PostgreSQL/TimescaleDB connection" << std::endl;
             std::cout << "  [DONE] Historical stock data access" << std::endl;

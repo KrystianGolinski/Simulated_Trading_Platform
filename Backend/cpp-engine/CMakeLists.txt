@@ -18,6 +18,8 @@ set(CORE_SOURCES
     src/market_data.cpp
     src/trading_engine.cpp
     src/database_connection.cpp
+    src/technical_indicators.cpp
+    src/trading_strategy.cpp
 )
 
 set(CORE_HEADERS
@@ -27,6 +29,8 @@ set(CORE_HEADERS
     include/market_data.h
     include/trading_engine.h
     include/database_connection.h
+    include/technical_indicators.h
+    include/trading_strategy.h
 )
 
 # Main executable

@@ -7,55 +7,7 @@
 #include <algorithm>
 #include <stdexcept>
 
-// PriceData implementation
-PriceData::PriceData(const std::map<std::string, std::string>& row) {
-    auto it = row.find("time");
-    if (it != row.end()) {
-        date = it->second.substr(0, 10); // Extract YYYY-MM-DD from timestamp
-    }
-    
-    it = row.find("symbol");
-    if (it != row.end()) {
-        symbol = it->second;
-    }
-    
-    it = row.find("open");
-    if (it != row.end() && !it->second.empty()) {
-        open = std::stod(it->second);
-    }
-    
-    it = row.find("high");
-    if (it != row.end() && !it->second.empty()) {
-        high = std::stod(it->second);
-    }
-    
-    it = row.find("low");
-    if (it != row.end() && !it->second.empty()) {
-        low = std::stod(it->second);
-    }
-    
-    it = row.find("close");
-    if (it != row.end() && !it->second.empty()) {
-        close = std::stod(it->second);
-    }
-    
-    it = row.find("volume");
-    if (it != row.end() && !it->second.empty()) {
-        volume = std::stol(it->second);
-    }
-}
-
-nlohmann::json PriceData::toJson() const {
-    nlohmann::json j;
-    j["date"] = date;
-    j["symbol"] = symbol;
-    j["open"] = open;
-    j["high"] = high;
-    j["low"] = low;
-    j["close"] = close;
-    j["volume"] = volume;
-    return j;
-}
+// PriceData implementation removed - now in technical_indicators.h/cpp
 
 // MarketData implementation
 MarketData::MarketData() 
@@ -183,12 +135,12 @@ std::map<std::string, double> MarketData::getCurrentPrices(const std::vector<std
 }
 
 // Historical data access
-std::vector<PriceData> MarketData::getHistoricalPrices(
+std::vector<std::map<std::string, std::string>> MarketData::getHistoricalPrices(
     const std::string& symbol,
     const std::string& start_date,
     const std::string& end_date) const {
     
-    std::vector<PriceData> prices;
+    std::vector<std::map<std::string, std::string>> prices;
     
     if (!ensureConnection()) {
         std::cerr << "Database connection failed" << std::endl;
@@ -197,19 +149,15 @@ std::vector<PriceData> MarketData::getHistoricalPrices(
     
     auto results = db_connection_->getStockPrices(symbol, start_date, end_date);
     
-    for (const auto& row : results) {
-        prices.emplace_back(row);
-    }
-    
-    return prices;
+    return results;
 }
 
-std::map<std::string, std::vector<PriceData>> MarketData::getHistoricalPrices(
+std::map<std::string, std::vector<std::map<std::string, std::string>>> MarketData::getHistoricalPrices(
     const std::vector<std::string>& symbols,
     const std::string& start_date,
     const std::string& end_date) const {
     
-    std::map<std::string, std::vector<PriceData>> all_prices;
+    std::map<std::string, std::vector<std::map<std::string, std::string>>> all_prices;
     
     for (const auto& symbol : symbols) {
         all_prices[symbol] = getHistoricalPrices(symbol, start_date, end_date);
@@ -219,7 +167,7 @@ std::map<std::string, std::vector<PriceData>> MarketData::getHistoricalPrices(
 }
 
 // Date range utilities
-std::vector<PriceData> MarketData::getPricesForDateRange(
+std::vector<std::map<std::string, std::string>> MarketData::getPricesForDateRange(
     const std::string& symbol,
     const std::string& start_date,
     const std::string& end_date) const {
@@ -227,14 +175,14 @@ std::vector<PriceData> MarketData::getPricesForDateRange(
     return getHistoricalPrices(symbol, start_date, end_date);
 }
 
-PriceData MarketData::getPriceForDate(const std::string& symbol, const std::string& date) const {
+std::map<std::string, std::string> MarketData::getPriceForDate(const std::string& symbol, const std::string& date) const {
     auto prices = getHistoricalPrices(symbol, date, date);
     
     if (!prices.empty()) {
         return prices[0];
     }
     
-    return PriceData(); // Return empty price data
+    return std::map<std::string, std::string>(); // Return empty price data
 }
 
 // Symbol validation and discovery
