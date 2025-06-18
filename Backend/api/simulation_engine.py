@@ -44,12 +44,12 @@ class SimulationEngine:
         self.results_storage: Dict[str, SimulationResults] = {}
         
     def _validate_cpp_engine(self) -> bool:
-        """Check if C++ engine executable exists and is accessible"""
+        # Check if C++ engine executable exists and is accessible
         validation = self._validate_cpp_engine_detailed()
         return validation['is_valid']
     
     def _validate_cpp_engine_detailed(self) -> Dict[str, Any]:
-        """Detailed validation of C++ engine with specific error messages"""
+        # Detailed validation of C++ engine with specific error messages
         if self.cpp_engine_path is None:
             return {
                 'is_valid': False,
@@ -136,7 +136,7 @@ class SimulationEngine:
         }
     
     def _build_cpp_command(self, config: SimulationConfig) -> list:
-        """Build command line arguments for C++ engine"""
+        # Build command line arguments for engine
         cmd = [
             str(self.cpp_engine_path),
             "--simulate",  # Use simulate mode for JSON output
@@ -173,8 +173,8 @@ class SimulationEngine:
         return cmd
     
     async def start_simulation(self, config: SimulationConfig) -> str:
-        """Start a new simulation and return simulation ID"""
-        # Phase 3: Enhanced engine validation with detailed error messages
+        # Start a new simulation and return simulation ID
+        # Enhanced engine validation with detailed error messages
         engine_validation = self._validate_cpp_engine_detailed()
         if not engine_validation['is_valid']:
             raise RuntimeError(f"C++ trading engine validation failed: {engine_validation['error']}")
@@ -191,7 +191,7 @@ class SimulationEngine:
         
         self.results_storage[simulation_id] = simulation_result
         
-        # Phase 4: Optimize simulation based on configuration
+        # Optimize simulation based on configuration
         optimization_info = await performance_optimizer.optimize_multi_symbol_simulation(config)
         logger.info(f"Simulation {simulation_id} optimization: {optimization_info}")
         
@@ -201,13 +201,13 @@ class SimulationEngine:
         return simulation_id
     
     async def _run_simulation(self, simulation_id: str, config: SimulationConfig, optimization_info: Dict[str, Any] = None):
-        """Run the C++ simulation in a subprocess with Phase 4 optimizations"""
+        # Run the simulation in a subprocess with optimizations
         try:
             # Update status to running
             self.results_storage[simulation_id].status = SimulationStatus.RUNNING
             self.results_storage[simulation_id].started_at = datetime.now()
             
-            # Phase 4: Build command with optimization info
+            # Build command with optimization info
             start_time = performance_optimizer.start_timer("command_building")
             cmd = self._build_cpp_command(config)
             
@@ -314,7 +314,7 @@ class SimulationEngine:
                     error_msg = self._format_cpp_engine_error("JSON_PARSE_ERROR", str(e), stdout_text, stderr_text)
                     self._mark_simulation_failed(simulation_id, error_msg)
             else:
-                # Phase 3: Enhanced error handling with specific error types
+                # Enhanced error handling with specific error types
                 error_msg = self._categorize_cpp_engine_error(process.returncode, stdout_text, stderr_text)
                 logger.error(f"Simulation {simulation_id} failed: {error_msg}")
                 self._mark_simulation_failed(simulation_id, error_msg)
@@ -328,7 +328,7 @@ class SimulationEngine:
                 del self.active_simulations[simulation_id]
     
     async def _process_simulation_results(self, simulation_id: str, result_data: dict):
-        """Process and store simulation results from C++ engine"""
+        # Process and store simulation results from engine
         try:
             simulation_result = self.results_storage[simulation_id]
             
@@ -383,7 +383,7 @@ class SimulationEngine:
             self._mark_simulation_failed(simulation_id, f"Result processing error: {e}")
     
     def _categorize_cpp_engine_error(self, return_code: int, stdout: str, stderr: str) -> str:
-        """Categorize C++ engine errors and provide helpful messages"""
+        # Categorize C++ engine errors and provide helpful messages
         # Common error patterns
         if 'database' in stderr.lower() or 'connection' in stderr.lower():
             return self._format_cpp_engine_error(
@@ -419,7 +419,7 @@ class SimulationEngine:
                 ]
             )
         
-        if return_code == -11:  # SIGSEGV
+        if return_code == -11:  # SIGSEGV - Segmentation fault
             return self._format_cpp_engine_error(
                 "CRASH_ERROR",
                 "C++ engine crashed (segmentation fault)",
@@ -431,7 +431,7 @@ class SimulationEngine:
                 ]
             )
         
-        if return_code == -15:  # SIGTERM
+        if return_code == -15:  # SIGTERM - Signal terminate
             return self._format_cpp_engine_error(
                 "TIMEOUT_ERROR",
                 "C++ engine was terminated (likely timeout)",
@@ -452,7 +452,7 @@ class SimulationEngine:
     def _format_cpp_engine_error(self, error_type: str, message: str, 
                                 stdout: str, stderr: str, 
                                 suggestions: List[str] = None) -> str:
-        """Format a comprehensive error message for C++ engine failures"""
+        # Format a comprehensive error message for C++ engine failures
         error_info = {
             "error_type": error_type,
             "message": message,
@@ -462,7 +462,7 @@ class SimulationEngine:
         if suggestions:
             error_info["suggestions"] = suggestions
         
-        # Add relevant output (truncated for brevity)
+        # Add relevant output (truncated for conciseness)
         if stderr and len(stderr.strip()) > 0:
             error_info["stderr"] = stderr[:500] + "..." if len(stderr) > 500 else stderr
         
@@ -472,18 +472,18 @@ class SimulationEngine:
         return json.dumps(error_info, indent=2)
     
     def _mark_simulation_failed(self, simulation_id: str, error_message: str):
-        """Mark simulation as failed with error message"""
+        # Mark simulation as failed with error message
         if simulation_id in self.results_storage:
             self.results_storage[simulation_id].status = SimulationStatus.FAILED
             self.results_storage[simulation_id].error_message = error_message
             self.results_storage[simulation_id].completed_at = datetime.now()
     
     def get_simulation_status(self, simulation_id: str) -> Optional[SimulationResults]:
-        """Get current status of a simulation"""
+        # Get current status of a simulation
         return self.results_storage.get(simulation_id)
     
     def get_simulation_progress(self, simulation_id: str) -> Dict[str, Any]:
-        """Get detailed progress information for a running simulation"""
+        # Get detailed progress information for a running simulation
         if simulation_id not in self.results_storage:
             return {"error": "Simulation not found"}
         
@@ -523,11 +523,11 @@ class SimulationEngine:
         return progress_info
     
     def list_simulations(self) -> Dict[str, SimulationResults]:
-        """List all simulations"""
+        # List all simulations
         return self.results_storage.copy()
     
     async def cancel_simulation(self, simulation_id: str) -> bool:
-        """Cancel a running simulation"""
+        # Cancel a running simulation
         if simulation_id in self.active_simulations:
             try:
                 process = self.active_simulations[simulation_id]["process"]

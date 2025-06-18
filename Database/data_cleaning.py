@@ -15,10 +15,9 @@ class DataCleaner:
         self.intraday_dir = os.path.join(data_dir, "intraday")
         
     def handle_stock_splits_and_dividends(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Handle stock splits and dividends by detecting and adjusting for them.
-        Uses the ratio between close and adj_close to identify corporate actions.
-        """
+        # Handle stock splits and dividends by detecting and adjusting for them.
+        # Uses the ratio between close and adj_close to identify corporate actions.
+
         df = df.copy()
         
         date_col = get_date_column(df)
@@ -50,11 +49,10 @@ class DataCleaner:
         return df
     
     def adjust_missing_trading_days(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Adjust for missing trading days by identifying and handling gaps in trading data.
-        For intraday data, this focuses on identifying missing trading sessions.
-        For daily data, this handles weekends and holidays.
-        """
+        # Adjust for missing trading days by identifying and handling gaps in trading data.
+        # For intraday data, this focuses on identifying missing trading sessions.
+        # For daily data, this handles weekends and holidays.
+        
         df = df.copy()
         
         date_col = get_date_column(df)
@@ -79,12 +77,11 @@ class DataCleaner:
         return df
     
     def normalize_price_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Normalize price data by:
-        1. Ensuring consistent decimal precision
-        2. Removing any negative prices or volumes
-        3. Validating OHLC relationships
-        """
+        # Normalize price data by:
+        # 1. Ensuring consistent decimal precision
+        # 2. Removing any negative prices or volumes
+        # 3. Validating OHLC relationships
+        
         df = df.copy()
         
         # Round price columns to 4 decimal places
@@ -121,9 +118,7 @@ class DataCleaner:
         return df
     
     def clean_csv_file(self, file_path: str, output_path: str = None) -> pd.DataFrame:
-        """
-        Clean a single CSV file with all cleaning routines.
-        """
+        # Clean a single CSV file with all cleaning routines.
         
         # Read the CSV file
         df = pd.read_csv(file_path)
@@ -140,9 +135,8 @@ class DataCleaner:
         return df
     
     def clean_all_files(self, data_type: str = "daily") -> Dict[str, pd.DataFrame]:
-        """
-        Clean all CSV files in the specified directory (daily or intraday).
-        """
+        # Clean all CSV files in the specified directory (daily or intraday).
+
         if data_type == "daily":
             source_dir = self.daily_dir
         elif data_type == "intraday":
@@ -184,9 +178,8 @@ class DataCleaner:
         return cleaned_data
     
     def generate_cleaning_report(self, original_df: pd.DataFrame, cleaned_df: pd.DataFrame, symbol: str) -> Dict:
-        """
-        Generate a report comparing original and cleaned data.
-        """
+        # Generate a report comparing original and cleaned data.
+        
         report = {
             'symbol': symbol,
             'original_rows': len(original_df),
@@ -202,9 +195,8 @@ class DataCleaner:
         return report
     
     def print_cleaning_summary(self, reports: list, data_type: str):
-        """
-        Print a summary of all cleaning operations.
-        """
+        # Print a summary of all cleaning operations.
+        
         print(f"\n{'='*50}")
         print(f"CLEANING SUMMARY - {data_type.upper()} DATA")
         print(f"{'='*50}")

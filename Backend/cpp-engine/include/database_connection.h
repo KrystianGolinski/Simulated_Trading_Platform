@@ -81,9 +81,9 @@ public:
     static DatabaseConnection createDefault();
 };
 
-/**
- * RAII wrapper for PGresult to ensure proper cleanup
- */
+/*
+RAII wrapper for PGresult to ensure proper cleanup
+*/
 class PGResultWrapper {
 private:
     PGresult* result_;

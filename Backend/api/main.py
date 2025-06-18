@@ -30,7 +30,7 @@ app.include_router(engine.router)
 # Startup and shutdown events
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database connection on startup"""
+    # Initialize database connection on startup
     try:
         await get_database()
         print("Database connection established at startup")
@@ -40,7 +40,7 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Close database connection on shutdown"""
+    # Close database connection on shutdown
     from database import db_manager
     await db_manager.disconnect()
 

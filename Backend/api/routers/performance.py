@@ -8,7 +8,7 @@ router = APIRouter(tags=["performance"])
 
 @router.get("/performance/stats")
 async def get_performance_stats(db: DatabaseManager = Depends(get_database)):
-    """Get comprehensive performance statistics"""
+    # Get performance stats
     try:
         # Get optimizer performance stats
         optimizer_stats = performance_optimizer.get_performance_summary()
@@ -26,7 +26,7 @@ async def get_performance_stats(db: DatabaseManager = Depends(get_database)):
 
 @router.post("/performance/clear-cache")
 async def clear_performance_cache(db: DatabaseManager = Depends(get_database)):
-    """Clear all performance caches"""
+    # Clear all performance caches
     try:
         # Clear database cache
         await db.clear_cache()
@@ -41,7 +41,7 @@ async def clear_performance_cache(db: DatabaseManager = Depends(get_database)):
 
 @router.get("/performance/cache-stats")
 async def get_cache_stats(db: DatabaseManager = Depends(get_database)):
-    """Get cache performance statistics"""
+    # Get cache performance statistics
     try:
         cache_stats = performance_optimizer.get_cache_statistics()
         db_perf = await db.get_performance_stats()

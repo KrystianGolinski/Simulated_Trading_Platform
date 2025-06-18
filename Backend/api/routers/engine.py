@@ -9,13 +9,14 @@ router = APIRouter(tags=["engine"])
 
 @router.get("/engine/test")
 async def test_engine():
-    """Test C++ engine directly and return raw output"""
+    # Test engine directly and return raw output
+
     engine_path = Path("/app/cpp-engine/build/trading_engine")
     if not engine_path.exists():
         return {"error": "Engine not found"}
     
     try:
-        # Test with simulate command to see what happens
+        # Run test simulation to capture output
         result = subprocess.run([str(engine_path), "--simulate", "--symbol", "AAPL", "--start", "2023-01-01", "--end", "2023-01-31", "--capital", "10000"], 
                               capture_output=True, text=True, timeout=30)
         
@@ -30,7 +31,7 @@ async def test_engine():
 
 @router.get("/engine/status")
 async def get_engine_status():
-    """Get C++ engine status and path information"""
+    # Get engine status and path information
     # Check engine path
     engine_path_info = {
         "cpp_engine_path": str(simulation_engine.cpp_engine_path) if simulation_engine.cpp_engine_path else None,
@@ -42,6 +43,7 @@ async def get_engine_status():
     }
     
     # List contents of possible directories
+    # Avoid creation of incorrect directories (Docker)
     possible_dirs = [
         Path("/home/krystian/Desktop/Simulated_Trading_Platform/Backend/cpp-engine"),  # Absolute development path
         Path("/app/cpp-engine"),  # Docker path

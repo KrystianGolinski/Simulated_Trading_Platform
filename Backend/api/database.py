@@ -22,7 +22,7 @@ class DatabaseManager:
             "DATABASE_URL", 
             f"postgresql://{os.getenv('DB_USER', 'trading_user')}:{os.getenv('DB_PASSWORD', 'trading_password')}@localhost:5433/simulated_trading_platform"
         )
-        # Phase 4: Add caching for frequently accessed data
+        # Add caching for frequently accessed data
         self._cache: Dict[str, Any] = {}
         self._cache_timestamps: Dict[str, datetime] = {}
         self._cache_ttl = 300  # 5 minutes TTL
@@ -34,12 +34,11 @@ class DatabaseManager:
         try:
             self.pool = await asyncpg.create_pool(
                 self.database_url,
-                min_size=10,  # Phase 4: Increased min size
-                max_size=50,  # Phase 4: Increased max size for better performance
-                command_timeout=60,  # Phase 4: Timeout for long queries
+                min_size=10,  # Min size of DB connections
+                max_size=50,  # Max size of DB connections for performace
+                command_timeout=60,  # Timeout for long queries (If not done by 60s usually signifies something has gone wrong)
                 server_settings={
                     'application_name': 'trading_platform_api',
-                    # Removed shared_preload_libraries - requires server restart
                 }
             )
             logger.info("Database connection pool created successfully")
@@ -54,30 +53,30 @@ class DatabaseManager:
             logger.info("Database connection pool closed")
     
     def _get_cache_key(self, *args) -> str:
-        """Generate cache key from arguments"""
+        # Generate cache key from arguments using md5
         key_str = "|".join(str(arg) for arg in args)
         return hashlib.md5(key_str.encode()).hexdigest()
     
     def _is_cache_valid(self, cache_key: str) -> bool:
-        """Check if cache entry is still valid"""
+        # Check if cache entry is still valid
         if cache_key not in self._cache_timestamps:
             return False
         age = (datetime.now() - self._cache_timestamps[cache_key]).total_seconds()
         return age < self._cache_ttl
     
     def _set_cache(self, cache_key: str, value: Any) -> None:
-        """Set cache value with timestamp"""
+        # Set cache value with timestamp
         self._cache[cache_key] = value
         self._cache_timestamps[cache_key] = datetime.now()
     
     def _get_cache(self, cache_key: str) -> Optional[Any]:
-        """Get cache value if valid"""
+        # Get cache value if valid
         if self._is_cache_valid(cache_key):
             return self._cache.get(cache_key)
         return None
     
     async def clear_cache(self) -> None:
-        """Clear all cached data"""
+        # Clear all cached data
         self._cache.clear()
         self._cache_timestamps.clear()
         self._available_stocks_cache = None
@@ -103,7 +102,7 @@ class DatabaseManager:
             return result
 
     async def get_available_stocks(self) -> List[str]:
-        # Phase 4: Get list of available stock symbols with caching
+        # Get list of available stock symbols with caching
         
         # Check cache first
         if (self._available_stocks_cache and self._available_stocks_cache_time and 
@@ -127,7 +126,7 @@ class DatabaseManager:
         return stocks
 
     async def get_stock_data(self, symbol: str, start_date: date, end_date: date, timeframe: str = 'daily') -> List[Dict[str, Any]]:
-        # Phase 4: Get historical stock data with caching
+        # Get historical stock data with caching
         
         # Check cache first
         cache_key = self._get_cache_key("stock_data", symbol, start_date, end_date, timeframe)
@@ -143,7 +142,7 @@ class DatabaseManager:
         else:
             raise ValueError(f"Unsupported timeframe: {timeframe}")
         
-        # Phase 4: Optimized query with index hints
+        # Optimized query with index hints
         query = f"""
             SELECT time, symbol, open, high, low, close, volume
             FROM {table}
@@ -241,7 +240,7 @@ class DatabaseManager:
         return session
 
     async def validate_symbol_exists(self, symbol: str) -> bool:
-        """Check if a stock symbol exists in the database"""
+        # Check if a stock symbol exists in the database
         query = """
             SELECT COUNT(*) as count
             FROM stock_prices_daily 
@@ -255,7 +254,7 @@ class DatabaseManager:
             return False
     
     async def validate_date_range_has_data(self, symbol: str, start_date: date, end_date: date) -> Dict[str, Any]:
-        """Check if data exists for symbol in the specified date range"""
+        # Check if data exists for symbol in the specified date range
         query = """
             SELECT 
                 MIN(time) as earliest_date,
@@ -299,7 +298,7 @@ class DatabaseManager:
             }
     
     async def get_symbol_date_range(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """Get the available date range for a symbol"""
+        # Get the available date range for a symbol
         query = """
             SELECT 
                 MIN(time) as earliest_date,
@@ -316,7 +315,7 @@ class DatabaseManager:
             return None
     
     async def validate_multiple_symbols(self, symbols: List[str]) -> Dict[str, bool]:
-        """Validate multiple symbols at once"""
+        # Validate multiple symbols at once
         if not symbols:
             return {}
         
@@ -338,7 +337,7 @@ class DatabaseManager:
             return {symbol.upper(): False for symbol in symbols}
     
     async def get_performance_stats(self) -> Dict[str, Any]:
-        """Phase 4: Get database performance statistics"""
+        # Get database performance statistics
         if not self.pool:
             return {"error": "Database not connected"}
         
@@ -367,7 +366,7 @@ class DatabaseManager:
             return {"error": str(e)}
 
     async def health_check(self) -> Dict[str, Any]:
-        # Phase 4: Enhanced health check with performance metrics
+        # Enhanced health check with performance metrics
         if not self.pool:
             return {"status": "disconnected"}
         

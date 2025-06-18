@@ -17,12 +17,10 @@ logger = logging.getLogger(__name__)
 
 class FreeDataCollector:
     def __init__(self, use_files: bool = False):
-        """
-        Initialize data collector
+        # Initialize data collector
         
-        Args:
-            use_files: If True, save to CSV files instead of database
-        """
+        # Args:
+        #    use_files: If True, save to CSV files instead of database
         self.use_files = use_files
         
         if use_files:
@@ -62,17 +60,14 @@ class FreeDataCollector:
         return stock_info
     
     def fetch_daily_data(self, symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
-        """
-        Fetch daily OHLCV data from Yahoo Finance
+        # Fetch daily OHLCV data from Yahoo Finance
+        # Args:
+        #    symbol: Stock symbol
+        #    start_date: Start date (YYYY-MM-DD)
+        #    end_date: End date (YYYY-MM-DD)
+        # Returns:
+        #    DataFrame with OHLCV data
         
-        Args:
-            symbol: Stock symbol
-            start_date: Start date (YYYY-MM-DD)
-            end_date: End date (YYYY-MM-DD)
-        
-        Returns:
-            DataFrame with OHLCV data
-        """
         try:
             df = yf.download(
                 symbol, 
@@ -105,9 +100,8 @@ class FreeDataCollector:
             return pd.DataFrame()
     
     def fetch_intraday_data(self, symbol: str, period: str = "7d") -> pd.DataFrame:
-        """
-        Fetch intraday data (limited by API to 7 days for 1-minute data)
-        """
+        # Fetch intraday data (limited by API to 7 days for 1-minute data)
+        
         try:
             ticker = yf.Ticker(symbol)
             
@@ -156,14 +150,12 @@ class FreeDataCollector:
         logger.info(f"Saved {len(df)} records to {filename}")
     
     def collect_all_data(self, symbols: List[str], start_date: str, end_date: str):
-        """
-        Collect all available data for given symbols
-        
-        Args:
-            symbols: List of stock symbols
-            start_date: Start date for daily data (YYYY-MM-DD)
-            end_date: End date for daily data (YYYY-MM-DD)
-        """
+        # Collect all available data for given symbols
+        # Args:
+        #    symbols: List of stock symbols
+        #    start_date: Start date for daily data (YYYY-MM-DD)
+        #    end_date: End date for daily data (YYYY-MM-DD)
+
         # First, get stock info
         logger.info("Fetching stock information...")
         stock_info = self.fetch_stock_info(symbols)

@@ -29,7 +29,7 @@ class SimulationConfig(BaseModel):
     
     @model_validator(mode='after')
     def validate_model(self):
-        # Basic validation only - comprehensive validation handled by validation.py
+        # Basic validation only - comprehensive validation handled by SimulationValidator in validation.py
         
         # Critical validation: end_date after start_date
         if self.end_date <= self.start_date:
@@ -45,7 +45,6 @@ class SimulationConfig(BaseModel):
             if self.long_ma <= self.short_ma:
                 raise ValueError('Long MA must be greater than short MA')
         
-        # Note: Comprehensive validation is handled by SimulationValidator in validation.py
         return self
     
     @field_validator('symbols')

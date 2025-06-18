@@ -16,7 +16,7 @@ router = APIRouter(tags=["simulation"])
 
 @router.post("/simulation/validate", response_model=ValidationResult)
 async def validate_simulation_config(config: SimulationConfig, db: DatabaseManager = Depends(get_database)):
-    """Validate simulation configuration without starting simulation"""
+    # Validate simulation configuration without starting simulation
     try:
         validator = SimulationValidator(db)
         validation_result = await validator.validate_simulation_config(config)
@@ -26,14 +26,13 @@ async def validate_simulation_config(config: SimulationConfig, db: DatabaseManag
 
 @router.post("/simulation/start", response_model=SimulationResponse)
 async def start_simulation(config: SimulationConfig, db: DatabaseManager = Depends(get_database)):
-    """Start a new trading simulation with comprehensive validation"""
+    # Start a new trading simulation with validation
     try:
-        # Phase 3: Comprehensive validation
         validator = SimulationValidator(db)
         validation_result = await validator.validate_simulation_config(config)
         
         if not validation_result.is_valid:
-            # Return detailed validation errors
+            # Return validation errors
             error_messages = [f"{error.field}: {error.message}" for error in validation_result.errors]
             raise HTTPException(
                 status_code=400, 
@@ -44,14 +43,14 @@ async def start_simulation(config: SimulationConfig, db: DatabaseManager = Depen
                 }
             )
         
-        # Log warnings if any
+        # Log warnings (if any)
         if validation_result.warnings:
             import logging
             logger = logging.getLogger(__name__)
             for warning in validation_result.warnings:
                 logger.warning(f"Simulation validation warning: {warning}")
         
-        # Start simulation if validation passes
+        # Start simulation
         simulation_id = await simulation_engine.start_simulation(config)
         
         message = "Simulation started successfully"
@@ -76,7 +75,7 @@ async def start_simulation(config: SimulationConfig, db: DatabaseManager = Depen
 
 @router.get("/simulation/{simulation_id}/status", response_model=SimulationStatusResponse)
 async def get_simulation_status(simulation_id: str):
-    """Get the current status of a simulation"""
+    # Get the current status of a simulation
     progress = simulation_engine.get_simulation_progress(simulation_id)
     
     if "error" in progress:
@@ -86,7 +85,7 @@ async def get_simulation_status(simulation_id: str):
 
 @router.get("/simulation/{simulation_id}/results", response_model=SimulationResults)
 async def get_simulation_results(simulation_id: str):
-    """Get the complete results of a simulation"""
+    # Get the complete results of a simulation
     result = simulation_engine.get_simulation_status(simulation_id)
     
     if not result:
@@ -96,7 +95,7 @@ async def get_simulation_results(simulation_id: str):
 
 @router.get("/simulation/{simulation_id}/cancel")
 async def cancel_simulation(simulation_id: str):
-    """Cancel a running simulation"""
+    # Cancel a running simulation
     success = await simulation_engine.cancel_simulation(simulation_id)
     
     if not success:
@@ -106,5 +105,5 @@ async def cancel_simulation(simulation_id: str):
 
 @router.get("/simulations", response_model=Dict[str, SimulationResults])
 async def list_simulations():
-    """List all simulations and their status"""
+    # List all simulations with status
     return simulation_engine.list_simulations()

@@ -1,7 +1,5 @@
-"""
-Performance Optimization Module
-Basic performance tracking with infrastructure for future parallel processing
-"""
+# Performance Optimization Module
+# Basic performance tracking with infrastructure for future parallel processing
 
 import time
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
@@ -15,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class PerformanceMetrics:
-    """Metrics for performance monitoring"""
+    # Metrics for performance monitoring
     cache_hits: int = 0
     cache_misses: int = 0
     query_time_ms: float = 0.0
@@ -24,9 +22,7 @@ class PerformanceMetrics:
     parallel_tasks: int = 0
 
 class PerformanceOptimizer:
-    """
-    Phase 4: Handles performance optimizations for trading simulations
-    """
+    # Handles performance optimizations for trading simulations
     
     def __init__(self):
         self.cache_enabled = True
@@ -45,11 +41,11 @@ class PerformanceOptimizer:
         logger.info(f"Performance optimizer initialized with {self.max_workers} max workers")
     
     def start_timer(self, operation: str) -> float:
-        """Start timing an operation"""
+        # Start timing an operation
         return time.time()
     
     def end_timer(self, operation: str, start_time: float) -> float:
-        """End timing and record the result"""
+        # End timing and record the result
         duration = (time.time() - start_time) * 1000  # Convert to ms
         if operation not in self.operation_times:
             self.operation_times[operation] = []
@@ -57,17 +53,15 @@ class PerformanceOptimizer:
         return duration
     
     async def optimize_multi_symbol_simulation(self, config: SimulationConfig) -> Dict[str, Any]:
-        """
-        Determine optimization strategy for multi-symbol simulations
-        Currently simplified but ready for future expansion
-        """
+        # Determine optimization strategy for multi-symbol simulations
+        # Currently simplified but ready for future expansion
         if len(config.symbols) <= 1:
             return {"optimization": "single_symbol", "parallel_tasks": 0}
         
         start_time = self.start_timer("multi_symbol_optimization")
         
         # For now, use simple strategy selection
-        # TODO: Implement actual parallel processing when C++ engine supports multi-symbol
+        # TODO: Implement actual parallel processing when engine supports multi-symbol
         if len(config.symbols) <= 5:
             strategy = "sequential_cached"
             parallel_tasks = 0
@@ -88,13 +82,11 @@ class PerformanceOptimizer:
         }
     
     
-    # TODO: Implement when C++ engine supports multi-symbol and parallel processing
+    # TODO: Implement when engine supports multi-symbol and parallel processing
     async def execute_parallel_simulation_groups(self, symbol_groups: List[List[str]], 
                                                 config: SimulationConfig) -> List[Dict[str, Any]]:
-        """
-        Placeholder for future parallel execution of simulation groups
-        Currently returns mock data for testing
-        """
+        # Placeholder for future parallel execution of simulation groups
+        # Currently returns mock data for testing
         start_time = self.start_timer("parallel_execution")
         
         # Mock implementation for now
@@ -114,7 +106,7 @@ class PerformanceOptimizer:
         return results
     
     def get_cache_statistics(self) -> Dict[str, Any]:
-        """Get cache performance statistics"""
+        # Get cache performance statistics
         total_requests = self.metrics.cache_hits + self.metrics.cache_misses
         hit_rate = (self.metrics.cache_hits / total_requests * 100) if total_requests > 0 else 0
         
@@ -127,7 +119,7 @@ class PerformanceOptimizer:
         }
     
     def get_performance_summary(self) -> Dict[str, Any]:
-        """Get comprehensive performance summary"""
+        # Get comprehensive performance summary
         avg_times = {}
         for operation, times in self.operation_times.items():
             avg_times[operation] = {
@@ -149,7 +141,7 @@ class PerformanceOptimizer:
         }
     
     async def cleanup(self):
-        """Clean up resources"""
+        # Clean up resources
         self.thread_executor.shutdown(wait=True)
         self.process_executor.shutdown(wait=True)
         logger.info("Performance optimizer cleaned up")

@@ -7,12 +7,13 @@ router = APIRouter(tags=["health"])
 
 @router.get("/")
 async def root():
-    """Root endpoint"""
-    return {"message": "Trading Platform API - Development Environment Ready"}
+    # Root endpoint
+    return {"message": "Trading Platform API"}
 
 @router.get("/health")
 async def health_check(db: DatabaseManager = Depends(get_database)):
-    """Enhanced health check with database status and validation system"""
+    # Enhanced health check with database status and validation system
+    # Validate connection
     try:
         db_health = await db.health_check()
         

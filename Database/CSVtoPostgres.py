@@ -13,13 +13,13 @@ logger = logging.getLogger(__name__)
 
 class CSVToPostgreSQLLoader:
     def __init__(self, db_config: Dict[str, str], data_dir: str = "historical_data"):
-        """
-        Initialize loader
         
-        Args:
-            db_config: PostgreSQL connection parameters
-            data_dir: Directory containing CSV files
-        """
+        # Initialize loader
+        
+        # Args:
+        #    db_config: PostgreSQL connection parameters
+        #    data_dir: Directory containing CSV files
+        
         self.db_config = db_config
         self.data_dir = data_dir
         
@@ -163,7 +163,7 @@ class CSVToPostgreSQLLoader:
             conn.close()
     
     def load_stock_info(self):
-        """Load stock metadata from JSON file"""
+        # Load stock metadata from JSON file
         info_file = os.path.join(self.data_dir, "stock_info.json")
         
         if not os.path.exists(info_file):
@@ -198,7 +198,7 @@ class CSVToPostgreSQLLoader:
             conn.close()
     
     def load_daily_data(self):
-        """Load daily price data from CSV files"""
+        # Load daily price data from CSV files
         daily_dir = os.path.join(self.data_dir, "daily")
         
         if not os.path.exists(daily_dir):
@@ -260,7 +260,7 @@ class CSVToPostgreSQLLoader:
         conn.close()
     
     def load_intraday_data(self):
-        """Load intraday (1-minute) data from CSV files"""
+        # Load intraday (1-minute) data from CSV files
         intraday_dir = os.path.join(self.data_dir, "intraday")
         
         if not os.path.exists(intraday_dir):
@@ -328,7 +328,7 @@ class CSVToPostgreSQLLoader:
         conn.close()
     
     def refresh_aggregates(self):
-        """Refresh continuous aggregates for C++ engine queries"""
+        # Refresh continuous aggregates for C++ engine queries
         conn = psycopg2.connect(**self.db_config)
         cur = conn.cursor()
         
@@ -348,7 +348,7 @@ class CSVToPostgreSQLLoader:
             conn.close()
     
     def verify_data(self):
-        """Verify data was loaded correctly"""
+        # Verify data was loaded correctly
         conn = psycopg2.connect(**self.db_config)
         cur = conn.cursor()
         
@@ -390,7 +390,7 @@ class CSVToPostgreSQLLoader:
             conn.close()
     
     def load_all_data(self):
-        """Load all data from CSV files to PostgreSQL"""
+        # Load all data from CSV files to PostgreSQL
         logger.info("Starting data load process...")
         
         # Create tables
@@ -414,9 +414,9 @@ class CSVToPostgreSQLLoader:
         logger.info("Data load complete!")
 
 
-# Example usage
+# Usage
 if __name__ == "__main__":
-    # Database configuration matching your architecture
+    # Database configuration matching architecture
     DBHost = input("Enter DB host (default: localhost): ") or "localhost"
     DBName = input("Enter DB name (default: simulated_trading_platform): ") or "simulated_trading_platform"
     DBUsername = input("Enter DB username (default: trading_user): ") or "trading_user"

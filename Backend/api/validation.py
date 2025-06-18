@@ -1,7 +1,5 @@
-"""
-Comprehensive validation system for Phase 3 implementation
-Handles input validation, error messaging, and data availability checks
-"""
+# Comprehensive validation system
+# Handles input validation, error messaging, and data availability checks
 
 import logging
 from typing import List, Dict, Any, Optional
@@ -12,39 +10,38 @@ from models import SimulationConfig, ValidationError, ValidationResult, Strategy
 logger = logging.getLogger(__name__)
 
 class SimulationValidator:
-    """Comprehensive validator for simulation configurations"""
+    # Comprehensive validator for simulation configurations
     
     def __init__(self, db: DatabaseManager):
         self.db = db
     
     async def validate_simulation_config(self, config: SimulationConfig) -> ValidationResult:
-        """
-        Comprehensive validation of simulation configuration
-        Returns ValidationResult with detailed error information
-        """
+        # Comprehensive validation of simulation configuration
+        # Returns ValidationResult with detailed error information
+
         errors = []
         warnings = []
         
         try:
-            # 1. Validate stock symbols
+            # Validate stock symbols
             symbol_validation = await self._validate_symbols(config.symbols)
             errors.extend(symbol_validation)
             
-            # 2. Validate date ranges and data availability
+            # Validate date ranges and data availability
             if not errors:  # Only check data if symbols are valid
                 date_validation = await self._validate_date_ranges(config)
                 errors.extend(date_validation['errors'])
                 warnings.extend(date_validation['warnings'])
             
-            # 3. Validate capital amount
+            # Validate capital amount
             capital_validation = self._validate_capital(config.starting_capital)
             errors.extend(capital_validation)
             
-            # 4. Validate strategy parameters
+            # Validate strategy parameters
             strategy_validation = self._validate_strategy_parameters(config)
             errors.extend(strategy_validation)
             
-            # 5. Check for potential issues (warnings)
+            # Check for potential issues (warnings)
             config_warnings = self._check_configuration_warnings(config)
             warnings.extend(config_warnings)
             
@@ -63,7 +60,7 @@ class SimulationValidator:
         )
     
     async def _validate_symbols(self, symbols: List[str]) -> List[ValidationError]:
-        """Validate stock symbols exist in database"""
+        # Validate stock symbols exist in database
         errors = []
         
         if not symbols:
@@ -113,7 +110,7 @@ class SimulationValidator:
         return errors
     
     async def _validate_date_ranges(self, config: SimulationConfig) -> Dict[str, List]:
-        """Validate date ranges have sufficient data"""
+        # Validate date ranges have sufficient data
         errors = []
         warnings = []
         
@@ -165,7 +162,7 @@ class SimulationValidator:
         return {"errors": errors, "warnings": warnings}
     
     def _validate_capital(self, capital: float) -> List[ValidationError]:
-        """Validate starting capital amount"""
+        # Validate starting capital amount
         errors = []
         
         # Basic range validation (already handled by Pydantic, but double-check)
@@ -195,7 +192,7 @@ class SimulationValidator:
         return errors
     
     def _validate_strategy_parameters(self, config: SimulationConfig) -> List[ValidationError]:
-        """Validate strategy-specific parameters"""
+        # Validate strategy-specific parameters
         errors = []
         
         if config.strategy == StrategyType.MA_CROSSOVER:
@@ -240,7 +237,7 @@ class SimulationValidator:
         return errors
     
     def _check_configuration_warnings(self, config: SimulationConfig) -> List[str]:
-        """Check for potential configuration issues that don't prevent execution"""
+        # Check for potential configuration issues that don't prevent execution
         warnings = []
         
         # Check date range length
@@ -282,7 +279,7 @@ class SimulationValidator:
         return warnings
     
     async def _get_symbol_suggestion(self, invalid_symbol: str) -> Optional[str]:
-        """Get suggestion for similar symbol"""
+        # Get suggestion for similar symbol
         try:
             # Get all available symbols
             all_symbols = await self.db.get_available_stocks()
@@ -298,7 +295,7 @@ class SimulationValidator:
             return None
     
     async def check_database_connection(self) -> ValidationResult:
-        """Check if database is accessible and contains required data"""
+        # Check if database is accessible and contains required data
         errors = []
         warnings = []
         

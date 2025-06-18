@@ -157,7 +157,7 @@ BacktestResult TradingEngine::runBacktest(const BacktestConfig& config) {
     for (size_t i = 1; i < price_data.size(); ++i) {
         const auto& data_point = price_data[i];
         
-        // Progress reporting every 5% of completion (more frequent)
+        // Progress reporting every 5% of completion
         if (i % (price_data.size() / 20) == 0 || i == price_data.size() - 1 || price_data.size() <= 20) {
             double progress_pct = (static_cast<double>(i) / (price_data.size() - 1)) * 100.0;
             std::map<std::string, double> current_prices;

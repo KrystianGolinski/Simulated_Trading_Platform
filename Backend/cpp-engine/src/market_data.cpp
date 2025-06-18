@@ -7,8 +7,6 @@
 #include <algorithm>
 #include <stdexcept>
 
-// PriceData implementation removed - now in technical_indicators.h/cpp
-
 // MarketData implementation
 MarketData::MarketData() 
     : db_connection_(std::make_unique<DatabaseConnection>(DatabaseConnection::createFromEnvironment())),

@@ -28,7 +28,7 @@ private:
     std::unique_ptr<TradingStrategy> strategy_;
     std::vector<TradingSignal> executed_signals_;
     
-    // Phase 4: Performance optimization members
+    // Performance optimization members
     std::map<std::string, std::vector<PriceData>> price_data_cache_;
     bool cache_enabled_;
     
@@ -57,14 +57,14 @@ public:
                                          const std::string& end_date,
                                          double starting_capital);
     
-    // Phase 4: Enhanced multi-symbol processing with performance optimizations
+    // Enhanced multi-symbol processing with performance optimizations
     std::string runSimulationMultiSymbol(const std::vector<std::string>& symbols, 
                                        const std::string& start_date, 
                                        const std::string& end_date, 
                                        double capital,
                                        bool enable_progress = false);
     
-    // Phase 4: Memory optimization methods
+    // Memory optimization methods
     void optimizeMemoryUsage();
     void clearCache();
     

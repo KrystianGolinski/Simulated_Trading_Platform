@@ -94,12 +94,12 @@ function App() {
               )}
               {simulation.error && (
                 <div className="flex items-center space-x-2 text-sm text-red-600">
-                  <span>⚠️ Error</span>
+                  <span>Error</span>
                 </div>
               )}
               {simulation.currentSimulation?.status === 'completed' && (
                 <div className="flex items-center space-x-2 text-sm text-green-600">
-                  <span>✅ Complete</span>
+                  <span>Complete</span>
                 </div>
               )}
               

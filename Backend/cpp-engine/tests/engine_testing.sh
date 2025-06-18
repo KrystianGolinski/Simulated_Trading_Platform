@@ -1,13 +1,12 @@
 #!/bin/bash
 
-# Comprehensive Trading Platform Test Suite
-# Tests all phases: Core functionality, Progress tracking, and Performance optimizations
+# Comprehensive trading platform engine testing
+# Tests all parts: Core functionality, Progress tracking, and Performance optimizations
 
 set -e  # Exit on error
 
 echo "=== Trading Platform Comprehensive Test Suite ==="
-echo "Testing all phases: Core functionality, Progress tracking, Performance optimizations"
-echo "================================================================================"
+echo "Testing all parts: Core functionality, Progress tracking, Performance optimizations"
 echo
 
 API_BASE="http://localhost:8000"
@@ -19,7 +18,6 @@ run_test() {
     local test_name="$1"
     local test_command="$2"
     echo "Running: $test_name"
-    echo "----------------------------------------"
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
     
     if eval "$test_command"; then
@@ -35,19 +33,15 @@ check_api_availability() {
     echo "Checking API availability..."
     if ! curl -s "$API_BASE/health" > /dev/null; then
         echo "ERROR: API not available at $API_BASE"
-        echo "Please ensure Docker containers are running:"
-        echo "  cd ../../../Docker && docker-compose -f docker-compose.dev.yml up -d"
         exit 1
     fi
     echo "SUCCESS: API is available"
     echo
 }
 
-# ============================================================================
-# PHASE 1: CORE FUNCTIONALITY TESTS
-# ============================================================================
-echo "PHASE 1: CORE FUNCTIONALITY TESTS"
-echo "===================================="
+# CORE FUNCTIONALITY TESTS
+
+echo "CORE FUNCTIONALITY TESTS"
 
 test_parameter_validation() {
     echo "Testing parameter variations produce different results..."
@@ -110,17 +104,15 @@ test_basic_simulation() {
     fi
 }
 
-# Run Phase 1 tests
+# Run core tests
 check_api_availability
 run_test "Parameter Validation" test_parameter_validation
 run_test "Input Validation System" test_validation_system  
 run_test "Basic Simulation Execution" test_basic_simulation
 
-# ============================================================================
-# PHASE 2: PROGRESS TRACKING TESTS
-# ============================================================================
-echo "PHASE 2: PROGRESS TRACKING TESTS"
-echo "==================================="
+# PROGRESS TRACKING TESTS
+
+echo "PROGRESS TRACKING TESTS"
 
 test_progress_tracking() {
     echo "Testing simulation progress tracking..."
@@ -159,18 +151,17 @@ test_progress_tracking() {
     fi
 }
 
+# Run progress tests
 run_test "Progress Tracking" test_progress_tracking
 
-# ============================================================================
-# PHASE 3: VALIDATION & ERROR HANDLING TESTS
-# ============================================================================
-echo "PHASE 3: VALIDATION & ERROR HANDLING TESTS"
-echo "=============================================="
+# VALIDATION & ERROR HANDLING TESTS
+
+echo "VALIDATION & ERROR HANDLING TESTS"
 
 test_comprehensive_validation() {
     echo "Testing comprehensive validation system..."
-    
     # Test various invalid inputs
+
     TESTS_PASSED=0
     
     # Invalid date range
@@ -196,18 +187,17 @@ test_comprehensive_validation() {
     if [ $TESTS_PASSED -ge 2 ]; then
         return 0
     else
-        echo "Some validation tests failed"
+        echo "Not all tests passed"
         return 1
     fi
 }
 
+# Run validation and error handling tests
 run_test "Comprehensive Validation" test_comprehensive_validation
 
-# ============================================================================
-# PHASE 4: PERFORMANCE OPTIMIZATION TESTS
-# ============================================================================
-echo "PHASE 4: PERFORMANCE OPTIMIZATION TESTS"
-echo "=========================================="
+# PERFORMANCE OPTIMIZATION TESTS
+
+echo "PERFORMANCE OPTIMIZATION TESTS"
 
 test_performance_endpoints() {
     echo "Testing performance monitoring endpoints..."
@@ -270,15 +260,14 @@ test_enhanced_health_check() {
     fi
 }
 
+# Run performance optimization tests
 run_test "Performance Endpoints" test_performance_endpoints
 run_test "Data Caching" test_data_caching
 run_test "Enhanced Health Check" test_enhanced_health_check
 
-# ============================================================================
 # INTEGRATION TESTS
-# ============================================================================
+
 echo "INTEGRATION TESTS"
-echo "==================="
 
 test_end_to_end_simulation() {
     echo "Testing complete end-to-end simulation flow..."
@@ -336,25 +325,23 @@ test_end_to_end_simulation() {
     fi
 }
 
+# Run integration tests
 run_test "End-to-End Simulation Flow" test_end_to_end_simulation
 
-# ============================================================================
 # SUMMARY
-# ============================================================================
-echo "================================================================================"
-echo "TEST SUITE SUMMARY"
-echo "================================================================================"
+
+echo "ENGINE TESTING SUMMARY"
 echo "Total tests run: $TOTAL_TESTS"
 echo "Tests passed: $((TOTAL_TESTS - FAILED_TESTS))"
 echo "Tests failed: $FAILED_TESTS"
 echo
 
 if [ $FAILED_TESTS -eq 0 ]; then
-    echo "ALL TESTS PASSED!"
-    echo "Trading platform is functioning correctly across all phases."
+    echo "ALL TESTS PASSED"
+    echo "Trading platform is functioning correctly across all parts"
     exit 0
 else
-    echo "SOME TESTS FAILED"
-    echo "Please review the failed tests above and check system logs."
+    echo "NOT ALL TESTS PASSED"
+    echo "Review the failed tests above and check system logs"
     exit 1
 fi
