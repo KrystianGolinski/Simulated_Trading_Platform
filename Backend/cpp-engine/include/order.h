@@ -38,7 +38,7 @@ public:
     Order(const Order& other);
     Order& operator=(const Order& other);
     
-    // Move constructor and assignment (C++11)
+    // Move constructor and assignment
     Order(Order&& other) noexcept;
     Order& operator=(Order&& other) noexcept;
     

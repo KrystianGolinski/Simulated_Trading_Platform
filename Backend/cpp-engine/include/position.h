@@ -22,7 +22,7 @@ public:
     Position(const Position& other);
     Position& operator=(const Position& other);
     
-    // Move constructor and assignment (C++11)
+    // Move constructor and assignment
     Position(Position&& other) noexcept;
     Position& operator=(Position&& other) noexcept;
     

@@ -25,7 +25,7 @@ public:
     Portfolio(const Portfolio& other);
     Portfolio& operator=(const Portfolio& other);
     
-    // Move constructor and assignment (C++11)
+    // Move constructor and assignment
     Portfolio(Portfolio&& other) noexcept;
     Portfolio& operator=(Portfolio&& other) noexcept;
     

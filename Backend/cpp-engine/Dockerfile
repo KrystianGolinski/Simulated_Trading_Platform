@@ -29,5 +29,5 @@ RUN chmod +x build.sh && ./build.sh
 # Run tests to verify build
 RUN ./build/test_basic
 
-# Default command
-CMD ["./build/trading_engine", "--help"]
+# Keep container running for volume sharing
+CMD ["tail", "-f", "/dev/null"]

@@ -6,31 +6,69 @@
 #include "trading_engine.h"
 
 // Helper function to parse command line arguments
-void parseArguments(int argc, char* argv[], std::string& symbol, std::string& start_date, std::string& end_date, double& capital) {
+void parseArguments(int argc, char* argv[], std::string& symbol, std::string& start_date, std::string& end_date, double& capital, int& short_ma, int& long_ma, bool& enable_progress) {
+    std::cerr << "[DEBUG] Parsing " << argc << " arguments:" << std::endl;
+    for (int i = 0; i < argc; ++i) {
+        std::cerr << "[DEBUG] argv[" << i << "] = '" << argv[i] << "'" << std::endl;
+    }
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
+        std::cerr << "[DEBUG] Processing argument: '" << arg << "'" << std::endl;
         
         // Handle --key=value format
         if (arg.find("--symbol=") == 0) {
             symbol = arg.substr(9); // Remove "--symbol="
+            std::cerr << "[DEBUG] Set symbol = '" << symbol << "'" << std::endl;
         } else if (arg.find("--start=") == 0) {
             start_date = arg.substr(8); // Remove "--start="
+            std::cerr << "[DEBUG] Set start_date = '" << start_date << "'" << std::endl;
         } else if (arg.find("--end=") == 0) {
             end_date = arg.substr(6); // Remove "--end="
+            std::cerr << "[DEBUG] Set end_date = '" << end_date << "'" << std::endl;
         } else if (arg.find("--capital=") == 0) {
             capital = std::stod(arg.substr(10)); // Remove "--capital="
+            std::cerr << "[DEBUG] Set capital = " << capital << std::endl;
+        } else if (arg.find("--short-ma=") == 0) {
+            short_ma = std::stoi(arg.substr(11)); // Remove "--short-ma="
+            std::cerr << "[DEBUG] Set short_ma = " << short_ma << std::endl;
+        } else if (arg.find("--long-ma=") == 0) {
+            long_ma = std::stoi(arg.substr(10)); // Remove "--long-ma="
+            std::cerr << "[DEBUG] Set long_ma = " << long_ma << std::endl;
         }
         // Handle --key value format
         else if (arg == "--symbol" && i + 1 < argc) {
             symbol = argv[++i];
+            std::cerr << "[DEBUG] Set symbol = '" << symbol << "'" << std::endl;
         } else if (arg == "--start" && i + 1 < argc) {
             start_date = argv[++i];
+            std::cerr << "[DEBUG] Set start_date = '" << start_date << "'" << std::endl;
         } else if (arg == "--end" && i + 1 < argc) {
             end_date = argv[++i];
+            std::cerr << "[DEBUG] Set end_date = '" << end_date << "'" << std::endl;
         } else if (arg == "--capital" && i + 1 < argc) {
             capital = std::stod(argv[++i]);
+            std::cerr << "[DEBUG] Set capital = " << capital << std::endl;
+        } else if (arg == "--short-ma" && i + 1 < argc) {
+            short_ma = std::stoi(argv[++i]);
+            std::cerr << "[DEBUG] Set short_ma = " << short_ma << std::endl;
+        } else if (arg == "--long-ma" && i + 1 < argc) {
+            long_ma = std::stoi(argv[++i]);
+            std::cerr << "[DEBUG] Set long_ma = " << long_ma << std::endl;
+        } else if (arg == "--progress") {
+            enable_progress = true;
+            std::cerr << "[DEBUG] Progress reporting enabled" << std::endl;
         }
     }
+    
+    std::cerr << "[DEBUG] Final parsed values:" << std::endl;
+    std::cerr << "[DEBUG]   symbol = '" << symbol << "'" << std::endl;
+    std::cerr << "[DEBUG]   start_date = '" << start_date << "'" << std::endl;
+    std::cerr << "[DEBUG]   end_date = '" << end_date << "'" << std::endl;
+    std::cerr << "[DEBUG]   capital = " << capital << std::endl;
+    std::cerr << "[DEBUG]   short_ma = " << short_ma << std::endl;
+    std::cerr << "[DEBUG]   long_ma = " << long_ma << std::endl;
+    std::cerr << "[DEBUG]   enable_progress = " << (enable_progress ? "true" : "false") << std::endl;
 }
 
 // Function to run backtest
@@ -119,17 +157,22 @@ void testDatabase(const std::string& symbol, const std::string& start_date, cons
 }
 
 int main(int argc, char* argv[]) {
-    std::cout << "Trading Engine C++ Backend - Phase 3 Implementation" << std::endl;
-    
     try {
         if (argc > 1) {
             std::string command = argv[1];
+            
+            // Only print header for non-simulate commands
+            if (command != "--simulate") {
+                std::cout << "Trading Engine C++ Backend" << std::endl;
+            }
             
             if (command == "--test-db") {
                 // Parse additional arguments for database testing
                 std::string symbol, start_date, end_date;
                 double capital = 10000.0;
-                parseArguments(argc, argv, symbol, start_date, end_date, capital);
+                int short_ma = 20, long_ma = 50;
+                bool enable_progress = false;
+                parseArguments(argc, argv, symbol, start_date, end_date, capital, short_ma, long_ma, enable_progress);
                 
                 // Set defaults if not provided
                 if (symbol.empty()) symbol = "AAPL";
@@ -142,7 +185,9 @@ int main(int argc, char* argv[]) {
                 // Parse additional arguments for backtesting
                 std::string symbol, start_date, end_date;
                 double capital = 10000.0;
-                parseArguments(argc, argv, symbol, start_date, end_date, capital);
+                int short_ma = 20, long_ma = 50;
+                bool enable_progress = false;
+                parseArguments(argc, argv, symbol, start_date, end_date, capital, short_ma, long_ma, enable_progress);
                 
                 // Set defaults if not provided
                 if (symbol.empty()) symbol = "AAPL";
@@ -154,18 +199,49 @@ int main(int argc, char* argv[]) {
             }
         }
         
-        // Create trading engine with $10,000 initial capital
-        TradingEngine engine(10000.0);
-        
         if (argc > 1 && std::string(argv[1]) == "--simulate") {
-            // Run simulation and output JSON
-            std::string result = engine.runSimulation();
+            // Parse command line arguments for simulation
+            std::string symbol, start_date, end_date;
+            double capital = 10000.0;
+            int short_ma = 20, long_ma = 50;
+            bool enable_progress = false;
+            parseArguments(argc, argv, symbol, start_date, end_date, capital, short_ma, long_ma, enable_progress);
+            
+            // Create trading engine with parsed capital instead of hardcoded value
+            TradingEngine engine(capital);
+            
+            // Set defaults if not provided
+            if (symbol.empty()) symbol = "AAPL";
+            if (start_date.empty()) start_date = "2023-01-01";
+            if (end_date.empty()) end_date = "2023-12-31";
+            
+            std::cerr << "[DEBUG] About to run simulation with:" << std::endl;
+            std::cerr << "[DEBUG]   symbol = '" << symbol << "'" << std::endl;
+            std::cerr << "[DEBUG]   start_date = '" << start_date << "'" << std::endl;
+            std::cerr << "[DEBUG]   end_date = '" << end_date << "'" << std::endl;
+            std::cerr << "[DEBUG]   capital = " << capital << std::endl;
+            std::cerr << "[DEBUG]   short_ma = " << short_ma << std::endl;
+            std::cerr << "[DEBUG]   long_ma = " << long_ma << std::endl;
+            
+            // Configure strategy with parsed parameters
+            engine.setMovingAverageStrategy(short_ma, long_ma);
+            
+            // Run simulation with or without progress based on flag
+            std::string result;
+            if (enable_progress) {
+                result = engine.runSimulationWithProgress(symbol, start_date, end_date, capital);
+            } else {
+                result = engine.runSimulationWithParams(symbol, start_date, end_date, capital);
+            }
             std::cout << result << std::endl;
         } else if (argc > 1 && std::string(argv[1]) == "--status") {
+            // Create default trading engine for status
+            TradingEngine engine(10000.0);
             // Show portfolio status
             std::cout << engine.getPortfolioStatus() << std::endl;
         } else {
-            // Show help
+            // Show help - print header for help
+            std::cout << "Trading Engine C++ Backend" << std::endl;
             std::cout << "\nUsage:" << std::endl;
             std::cout << "  " << argv[0] << " --simulate              Run simulation and output JSON" << std::endl;
             std::cout << "  " << argv[0] << " --status                Show portfolio status" << std::endl;
@@ -177,24 +253,6 @@ int main(int argc, char* argv[]) {
             std::cout << "  --start DATE      Start date (default: 2023-01-01)" << std::endl;
             std::cout << "  --end DATE        End date (default: 2023-12-31)" << std::endl;
             std::cout << "  --capital AMOUNT  Starting capital (default: 10000)" << std::endl;
-            std::cout << "\nPhase 3 Features:" << std::endl;
-            std::cout << "  [DONE] Technical indicators (SMA, EMA, RSI)" << std::endl;
-            std::cout << "  [DONE] Moving average crossover strategy" << std::endl;
-            std::cout << "  [DONE] RSI-based trading strategy" << std::endl;
-            std::cout << "  [DONE] Backtesting engine with performance metrics" << std::endl;
-            std::cout << "  [DONE] Signal generation and execution" << std::endl;
-            std::cout << "  [DONE] Risk management and position sizing" << std::endl;
-            std::cout << "\nPhase 2 Features:" << std::endl;
-            std::cout << "  [DONE] PostgreSQL/TimescaleDB connection" << std::endl;
-            std::cout << "  [DONE] Historical stock data access" << std::endl;
-            std::cout << "  [DONE] Real-time price queries" << std::endl;
-            std::cout << "  [DONE] Data validation and caching" << std::endl;
-            std::cout << "  [DONE] JSON output for frontend integration" << std::endl;
-            std::cout << "\nPrevious Features:" << std::endl;
-            std::cout << "  ✓ Position management (buy/sell shares)" << std::endl;
-            std::cout << "  ✓ Portfolio tracking (cash + positions)" << std::endl;
-            std::cout << "  ✓ Order management (buy/sell orders)" << std::endl;
-            std::cout << "  ✓ Basic value calculations" << std::endl;
         }
         
     } catch (const std::exception& e) {

@@ -253,7 +253,7 @@ void test_trading_strategy() {
 }
 
 int main() {
-    std::cout << "Running C++ Trading Engine Phase 3 Tests" << std::endl;
+    std::cout << "Running C++ Trading Engine" << std::endl;
     
     test_position_basic();
     test_portfolio_basic();

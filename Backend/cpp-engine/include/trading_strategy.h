@@ -26,6 +26,7 @@ struct StrategyConfig {
 };
 
 struct BacktestResult {
+    std::string symbol;
     double starting_capital;
     double ending_value;
     double total_return_pct;

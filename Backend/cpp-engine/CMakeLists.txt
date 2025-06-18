@@ -39,7 +39,6 @@ add_executable(trading_engine src/main.cpp ${CORE_SOURCES} ${CORE_HEADERS})
 # Test executable
 add_executable(test_basic tests/test_basic.cpp ${CORE_SOURCES} ${CORE_HEADERS})
 
-# Phase 2: Database Integration
 # Find required packages
 find_package(PkgConfig REQUIRED)
 

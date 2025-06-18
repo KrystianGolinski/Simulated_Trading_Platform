@@ -20,12 +20,103 @@ export interface HealthData {
   minute_records_count: number;
 }
 
+export interface SimulationConfig {
+  symbols: string[];
+  start_date: string;
+  end_date: string;
+  starting_capital: number;
+  strategy: 'ma_crossover' | 'rsi';
+  short_ma?: number;
+  long_ma?: number;
+  rsi_period?: number;
+  rsi_oversold?: number;
+  rsi_overbought?: number;
+}
+
+export interface SimulationResponse {
+  simulation_id: string;
+  status: string;
+  message: string;
+}
+
+export interface SimulationStatusResponse {
+  simulation_id: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  progress_pct?: number;
+  current_date?: string;
+  elapsed_time?: number;
+  estimated_remaining?: number;
+}
+
+export interface TradeRecord {
+  date: string;
+  symbol: string;
+  action: string;
+  shares: number;
+  price: number;
+  total_value: number;
+}
+
+export interface PerformanceMetrics {
+  total_return_pct: number;
+  sharpe_ratio?: number;
+  max_drawdown_pct: number;
+  win_rate: number;
+  total_trades: number;
+  winning_trades: number;
+  losing_trades: number;
+}
+
+export interface ValidationError {
+  field: string;
+  message: string;
+  error_code: string;
+}
+
+export interface ValidationResult {
+  is_valid: boolean;
+  errors: ValidationError[];
+  warnings: string[];
+}
+
+export interface ApiErrorResponse {
+  message: string;
+  errors?: string[];
+  error_details?: ValidationError[];
+}
+
+export interface SimulationResults {
+  simulation_id: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  config: SimulationConfig;
+  starting_capital?: number;
+  ending_value?: number;
+  total_return_pct?: number;
+  performance_metrics?: PerformanceMetrics;
+  trades?: TradeRecord[];
+  equity_curve?: Array<{date: string; value: number}>;
+  created_at: string;
+  started_at?: string;
+  completed_at?: string;
+  error_message?: string;
+}
+
 class ApiService {
-  private async fetchWithErrorHandling<T>(url: string): Promise<T> {
+  private async fetchWithErrorHandling<T>(url: string, options?: RequestInit): Promise<T> {
     try {
-      const response = await fetch(`${API_BASE_URL}${url}`);
+      const response = await fetch(`${API_BASE_URL}${url}`, options);
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        // Try to parse error response for detailed validation errors
+        try {
+          const errorData: ApiErrorResponse = await response.json();
+          const error = new Error(errorData.message || `HTTP error! status: ${response.status}`);
+          (error as any).errorDetails = errorData.error_details;
+          (error as any).errors = errorData.errors;
+          (error as any).status = response.status;
+          throw error;
+        } catch (parseError) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
       }
       return await response.json();
     } catch (error) {
@@ -72,6 +163,54 @@ class ApiService {
       volume: parseInt(item.volume) || 0,
       vwap: item.vwap ? parseFloat(item.vwap) : undefined
     }));
+  }
+
+  // Validate simulation configuration
+  async validateSimulation(config: SimulationConfig): Promise<ValidationResult> {
+    return this.fetchWithErrorHandling<ValidationResult>('/simulation/validate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(config),
+    });
+  }
+
+  // Start a new simulation
+  async startSimulation(config: SimulationConfig): Promise<SimulationResponse> {
+    return this.fetchWithErrorHandling<SimulationResponse>('/simulation/start', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(config),
+    });
+  }
+
+  // Get simulation status and progress
+  async getSimulationStatus(simulationId: string): Promise<SimulationStatusResponse> {
+    return this.fetchWithErrorHandling<SimulationStatusResponse>(
+      `/simulation/${simulationId}/status`
+    );
+  }
+
+  // Get simulation results
+  async getSimulationResults(simulationId: string): Promise<SimulationResults> {
+    return this.fetchWithErrorHandling<SimulationResults>(
+      `/simulation/${simulationId}/results`
+    );
+  }
+
+  // Cancel a running simulation
+  async cancelSimulation(simulationId: string): Promise<{ message: string }> {
+    return this.fetchWithErrorHandling<{ message: string }>(
+      `/simulation/${simulationId}/cancel`
+    );
+  }
+
+  // List all simulations
+  async listSimulations(): Promise<Record<string, SimulationResults>> {
+    return this.fetchWithErrorHandling<Record<string, SimulationResults>>('/simulations');
   }
 }
 

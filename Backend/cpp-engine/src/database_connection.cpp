@@ -288,16 +288,29 @@ DatabaseConnection DatabaseConnection::createFromEnvironment() {
     const char* username = std::getenv("DB_USER");
     const char* password = std::getenv("DB_PASSWORD");
     
+    // Use Docker-friendly defaults
     return DatabaseConnection(
-        host ? host : "localhost",
-        port ? port : "5432",
-        database ? database : "trading_db",
-        username ? username : "postgres",
-        password ? password : ""
+        host ? host : "postgres",
+        port ? port : "5432", 
+        database ? database : "simulated_trading_platform",
+        username ? username : "trading_user",
+        password ? password : "trading_password"
     );
 }
 
 DatabaseConnection DatabaseConnection::createDefault() {
-    // Default connection for development
-    return DatabaseConnection("localhost", "5433", "simulated_trading_platform", "trading_user", "trading_password");
+    // Read from environment variables first, fall back to development defaults
+    const char* host = std::getenv("DB_HOST");
+    const char* port = std::getenv("DB_PORT");
+    const char* dbname = std::getenv("DB_NAME");
+    const char* user = std::getenv("DB_USER");
+    const char* password = std::getenv("DB_PASSWORD");
+    
+    return DatabaseConnection(
+        host ? host : "localhost",
+        port ? port : "5433",
+        dbname ? dbname : "simulated_trading_platform",
+        user ? user : "trading_user",
+        password ? password : "trading_password"
+    );
 }

@@ -18,7 +18,7 @@ struct BacktestConfig {
     std::string strategy_name;
     StrategyConfig strategy_config;
     
-    BacktestConfig() : starting_capital(10000.0), strategy_name("ma_crossover") {}
+    BacktestConfig() : starting_capital(0.0), strategy_name("ma_crossover") {}
 };
 
 class TradingEngine {
@@ -27,6 +27,10 @@ private:
     MarketData market_data_;
     std::unique_ptr<TradingStrategy> strategy_;
     std::vector<TradingSignal> executed_signals_;
+    
+    // Phase 4: Performance optimization members
+    std::map<std::string, std::vector<PriceData>> price_data_cache_;
+    bool cache_enabled_;
     
 public:
     TradingEngine();
@@ -45,11 +49,24 @@ public:
     
     // Simulation methods
     std::string runSimulation();
+    std::string runSimulationWithParams(const std::string& symbol, const std::string& start_date, const std::string& end_date, double capital);
+    std::string runSimulationWithProgress(const std::string& symbol, const std::string& start_date, const std::string& end_date, double capital);
     BacktestResult runBacktest(const BacktestConfig& config);
     BacktestResult runBacktestMultiSymbol(const std::vector<std::string>& symbols,
                                          const std::string& start_date,
                                          const std::string& end_date,
                                          double starting_capital);
+    
+    // Phase 4: Enhanced multi-symbol processing with performance optimizations
+    std::string runSimulationMultiSymbol(const std::vector<std::string>& symbols, 
+                                       const std::string& start_date, 
+                                       const std::string& end_date, 
+                                       double capital,
+                                       bool enable_progress = false);
+    
+    // Phase 4: Memory optimization methods
+    void optimizeMemoryUsage();
+    void clearCache();
     
     // Portfolio access
     std::string getPortfolioStatus();

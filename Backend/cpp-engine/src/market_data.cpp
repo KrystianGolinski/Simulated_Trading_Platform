@@ -11,7 +11,7 @@
 
 // MarketData implementation
 MarketData::MarketData() 
-    : db_connection_(std::make_unique<DatabaseConnection>(DatabaseConnection::createDefault())),
+    : db_connection_(std::make_unique<DatabaseConnection>(DatabaseConnection::createFromEnvironment())),
       cache_enabled_(true) {
 }
 

@@ -4,14 +4,20 @@ interface SimulationProgressProps {
   isRunning: boolean;
   progress: number;
   currentStep: string;
-  estimatedTimeRemaining?: number;
+  simulationId?: string;
+  onCancel?: () => Promise<void>;
+  estimatedRemaining?: number;
+  elapsedTime?: number;
 }
 
 export const SimulationProgress: React.FC<SimulationProgressProps> = ({
   isRunning,
   progress,
   currentStep,
-  estimatedTimeRemaining
+  simulationId,
+  onCancel,
+  estimatedRemaining,
+  elapsedTime
 }) => {
   if (!isRunning) return null;
 
@@ -43,18 +49,36 @@ export const SimulationProgress: React.FC<SimulationProgressProps> = ({
             <p className="text-xl font-semibold text-blue-600">{currentStep}</p>
           </div>
 
-          {/* Estimated Time */}
-          {estimatedTimeRemaining && (
-            <div className="text-center mb-6">
+          {/* Time Information */}
+          <div className="text-center mb-6 space-y-2">
+            {elapsedTime && (
               <p className="text-sm text-gray-600">
-                Estimated time remaining: {Math.ceil(estimatedTimeRemaining / 60)} minutes
+                Elapsed time: {Math.floor(elapsedTime)} seconds
               </p>
-            </div>
-          )}
+            )}
+            {estimatedRemaining && (
+              <p className="text-sm text-gray-600">
+                Estimated time remaining: {Math.ceil(estimatedRemaining)} seconds
+              </p>
+            )}
+            {simulationId && (
+              <p className="text-xs text-gray-500">
+                Simulation ID: {simulationId.slice(0, 8)}...
+              </p>
+            )}
+          </div>
 
-          {/* Loading Animation */}
-          <div className="flex justify-center">
+          {/* Loading Animation and Cancel Button */}
+          <div className="flex flex-col items-center space-y-4">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            {onCancel && (
+              <button
+                onClick={onCancel}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+              >
+                Cancel Simulation
+              </button>
+            )}
           </div>
 
           {/* Steps Indicator */}

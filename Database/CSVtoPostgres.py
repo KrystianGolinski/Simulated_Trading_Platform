@@ -417,10 +417,10 @@ class CSVToPostgreSQLLoader:
 # Example usage
 if __name__ == "__main__":
     # Database configuration matching your architecture
-    DBHost = input("Enter DB host (default: host.docker.internal): ") or "host.docker.internal"
+    DBHost = input("Enter DB host (default: localhost): ") or "localhost"
     DBName = input("Enter DB name (default: simulated_trading_platform): ") or "simulated_trading_platform"
-    DBUsername = input("\nEnter DB username (default: trading_user): ") or "trading_user"
-    DBPassword = input("\nEnter DB password (default: trading_password): ") or "trading_password"
+    DBUsername = input("Enter DB username (default: trading_user): ") or "trading_user"
+    DBPassword = input("Enter DB password (default: trading_password): ") or "trading_password"
     DB_CONFIG = {
         "host": DBHost,
         "database": DBName,

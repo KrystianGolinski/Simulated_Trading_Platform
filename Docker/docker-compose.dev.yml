@@ -16,18 +16,6 @@ services:
     networks:
       - trading_network
 
-  redis:
-    env_file:
-      - ../.env
-    container_name: trading-cache
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - trading_network
-
   fastapi:
     env_file:
       - ../.env
@@ -39,12 +27,13 @@ services:
       - "8000:8000"
     depends_on:
       - postgres
-      - redis
+      - cpp-engine
     environment:
       DATABASE_URL: postgresql://trading_user:trading_password@postgres:5432/simulated_trading_platform
-      REDIS_URL: redis://redis:6379
+      DOCKER_ENV: "true"
     volumes:
       - ../Backend/api:/app
+      - cpp_engine_build:/shared/cpp-engine-build
     networks:
       - trading_network
     command: ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
@@ -64,6 +53,8 @@ services:
       DB_NAME: simulated_trading_platform
       DB_USER: trading_user
       DB_PASSWORD: trading_password
+    volumes:
+      - cpp_engine_build:/app/build
     networks:
       - trading_network
 
@@ -90,7 +81,7 @@ services:
 
 volumes:
   postgres_data:
-  redis_data:
+  cpp_engine_build:
 
 networks:
   trading_network:

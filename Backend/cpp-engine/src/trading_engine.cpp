@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <chrono>
+#include <thread>
 
 // Constructors
 TradingEngine::TradingEngine() : portfolio_(10000.0) {
@@ -56,15 +58,70 @@ std::string TradingEngine::runSimulation() {
     return getBacktestResultsAsJson(result).dump(2);
 }
 
+// New simulation method with parameters
+std::string TradingEngine::runSimulationWithParams(const std::string& symbol, const std::string& start_date, const std::string& end_date, double capital) {
+    std::cerr << "[DEBUG] TradingEngine::runSimulationWithParams called with:" << std::endl;
+    std::cerr << "[DEBUG]   symbol = '" << symbol << "'" << std::endl;
+    std::cerr << "[DEBUG]   start_date = '" << start_date << "'" << std::endl;
+    std::cerr << "[DEBUG]   end_date = '" << end_date << "'" << std::endl;
+    std::cerr << "[DEBUG]   capital = " << capital << std::endl;
+    
+    BacktestConfig config;
+    config.symbol = symbol;
+    config.start_date = start_date;
+    config.end_date = end_date;
+    config.starting_capital = capital;
+    
+    std::cerr << "[DEBUG] BacktestConfig created:" << std::endl;
+    std::cerr << "[DEBUG]   config.symbol = '" << config.symbol << "'" << std::endl;
+    std::cerr << "[DEBUG]   config.start_date = '" << config.start_date << "'" << std::endl;
+    std::cerr << "[DEBUG]   config.end_date = '" << config.end_date << "'" << std::endl;
+    std::cerr << "[DEBUG]   config.starting_capital = " << config.starting_capital << std::endl;
+    
+    // Reset portfolio with new capital
+    portfolio_ = Portfolio(capital);
+    std::cerr << "[DEBUG] Portfolio initialized with capital: " << capital << std::endl;
+    std::cerr << "[DEBUG] Portfolio initial capital: " << portfolio_.getInitialCapital() << std::endl;
+    
+    BacktestResult result = runBacktest(config);
+    
+    std::cerr << "[DEBUG] Backtest completed. Result:" << std::endl;
+    std::cerr << "[DEBUG]   starting_capital = " << result.starting_capital << std::endl;
+    std::cerr << "[DEBUG]   ending_value = " << result.ending_value << std::endl;
+    std::cerr << "[DEBUG]   total_return_pct = " << result.total_return_pct << std::endl;
+    std::cerr << "[DEBUG]   total_trades = " << result.total_trades << std::endl;
+    
+    return getBacktestResultsAsJson(result).dump(2);
+}
+
+// New simulation method with progress output
+std::string TradingEngine::runSimulationWithProgress(const std::string& symbol, const std::string& start_date, const std::string& end_date, double capital) {
+    std::cerr << "[DEBUG] TradingEngine::runSimulationWithProgress called with:" << std::endl;
+    std::cerr << "[DEBUG]   symbol = '" << symbol << "'" << std::endl;
+    std::cerr << "[DEBUG]   start_date = '" << start_date << "'" << std::endl;
+    std::cerr << "[DEBUG]   end_date = '" << end_date << "'" << std::endl;
+    std::cerr << "[DEBUG]   capital = " << capital << std::endl;
+    
+    // This method is the same as runSimulationWithParams but the progress output is already built into runBacktest
+    return runSimulationWithParams(symbol, start_date, end_date, capital);
+}
+
 // Main backtesting implementation
 BacktestResult TradingEngine::runBacktest(const BacktestConfig& config) {
+    std::cerr << "[DEBUG] TradingEngine::runBacktest called with:" << std::endl;
+    std::cerr << "[DEBUG]   config.symbol = '" << config.symbol << "'" << std::endl;
+    std::cerr << "[DEBUG]   config.start_date = '" << config.start_date << "'" << std::endl;
+    std::cerr << "[DEBUG]   config.end_date = '" << config.end_date << "'" << std::endl;
+    std::cerr << "[DEBUG]   config.starting_capital = " << config.starting_capital << std::endl;
+    
     BacktestResult result;
+    result.symbol = config.symbol;
     result.starting_capital = config.starting_capital;
     result.start_date = config.start_date;
     result.end_date = config.end_date;
     
     if (!strategy_) {
-        std::cerr << "No strategy configured for backtesting" << std::endl;
+        std::cerr << "[ERROR] No strategy configured for backtesting" << std::endl;
         return result;
     }
     
@@ -72,24 +129,59 @@ BacktestResult TradingEngine::runBacktest(const BacktestConfig& config) {
     portfolio_ = Portfolio(config.starting_capital);
     executed_signals_.clear();
     
+    std::cerr << "[DEBUG] Getting historical price data..." << std::endl;
     // Get historical price data
     auto price_data_raw = market_data_.getHistoricalPrices(config.symbol, config.start_date, config.end_date);
+    std::cerr << "[DEBUG] Retrieved " << price_data_raw.size() << " price records" << std::endl;
+    
     if (price_data_raw.empty()) {
-        std::cerr << "No price data available for " << config.symbol << std::endl;
+        std::cerr << "[ERROR] No price data available for " << config.symbol << std::endl;
         return result;
     }
     
     auto price_data = convertToTechnicalData(price_data_raw);
+    std::cerr << "[DEBUG] Converted to " << price_data.size() << " technical data points" << std::endl;
+    
     if (price_data.empty()) {
-        std::cerr << "Failed to convert price data" << std::endl;
+        std::cerr << "[ERROR] Failed to convert price data" << std::endl;
         return result;
     }
     
     // Initialize equity curve
     result.equity_curve.push_back(config.starting_capital);
     
+    std::cerr << "[DEBUG] Starting backtest loop with " << price_data.size() << " data points" << std::endl;
+    std::cerr << "[DEBUG] Initial portfolio value: " << portfolio_.getTotalValue({}) << std::endl;
+    
     // Process each day
     for (size_t i = 1; i < price_data.size(); ++i) {
+        const auto& data_point = price_data[i];
+        
+        // Progress reporting every 5% of completion (more frequent)
+        if (i % (price_data.size() / 20) == 0 || i == price_data.size() - 1 || price_data.size() <= 20) {
+            double progress_pct = (static_cast<double>(i) / (price_data.size() - 1)) * 100.0;
+            std::map<std::string, double> current_prices;
+            current_prices[config.symbol] = data_point.close;
+            double current_value = portfolio_.getTotalValue(current_prices);
+            
+            // Output progress to stderr as JSON
+            nlohmann::json progress;
+            progress["type"] = "progress";
+            progress["progress_pct"] = progress_pct;
+            progress["current_date"] = data_point.date;
+            progress["current_value"] = current_value;
+            progress["current_price"] = data_point.close;
+            progress["day"] = static_cast<int>(i);
+            progress["total_days"] = static_cast<int>(price_data.size());
+            
+            std::cerr << progress.dump() << std::endl;
+        }
+        
+        if (i % 50 == 0) { // Log every 50 days
+            std::cerr << "[DEBUG] Day " << i << ": Price = " << data_point.close 
+                      << ", Portfolio = " << portfolio_.getTotalValue({{config.symbol, data_point.close}}) << std::endl;
+        }
+        
         std::vector<PriceData> historical_window(price_data.begin(), price_data.begin() + i + 1);
         
         // Create a copy of portfolio for strategy evaluation (to avoid modifying original)
@@ -97,23 +189,49 @@ BacktestResult TradingEngine::runBacktest(const BacktestConfig& config) {
         TradingSignal signal = strategy_->evaluateSignal(historical_window, portfolio_copy, config.symbol);
         
         if (signal.signal != Signal::HOLD) {
+            std::cerr << "[DEBUG] Generated signal: " << (signal.signal == Signal::BUY ? "BUY" : "SELL") 
+                      << " confidence=" << signal.confidence << " at price=" << signal.price << std::endl;
+        }
+        
+        if (signal.signal != Signal::HOLD) {
             if (executeSignal(signal, config.symbol)) {
                 executed_signals_.push_back(signal);
                 result.signals_generated.push_back(signal);
                 result.total_trades++;
+                std::cerr << "[DEBUG] Signal EXECUTED" << std::endl;
+            } else {
+                std::cerr << "[DEBUG] Signal REJECTED" << std::endl;
             }
         }
         
         // Update equity curve
         std::map<std::string, double> current_prices;
-        current_prices[config.symbol] = price_data[i].close;
+        current_prices[config.symbol] = data_point.close;
         double portfolio_value = portfolio_.getTotalValue(current_prices);
         result.equity_curve.push_back(portfolio_value);
     }
     
+    std::cerr << "[DEBUG] Backtest loop completed" << std::endl;
+    std::cerr << "[DEBUG] Total signals generated: " << executed_signals_.size() << std::endl;
+    std::cerr << "[DEBUG] Total trades executed: " << result.total_trades << std::endl;
+    
     // Calculate final results
-    result.ending_value = result.equity_curve.back();
-    result.total_return_pct = ((result.ending_value - result.starting_capital) / result.starting_capital) * 100.0;
+    if (!result.equity_curve.empty()) {
+        result.ending_value = result.equity_curve.back();
+        result.total_return_pct = ((result.ending_value - result.starting_capital) / result.starting_capital) * 100.0;
+        
+        std::cerr << "[DEBUG] Final calculations:" << std::endl;
+        if (!price_data.empty()) {
+            std::cerr << "[DEBUG]   Final price: " << price_data.back().close << std::endl;
+        }
+        std::cerr << "[DEBUG]   Portfolio cash: " << portfolio_.getCashBalance() << std::endl;
+        std::cerr << "[DEBUG]   Calculated ending value: " << result.ending_value << std::endl;
+        std::cerr << "[DEBUG]   Calculated return: " << result.total_return_pct << "%" << std::endl;
+    } else {
+        result.ending_value = result.starting_capital;
+        result.total_return_pct = 0.0;
+        std::cerr << "[DEBUG] Empty equity curve, using starting capital as ending value" << std::endl;
+    }
     
     // Calculate performance metrics
     auto daily_returns = calculateDailyReturns(result.equity_curve);
@@ -208,7 +326,7 @@ nlohmann::json TradingEngine::getBacktestResultsAsJson(const BacktestResult& res
     
     json_result["starting_capital"] = result.starting_capital;
     json_result["ending_value"] = result.ending_value;
-    json_result["return_pct"] = result.total_return_pct;
+    json_result["total_return_pct"] = result.total_return_pct;
     json_result["trades"] = result.total_trades;
     json_result["winning_trades"] = result.winning_trades;
     json_result["losing_trades"] = result.losing_trades;
@@ -219,11 +337,27 @@ nlohmann::json TradingEngine::getBacktestResultsAsJson(const BacktestResult& res
     json_result["start_date"] = result.start_date;
     json_result["end_date"] = result.end_date;
     
-    // Add equity curve
+    // Add performance metrics object
+    nlohmann::json performance_metrics;
+    performance_metrics["total_return_pct"] = result.total_return_pct;
+    performance_metrics["sharpe_ratio"] = result.sharpe_ratio;
+    performance_metrics["max_drawdown_pct"] = result.max_drawdown;
+    performance_metrics["win_rate"] = result.win_rate;
+    performance_metrics["total_trades"] = result.total_trades;
+    performance_metrics["winning_trades"] = result.winning_trades;
+    performance_metrics["losing_trades"] = result.losing_trades;
+    json_result["performance_metrics"] = performance_metrics;
+    
+    // Add equity curve with actual dates
     nlohmann::json equity_array = nlohmann::json::array();
-    for (size_t i = 0; i < result.equity_curve.size(); ++i) {
+    
+    // Get price data to extract actual dates
+    auto price_data_raw = market_data_.getHistoricalPrices(result.symbol, result.start_date, result.end_date);
+    auto price_data = convertToTechnicalData(price_data_raw);
+    
+    for (size_t i = 0; i < result.equity_curve.size() && i < price_data.size(); ++i) {
         nlohmann::json point;
-        point["day"] = i;
+        point["date"] = (i < price_data.size()) ? price_data[i].date : result.start_date;
         point["value"] = result.equity_curve[i];
         equity_array.push_back(point);
     }
@@ -247,21 +381,54 @@ nlohmann::json TradingEngine::getBacktestResultsAsJson(const BacktestResult& res
 
 // Private helper methods
 bool TradingEngine::executeSignal(const TradingSignal& signal, const std::string& symbol) {
-    if (signal.signal == Signal::BUY) {
-        // Only buy if we don't already have a position
-        if (!portfolio_.hasPosition(symbol) || portfolio_.getPosition(symbol).getShares() == 0) {
-            double position_size = strategy_->calculatePositionSize(portfolio_.getCashBalance(), signal.price);
-            if (position_size > 0) {
-                return portfolio_.buyStock(symbol, static_cast<int>(position_size), signal.price);
+    std::cerr << "[DEBUG] executeSignal called: " << (signal.signal == Signal::BUY ? "BUY" : "SELL") 
+              << " symbol=" << symbol << " confidence=" << signal.confidence << std::endl;
+    
+    try {
+        if (signal.signal == Signal::BUY) {
+            // Only buy if we don't already have a position
+            bool has_position = portfolio_.hasPosition(symbol);
+            int current_shares = has_position ? portfolio_.getPosition(symbol).getShares() : 0;
+            
+            std::cerr << "[DEBUG] BUY signal - has_position=" << has_position 
+                      << " current_shares=" << current_shares << std::endl;
+            
+            if (!has_position || current_shares == 0) {
+                double cash_available = portfolio_.getCashBalance();
+                double position_size = strategy_->calculatePositionSize(cash_available, signal.price);
+                
+                std::cerr << "[DEBUG] BUY order: cash=" << cash_available 
+                          << " position_size=" << position_size 
+                          << " price=" << signal.price << std::endl;
+                
+                if (position_size > 0) {
+                    bool success = portfolio_.buyStock(symbol, static_cast<int>(position_size), signal.price);
+                    std::cerr << "[DEBUG] Buy order " << (success ? "SUCCESS" : "FAILED") << std::endl;
+                    return success;
+                }
+            }
+        } else if (signal.signal == Signal::SELL) {
+            // Only sell if we have a position
+            bool has_position = portfolio_.hasPosition(symbol);
+            int shares_owned = has_position ? portfolio_.getPosition(symbol).getShares() : 0;
+            
+            std::cerr << "[DEBUG] SELL signal - has_position=" << has_position 
+                      << " shares_owned=" << shares_owned << std::endl;
+            
+            if (has_position && shares_owned > 0) {
+                std::cerr << "[DEBUG] SELL order: shares_owned=" << shares_owned 
+                          << " price=" << signal.price << std::endl;
+                
+                bool success = portfolio_.sellStock(symbol, shares_owned, signal.price);
+                std::cerr << "[DEBUG] Sell order " << (success ? "SUCCESS" : "FAILED") << std::endl;
+                return success;
             }
         }
-    } else if (signal.signal == Signal::SELL) {
-        // Only sell if we have a position
-        if (portfolio_.hasPosition(symbol) && portfolio_.getPosition(symbol).getShares() > 0) {
-            auto position = portfolio_.getPosition(symbol);
-            return portfolio_.sellStock(symbol, position.getShares(), signal.price);
-        }
+    } catch (const std::exception& e) {
+        std::cerr << "[ERROR] executeSignal exception: " << e.what() << std::endl;
     }
+    
+    std::cerr << "[DEBUG] executeSignal returning false (no action taken)" << std::endl;
     return false;
 }
 

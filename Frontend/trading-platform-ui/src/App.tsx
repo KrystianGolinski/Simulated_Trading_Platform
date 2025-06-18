@@ -1,4 +1,6 @@
-import { useState, lazy, Suspense } from 'react';
+import { useState, lazy, Suspense, useEffect } from 'react';
+import { useSimulation } from './hooks/useSimulation';
+import { SimulationConfig } from './services/api';
 
 const SimulationSetup = lazy(() => import('./components/SimulationSetup').then(module => ({ default: module.SimulationSetup })));
 const SimulationProgress = lazy(() => import('./components/SimulationProgress').then(module => ({ default: module.SimulationProgress })));
@@ -9,55 +11,69 @@ type AppState = 'setup' | 'progress' | 'results' | 'dashboard';
 
 function App() {
   const [currentView, setCurrentView] = useState<AppState>('setup');
-  const [simulationProgress] = useState({
-    isRunning: false,
-    progress: 0,
-    currentStep: 'Initializing...'
-  });
+  const simulation = useSimulation();
 
-  // Mock simulation results for development
-  const mockResults = {
-    simulationId: 'sim_123',
-    startingCapital: 10000,
-    finalPortfolioValue: 12500,
-    totalReturnPercentage: 25.0,
-    totalTrades: 45,
-    winningTrades: 28,
-    losingTrades: 17,
-    equityCurve: [
-      { date: '2023-01-01', value: 10000 },
-      { date: '2023-03-01', value: 10500 },
-      { date: '2023-06-01', value: 11200 },
-      { date: '2023-09-01', value: 12100 },
-      { date: '2023-12-31', value: 12500 }
-    ],
-    config: {
-      startDate: '2023-01-01',
-      endDate: '2023-12-31',
-      selectedStocks: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA'],
-      shortMAPeriod: 20,
-      longMAPeriod: 50
+  // Auto-navigate based on simulation state
+  useEffect(() => {
+    if (simulation.isLoading && currentView !== 'progress') {
+      setCurrentView('progress');
+    } else if (simulation.currentSimulation?.status === 'completed' && currentView !== 'results') {
+      setCurrentView('results');
+    } else if (simulation.error && currentView === 'progress') {
+      setCurrentView('setup');
     }
+  }, [simulation.isLoading, simulation.currentSimulation, simulation.error, currentView]);
+
+  const handleStartSimulation = async (config: SimulationConfig) => {
+    await simulation.startSimulation(config);
+  };
+
+  const handleResetSimulation = () => {
+    simulation.reset();
+    setCurrentView('setup');
   };
 
   const renderCurrentView = () => {
     switch (currentView) {
       case 'setup':
-        return <SimulationSetup />;
+        return (
+          <SimulationSetup 
+            onStartSimulation={handleStartSimulation}
+            isLoading={simulation.isLoading}
+            error={simulation.error}
+            onClearError={simulation.clearError}
+          />
+        );
       case 'progress':
         return (
           <SimulationProgress
-            isRunning={simulationProgress.isRunning}
-            progress={simulationProgress.progress}
-            currentStep={simulationProgress.currentStep}
+            isRunning={simulation.isLoading}
+            progress={simulation.status?.progress_pct || 0}
+            currentStep={simulation.status?.status === 'running' ? 'Running simulation...' : 'Initializing...'}
+            simulationId={simulation.currentSimulation?.simulation_id}
+            onCancel={simulation.cancelSimulation}
+            estimatedRemaining={simulation.status?.estimated_remaining}
+            elapsedTime={simulation.status?.elapsed_time}
           />
         );
       case 'results':
-        return <SimulationResults results={mockResults} />;
+        return (
+          <SimulationResults 
+            results={simulation.currentSimulation} 
+            onStartNew={handleResetSimulation}
+          />
+        );
       case 'dashboard':
         return <Dashboard />;
       default:
-        return <SimulationSetup />;
+        return (
+          <SimulationSetup 
+            onStartSimulation={handleStartSimulation}
+            isLoading={simulation.isLoading}
+            error={simulation.error}
+            onClearError={simulation.clearError}
+          />
+        );
     }
   };
 
@@ -68,27 +84,49 @@ function App() {
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex justify-between items-center h-16">
             <h1 className="text-xl font-bold text-gray-900">Trading Platform</h1>
-            <div className="flex space-x-6">
+            <div className="flex items-center space-x-6">
+              {/* Simulation Status Indicator */}
+              {simulation.isLoading && (
+                <div className="flex items-center space-x-2 text-sm text-orange-600">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-600"></div>
+                  <span>Simulation Running</span>
+                </div>
+              )}
+              {simulation.error && (
+                <div className="flex items-center space-x-2 text-sm text-red-600">
+                  <span>⚠️ Error</span>
+                </div>
+              )}
+              {simulation.currentSimulation?.status === 'completed' && (
+                <div className="flex items-center space-x-2 text-sm text-green-600">
+                  <span>✅ Complete</span>
+                </div>
+              )}
+              
+              {/* Navigation Buttons */}
               <button
-                onClick={() => setCurrentView('setup')}
+                onClick={handleResetSimulation}
+                disabled={simulation.isLoading}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                   currentView === 'setup'
                     ? 'bg-blue-600 text-white'
                     : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'
-                }`}
+                } ${simulation.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 New Simulation
               </button>
-              <button
-                onClick={() => setCurrentView('results')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  currentView === 'results'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'
-                }`}
-              >
-                Results (Demo)
-              </button>
+              {simulation.currentSimulation && (
+                <button
+                  onClick={() => setCurrentView('results')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    currentView === 'results'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'
+                  }`}
+                >
+                  Results
+                </button>
+              )}
               <button
                 onClick={() => setCurrentView('dashboard')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${

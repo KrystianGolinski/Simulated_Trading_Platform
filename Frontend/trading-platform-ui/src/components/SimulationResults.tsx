@@ -12,6 +12,7 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import 'chartjs-adapter-date-fns';
+import { SimulationResults as SimulationResultsType } from '../services/api';
 
 ChartJS.register(
   CategoryScale,
@@ -25,26 +26,14 @@ ChartJS.register(
 );
 
 interface SimulationResultsProps {
-  results: {
-    simulationId: string;
-    startingCapital: number;
-    finalPortfolioValue: number;
-    totalReturnPercentage: number;
-    totalTrades: number;
-    winningTrades: number;
-    losingTrades: number;
-    equityCurve: Array<{ date: string; value: number }>;
-    config: {
-      startDate: string;
-      endDate: string;
-      selectedStocks: string[];
-      shortMAPeriod: number;
-      longMAPeriod: number;
-    };
-  };
+  results: SimulationResultsType | null;
+  onStartNew?: () => void;
 }
 
-export const SimulationResults: React.FC<SimulationResultsProps> = ({ results }) => {
+export const SimulationResults: React.FC<SimulationResultsProps> = ({ 
+  results, 
+  onStartNew 
+}) => {
   const chartRef = useRef(null);
 
   useEffect(() => {
@@ -55,16 +44,59 @@ export const SimulationResults: React.FC<SimulationResultsProps> = ({ results })
       }
     };
   }, []);
-  const {
-    startingCapital,
-    finalPortfolioValue,
-    totalReturnPercentage,
-    totalTrades,
-    winningTrades,
-    losingTrades,
-    equityCurve,
-    config
-  } = results;
+
+  if (!results) {
+    return (
+      <div className="p-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">No Results Available</h1>
+          <p className="text-gray-600">Please run a simulation to see results.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle cases where simulation failed or is incomplete
+  if (results.status === 'failed') {
+    return (
+      <div className="p-6">
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">Simulation Failed</h1>
+          <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
+            <p className="text-red-700">{results.error_message || 'Unknown error occurred'}</p>
+          </div>
+          {onStartNew && (
+            <button 
+              onClick={onStartNew}
+              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
+            >
+              Try New Simulation
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (results.status !== 'completed') {
+    return (
+      <div className="p-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">Simulation In Progress</h1>
+          <p className="text-gray-600">Status: {results.status}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const startingCapital = results.starting_capital || 0;
+  const finalPortfolioValue = results.ending_value || startingCapital;
+  const totalReturnPercentage = results.total_return_pct || 0;
+  const performanceMetrics = results.performance_metrics;
+  const totalTrades = performanceMetrics?.total_trades || 0;
+  const winningTrades = performanceMetrics?.winning_trades || 0;
+  const losingTrades = performanceMetrics?.losing_trades || 0;
+  const equityCurve = results.equity_curve || [];
 
   const winRate = totalTrades > 0 ? ((winningTrades / totalTrades) * 100).toFixed(1) : '0';
   const profitLoss = finalPortfolioValue - startingCapital;
@@ -207,24 +239,28 @@ export const SimulationResults: React.FC<SimulationResultsProps> = ({ results })
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-gray-600">Period:</span>
-                <span className="font-semibold">{config.startDate} to {config.endDate}</span>
+                <span className="font-semibold">{results.config.start_date} to {results.config.end_date}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Stocks:</span>
-                <span className="font-semibold">{config.selectedStocks.length} symbols</span>
+                <span className="font-semibold">{results.config.symbols.length} symbols</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Strategy:</span>
+                <span className="font-semibold">{results.config.strategy}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Short MA:</span>
-                <span className="font-semibold">{config.shortMAPeriod} days</span>
+                <span className="font-semibold">{results.config.short_ma} days</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Long MA:</span>
-                <span className="font-semibold">{config.longMAPeriod} days</span>
+                <span className="font-semibold">{results.config.long_ma} days</span>
               </div>
               <div className="mt-4">
                 <span className="text-gray-600">Selected Stocks:</span>
                 <div className="mt-1">
-                  <span className="font-semibold">{config.selectedStocks.join(', ')}</span>
+                  <span className="font-semibold">{results.config.symbols.join(', ')}</span>
                 </div>
               </div>
             </div>
@@ -234,9 +270,14 @@ export const SimulationResults: React.FC<SimulationResultsProps> = ({ results })
         {/* Action Buttons */}
         <div className="bg-white rounded-lg shadow p-4">
           <div className="flex space-x-4">
-            <button className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700">
-              Run New Simulation
-            </button>
+            {onStartNew && (
+              <button 
+                onClick={onStartNew}
+                className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
+              >
+                Run New Simulation
+              </button>
+            )}
             <button className="bg-gray-600 text-white px-6 py-2 rounded-md hover:bg-gray-700">
               Export Results
             </button>
