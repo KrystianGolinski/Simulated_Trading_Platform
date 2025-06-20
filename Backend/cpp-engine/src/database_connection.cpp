@@ -7,8 +7,8 @@
 // Constructors and destructor
 DatabaseConnection::DatabaseConnection() 
     : connection_(nullptr), connected_(false),
-      host_("localhost"), port_("5432"), database_("trading_db"),
-      username_("postgres"), password_("") {
+      host_("postgres"), port_("5432"), database_("simulated_trading_platform"),
+      username_("trading_user"), password_("trading_password") {
     buildConnectionString();
 }
 
@@ -280,18 +280,18 @@ nlohmann::json DatabaseConnection::getConnectionInfo() const {
     return info;
 }
 
-// Static methods
+// Static methods - Simplified for Docker environment
 DatabaseConnection DatabaseConnection::createFromEnvironment() {
+    // Always assume Docker environment with known container names and credentials
     const char* host = std::getenv("DB_HOST");
     const char* port = std::getenv("DB_PORT");
     const char* database = std::getenv("DB_NAME");
     const char* username = std::getenv("DB_USER");
     const char* password = std::getenv("DB_PASSWORD");
     
-    // Use Docker-friendly defaults
     return DatabaseConnection(
-        host ? host : "postgres",
-        port ? port : "5432", 
+        host ? host : "postgres",           // Docker service name
+        port ? port : "5432",              // Standard PostgreSQL port inside container
         database ? database : "simulated_trading_platform",
         username ? username : "trading_user",
         password ? password : "trading_password"
@@ -299,18 +299,6 @@ DatabaseConnection DatabaseConnection::createFromEnvironment() {
 }
 
 DatabaseConnection DatabaseConnection::createDefault() {
-    // Read from environment variables first, fall back to development defaults
-    const char* host = std::getenv("DB_HOST");
-    const char* port = std::getenv("DB_PORT");
-    const char* dbname = std::getenv("DB_NAME");
-    const char* user = std::getenv("DB_USER");
-    const char* password = std::getenv("DB_PASSWORD");
-    
-    return DatabaseConnection(
-        host ? host : "localhost",
-        port ? port : "5433",
-        dbname ? dbname : "simulated_trading_platform",
-        user ? user : "trading_user",
-        password ? password : "trading_password"
-    );
+    // Always use Docker environment defaults
+    return createFromEnvironment();
 }

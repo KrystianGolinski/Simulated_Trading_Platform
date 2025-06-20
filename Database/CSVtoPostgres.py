@@ -116,15 +116,6 @@ class CSVToPostgreSQLLoader:
                 WITH NO DATA;
             """)
             
-            # Add refresh policy
-            cur.execute("""
-                SELECT add_continuous_aggregate_policy('stock_prices_hourly',
-                    start_offset => INTERVAL '3 days',
-                    end_offset => INTERVAL '1 hour',
-                    schedule_interval => INTERVAL '1 hour',
-                    if_not_exists => TRUE
-                );
-            """)
             
             # Create tables for backtesting results (matching your architecture)
             cur.execute("""
@@ -327,26 +318,6 @@ class CSVToPostgreSQLLoader:
         cur.close()
         conn.close()
     
-    def refresh_aggregates(self):
-        # Refresh continuous aggregates for C++ engine queries
-        conn = psycopg2.connect(**self.db_config)
-        cur = conn.cursor()
-        
-        try:
-            # Refresh hourly aggregate
-            cur.execute("""
-                CALL refresh_continuous_aggregate('stock_prices_hourly', NULL, NULL);
-            """)
-            
-            conn.commit()
-            logger.info("Refreshed continuous aggregates")
-            
-        except Exception as e:
-            logger.error(f"Error refreshing aggregates: {e}")
-        finally:
-            cur.close()
-            conn.close()
-    
     def verify_data(self):
         # Verify data was loaded correctly
         conn = psycopg2.connect(**self.db_config)
@@ -405,8 +376,6 @@ class CSVToPostgreSQLLoader:
         # Load intraday data
         self.load_intraday_data()
         
-        # Refresh aggregates
-        # self.refresh_aggregates()
         
         # Verify
         self.verify_data()
@@ -416,16 +385,12 @@ class CSVToPostgreSQLLoader:
 
 # Usage
 if __name__ == "__main__":
-    # Database configuration matching architecture
-    DBHost = input("Enter DB host (default: localhost): ") or "localhost"
-    DBName = input("Enter DB name (default: simulated_trading_platform): ") or "simulated_trading_platform"
-    DBUsername = input("Enter DB username (default: trading_user): ") or "trading_user"
-    DBPassword = input("Enter DB password (default: trading_password): ") or "trading_password"
+    # Database configuration for Docker environment
     DB_CONFIG = {
-        "host": DBHost,
-        "database": DBName,
-        "user": DBUsername,
-        "password": DBPassword,
+        "host": "localhost",
+        "database": "simulated_trading_platform",
+        "user": "trading_user",
+        "password": "trading_password",
         "port": 5433
     }
     

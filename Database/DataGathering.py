@@ -2,12 +2,10 @@
 
 import yfinance as yf
 import pandas as pd
-import psycopg2
-from psycopg2.extras import execute_values
 from datetime import datetime, timedelta
 import logging
 import time
-from typing import List, Dict, Optional
+from typing import List, Dict
 import os
 import json
 
@@ -16,18 +14,16 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class FreeDataCollector:
-    def __init__(self, use_files: bool = False):
-        # Initialize data collector
-        
-        # Args:
-        #    use_files: If True, save to CSV files instead of database
-        self.use_files = use_files
-        
-        if use_files:
-            self.data_dir = "historical_data"
-            os.makedirs(self.data_dir, exist_ok=True)
-            os.makedirs(os.path.join(self.data_dir, "daily"), exist_ok=True)
-            os.makedirs(os.path.join(self.data_dir, "intraday"), exist_ok=True)
+    
+    # Simplified data collector that always uses CSV-to-DB workflow.
+    # Collects data from Yahoo Finance, saves to CSV files, then imports to database.
+    
+    def __init__(self):
+        # Initialize data collector for CSV-only workflow
+        self.data_dir = "historical_data"
+        os.makedirs(self.data_dir, exist_ok=True)
+        os.makedirs(os.path.join(self.data_dir, "daily"), exist_ok=True)
+        os.makedirs(os.path.join(self.data_dir, "intraday"), exist_ok=True)
     
     def fetch_stock_info(self, symbols: List[str]) -> Dict[str, Dict]:
         # Fetch stock metadata from Yahoo Finance
@@ -190,43 +186,50 @@ class FreeDataCollector:
         self.generate_summary()
     
     def generate_summary(self):
-        # Generate a summary of collected data
-        if self.use_files:
-            summary = {"daily": {}, "intraday": {}}
-            
-            # Check daily files
-            for file in os.listdir(os.path.join(self.data_dir, "daily")):
+        # Generate a summary of collected CSV data.
+        summary = {"daily": {}, "intraday": {}}
+        
+        # Check daily files
+        daily_dir = os.path.join(self.data_dir, "daily")
+        if os.path.exists(daily_dir):
+            for file in os.listdir(daily_dir):
                 if file.endswith(".csv"):
-                    df = pd.read_csv(os.path.join(self.data_dir, "daily", file))
+                    df = pd.read_csv(os.path.join(daily_dir, file))
                     symbol = file.replace("_daily.csv", "")
                     summary["daily"][symbol] = {
                         "records": len(df),
                         "start_date": df['date'].min(),
                         "end_date": df['date'].max()
                     }
-            
-            # Check intraday files
-            for file in os.listdir(os.path.join(self.data_dir, "intraday")):
+        
+        # Check intraday files
+        intraday_dir = os.path.join(self.data_dir, "intraday")
+        if os.path.exists(intraday_dir):
+            for file in os.listdir(intraday_dir):
                 if file.endswith(".csv"):
-                    df = pd.read_csv(os.path.join(self.data_dir, "intraday", file))
+                    df = pd.read_csv(os.path.join(intraday_dir, file))
                     symbol = file.replace("_intraday.csv", "")
                     summary["intraday"][symbol] = {
                         "records": len(df),
                         "start_date": df['datetime'].min(),
                         "end_date": df['datetime'].max()
                     }
-            
-            with open(os.path.join(self.data_dir, "summary.json"), 'w') as f:
-                json.dump(summary, f, indent=2)
-            
-            print("\n=== Data Collection Summary ===")
-            print(f"Daily data collected for {len(summary['daily'])} symbols")
-            print(f"Intraday data collected for {len(summary['intraday'])} symbols")
-            
-            for symbol, info in summary['daily'].items():
-                print(f"\n{symbol}:")
-                print(f"  Daily records: {info['records']}")
-                print(f"  Date range: {info['start_date']} to {info['end_date']}")
+        
+        # Save summary
+        with open(os.path.join(self.data_dir, "summary.json"), 'w') as f:
+            json.dump(summary, f, indent=2)
+        
+        # Print summary
+        print("\n=== Data Collection Summary ===")
+        print(f"Daily data collected for {len(summary['daily'])} symbols")
+        print(f"Intraday data collected for {len(summary['intraday'])} symbols")
+        
+        for symbol, info in summary['daily'].items():
+            print(f"\n{symbol}:")
+            print(f"  Daily records: {info['records']}")
+            print(f"  Date range: {info['start_date']} to {info['end_date']}")
+        
+        print("\nNext step: Use CSVtoPostgres.py to import data to database")
 
 if __name__ == "__main__":
     # List of stocks to collect
@@ -243,11 +246,13 @@ if __name__ == "__main__":
     START_DATE = (datetime.now() - timedelta(days=10*365)).strftime("%Y-%m-%d")
     
     print(f"Collecting data from {START_DATE} to {END_DATE}")
+    print("Data will be saved to CSV files for import to database")
     
-    # Create collector, save to files
-    collector = FreeDataCollector(use_files=True)
+    # Create collector (always saves to CSV files)
+    collector = FreeDataCollector()
     
     # Collect all data
     collector.collect_all_data(SYMBOLS, START_DATE, END_DATE)
     
     print("\nData collection complete!")
+    print("Run CSVtoPostgres.py to import the collected data to PostgreSQL database")

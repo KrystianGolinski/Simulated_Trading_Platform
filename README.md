@@ -60,7 +60,6 @@ GET /docs            # Interactive API documentation
 ```yaml
 # docker-compose.dev.yml
 postgres     # TimescaleDB (port 5432)
-redis        # Caching layer (port 6379) 
 fastapi      # Python API (port 8000)
 cpp-engine   # C++ trading engine
 frontend     # React UI (port 3000)

@@ -42,10 +42,9 @@ async def get_engine_status():
         "api_file_location": str(Path(__file__).parent),
     }
     
-    # List contents of possible directories
-    # Avoid creation of incorrect directories (Docker)
+    # List contents of Docker directory
+    # Always assume Docker environment
     possible_dirs = [
-        Path("/home/krystian/Desktop/Simulated_Trading_Platform/Backend/cpp-engine"),  # Absolute development path
         Path("/app/cpp-engine"),  # Docker path
     ]
     

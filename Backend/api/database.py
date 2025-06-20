@@ -17,10 +17,10 @@ logger = logging.getLogger(__name__)
 class DatabaseManager:
     def __init__(self):
         self.pool: Optional[asyncpg.Pool] = None
-        # Get credentials from environment
+        # Get credentials from environment - assume Docker environment
         self.database_url = os.getenv(
             "DATABASE_URL", 
-            f"postgresql://{os.getenv('DB_USER', 'trading_user')}:{os.getenv('DB_PASSWORD', 'trading_password')}@localhost:5433/simulated_trading_platform"
+            f"postgresql://{os.getenv('DB_USER', 'trading_user')}:{os.getenv('DB_PASSWORD', 'trading_password')}@postgres:5432/simulated_trading_platform"
         )
         # Add caching for frequently accessed data
         self._cache: Dict[str, Any] = {}

@@ -243,7 +243,6 @@ run_development_mode() {
     echo "  FastAPI:     http://localhost:8000"
     echo "  API Docs:    http://localhost:8000/docs"
     echo "  PostgreSQL:  localhost:5433"
-    echo "  Redis:       localhost:6379"
 }
 
 # Main execution flow

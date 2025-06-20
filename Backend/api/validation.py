@@ -3,7 +3,7 @@
 
 import logging
 from typing import List, Dict, Any, Optional
-from datetime import date, datetime, timedelta
+from datetime import date
 from database import DatabaseManager
 from models import SimulationConfig, ValidationError, ValidationResult, StrategyType
 
@@ -23,27 +23,42 @@ class SimulationValidator:
         warnings = []
         
         try:
-            # Validate stock symbols
+            # Validate stock symbols (critical validation first)
             symbol_validation = await self._validate_symbols(config.symbols)
             errors.extend(symbol_validation)
             
-            # Validate date ranges and data availability
-            if not errors:  # Only check data if symbols are valid
-                date_validation = await self._validate_date_ranges(config)
-                errors.extend(date_validation['errors'])
-                warnings.extend(date_validation['warnings'])
+            # Early exit if symbols are invalid - no point checking other validations
+            if errors:
+                logger.debug(f"Early exit due to symbol validation errors: {len(errors)} errors found")
+                return ValidationResult(is_valid=False, errors=errors, warnings=[])
             
-            # Validate capital amount
+            # Validate capital amount (quick validation)
             capital_validation = self._validate_capital(config.starting_capital)
             errors.extend(capital_validation)
             
-            # Validate strategy parameters
+            # Early exit if capital is invalid
+            if errors:
+                logger.debug("Early exit due to capital validation errors")
+                return ValidationResult(is_valid=False, errors=errors, warnings=[])
+            
+            # Validate strategy parameters (quick validation)
             strategy_validation = self._validate_strategy_parameters(config)
             errors.extend(strategy_validation)
             
-            # Check for potential issues (warnings)
-            config_warnings = self._check_configuration_warnings(config)
-            warnings.extend(config_warnings)
+            # Early exit if strategy parameters are invalid
+            if errors:
+                logger.debug("Early exit due to strategy parameter validation errors")
+                return ValidationResult(is_valid=False, errors=errors, warnings=[])
+            
+            # Only perform expensive data validation if all basic validations pass
+            date_validation = await self._validate_date_ranges(config)
+            errors.extend(date_validation['errors'])
+            warnings.extend(date_validation['warnings'])
+            
+            # Check for potential issues (warnings) - only if no critical errors
+            if not errors:
+                config_warnings = self._check_configuration_warnings(config)
+                warnings.extend(config_warnings)
             
         except Exception as e:
             logger.error(f"Validation error: {e}")
@@ -87,15 +102,9 @@ class SimulationValidator:
             for symbol in symbols:
                 symbol_upper = symbol.upper()
                 if not symbol_validation.get(symbol_upper, False):
-                    # Get suggestion for similar symbols
-                    suggestion = await self._get_symbol_suggestion(symbol_upper)
-                    message = f"Stock symbol '{symbol_upper}' not found in database"
-                    if suggestion:
-                        message += f". Did you mean '{suggestion}'?"
-                    
                     errors.append(ValidationError(
                         field="symbols",
-                        message=message,
+                        message=f"Stock symbol '{symbol_upper}' not found in database",
                         error_code="SYMBOL_NOT_FOUND"
                     ))
                     
@@ -130,16 +139,9 @@ class SimulationValidator:
                     continue
                 
                 if not data_check['has_data']:
-                    # Get available date range for suggestion
-                    available_range = await self.db.get_symbol_date_range(symbol)
-                    message = f"No data available for {symbol} between {config.start_date} and {config.end_date}"
-                    
-                    if available_range:
-                        message += f". Available data: {available_range['earliest_date']} to {available_range['latest_date']}"
-                    
                     errors.append(ValidationError(
                         field="date_range",
-                        message=message,
+                        message=f"No data available for {symbol} between {config.start_date} and {config.end_date}",
                         error_code="NO_DATA_AVAILABLE"
                     ))
                 
@@ -278,21 +280,6 @@ class SimulationValidator:
         
         return warnings
     
-    async def _get_symbol_suggestion(self, invalid_symbol: str) -> Optional[str]:
-        # Get suggestion for similar symbol
-        try:
-            # Get all available symbols
-            all_symbols = await self.db.get_available_stocks()
-            
-            # Simple similarity check - look for symbols that start with the same letters
-            prefix = invalid_symbol[:3] if len(invalid_symbol) >= 3 else invalid_symbol[:2]
-            
-            suggestions = [s for s in all_symbols if s.startswith(prefix)]
-            return suggestions[0] if suggestions else None
-            
-        except Exception as e:
-            logger.error(f"Error getting symbol suggestion: {e}")
-            return None
     
     async def check_database_connection(self) -> ValidationResult:
         # Check if database is accessible and contains required data

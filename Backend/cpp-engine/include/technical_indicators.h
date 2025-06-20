@@ -68,6 +68,7 @@ public:
     void clearCache();
     
 private:
+    void validatePeriod(int period) const;
     std::string getCacheKey(const std::string& indicator, int period) const;
     bool isCached(const std::string& key) const;
     void cacheIndicator(const std::string& key, const std::vector<double>& values);

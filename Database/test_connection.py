@@ -2,40 +2,16 @@
 import psycopg2
 
 def test_database_connection():
-    # Test PostgreSQL connection using various configurations
+    # Test PostgreSQL connection - simplified for Docker environment
     
     configs = [
         {
-            "name": "localhost",
-            "host": "localhost",
+            "name": "Docker postgres service",
+            "host": "postgres",
             "database": "simulated_trading_platform",
             "user": "trading_user",
             "password": "trading_password",
-            "port": 5433
-        },
-        {
-            "name": "host.docker.internal (Windows Docker)",
-            "host": "host.docker.internal",
-            "database": "simulated_trading_platform",
-            "user": "trading_user",
-            "password": "trading_password",
-            "port": 5433
-        },
-        {
-            "name": "127.0.0.1 (Windows alternative)",
-            "host": "127.0.0.1",
-            "database": "simulated_trading_platform",
-            "user": "trading_user",
-            "password": "trading_password",
-            "port": 5433
-        },
-        {
-            "name": "Docker container IP",
-            "host": "172.18.0.3",
-            "database": "simulated_trading_platform",
-            "user": "trading_user",
-            "password": "trading_password",
-            "port": 5433
+            "port": 5432
         }
     ]
     

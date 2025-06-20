@@ -48,9 +48,7 @@ public:
     void setRSIStrategy(int period = 14, double oversold = 30.0, double overbought = 70.0);
     
     // Simulation methods
-    std::string runSimulation();
     std::string runSimulationWithParams(const std::string& symbol, const std::string& start_date, const std::string& end_date, double capital);
-    std::string runSimulationWithProgress(const std::string& symbol, const std::string& start_date, const std::string& end_date, double capital);
     BacktestResult runBacktest(const BacktestConfig& config);
     BacktestResult runBacktestMultiSymbol(const std::vector<std::string>& symbols,
                                          const std::string& start_date,

@@ -46,18 +46,6 @@ void TradingEngine::setRSIStrategy(int period, double oversold, double overbough
     strategy_ = std::make_unique<RSIStrategy>(period, oversold, overbought);
 }
 
-// Legacy simulation method
-std::string TradingEngine::runSimulation() {
-    BacktestConfig config;
-    config.symbol = "AAPL";
-    config.start_date = "2023-01-01";
-    config.end_date = "2023-12-31";
-    config.starting_capital = portfolio_.getInitialCapital();
-    
-    BacktestResult result = runBacktest(config);
-    return getBacktestResultsAsJson(result).dump(2);
-}
-
 // New simulation method with parameters
 std::string TradingEngine::runSimulationWithParams(const std::string& symbol, const std::string& start_date, const std::string& end_date, double capital) {
     std::cerr << "[DEBUG] TradingEngine::runSimulationWithParams called with:" << std::endl;
@@ -92,18 +80,6 @@ std::string TradingEngine::runSimulationWithParams(const std::string& symbol, co
     std::cerr << "[DEBUG]   total_trades = " << result.total_trades << std::endl;
     
     return getBacktestResultsAsJson(result).dump(2);
-}
-
-// New simulation method with progress output
-std::string TradingEngine::runSimulationWithProgress(const std::string& symbol, const std::string& start_date, const std::string& end_date, double capital) {
-    std::cerr << "[DEBUG] TradingEngine::runSimulationWithProgress called with:" << std::endl;
-    std::cerr << "[DEBUG]   symbol = '" << symbol << "'" << std::endl;
-    std::cerr << "[DEBUG]   start_date = '" << start_date << "'" << std::endl;
-    std::cerr << "[DEBUG]   end_date = '" << end_date << "'" << std::endl;
-    std::cerr << "[DEBUG]   capital = " << capital << std::endl;
-    
-    // This method is the same as runSimulationWithParams but the progress output is already built into runBacktest
-    return runSimulationWithParams(symbol, start_date, end_date, capital);
 }
 
 // Main backtesting implementation

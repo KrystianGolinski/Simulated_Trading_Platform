@@ -29,10 +29,14 @@ void TechnicalIndicators::addPriceData(const PriceData& data) {
     clearCache();
 }
 
-std::vector<double> TechnicalIndicators::calculateSMA(int period) const {
+void TechnicalIndicators::validatePeriod(int period) const {
     if (period <= 0) {
         throw std::invalid_argument("Period must be positive");
     }
+}
+
+std::vector<double> TechnicalIndicators::calculateSMA(int period) const {
+    validatePeriod(period);
     
     std::string cache_key = getCacheKey("SMA", period);
     if (isCached(cache_key)) {
@@ -58,9 +62,7 @@ std::vector<double> TechnicalIndicators::calculateSMA(int period) const {
 }
 
 std::vector<double> TechnicalIndicators::calculateEMA(int period) const {
-    if (period <= 0) {
-        throw std::invalid_argument("Period must be positive");
-    }
+    validatePeriod(period);
     
     std::string cache_key = getCacheKey("EMA", period);
     if (isCached(cache_key)) {
@@ -88,9 +90,7 @@ std::vector<double> TechnicalIndicators::calculateEMA(int period) const {
 }
 
 std::vector<double> TechnicalIndicators::calculateRSI(int period) const {
-    if (period <= 0) {
-        throw std::invalid_argument("Period must be positive");
-    }
+    validatePeriod(period);
     
     std::string cache_key = getCacheKey("RSI", period);
     if (isCached(cache_key)) {
@@ -143,9 +143,7 @@ std::vector<double> TechnicalIndicators::calculateRSI(int period) const {
 }
 
 std::vector<double> TechnicalIndicators::calculateBollingerBands(int period, double std_dev) const {
-    if (period <= 0) {
-        throw std::invalid_argument("Period must be positive");
-    }
+    validatePeriod(period);
     
     std::vector<double> sma = calculateSMA(period);
     std::vector<double> bb_values;

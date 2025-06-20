@@ -15,50 +15,25 @@ logger = logging.getLogger(__name__)
 
 class SimulationEngine:
     def __init__(self):
-        # Check if we're running in Docker by looking for environment variables
-        self.is_docker = os.getenv('DOCKER_ENV', 'false').lower() == 'true' or os.path.exists('/.dockerenv')
-        
-        if self.is_docker:
-            # In Docker, the C++ engine is accessible via shared volume
-            self.cpp_engine_path = Path("/shared/cpp-engine-build/trading_engine")
-        else:
-            # Development mode - try different possible paths for the C++ engine
-            # Try absolute path first to avoid relative path issues
-            possible_paths = [
-                Path("/home/krystian/Desktop/Simulated_Trading_Platform/Backend/cpp-engine/build/trading_engine"),  # Absolute path (preferred)
-                Path(__file__).parent.parent / "cpp-engine" / "build" / "trading_engine",  # Relative path (fallback)
-            ]
-            
-            self.cpp_engine_path = None
-            for path in possible_paths:
-                resolved_path = path.resolve()  # Resolve immediately to check actual path
-                logger.info(f"Checking C++ engine path: {resolved_path}")
-                if resolved_path.exists() and os.access(resolved_path, os.X_OK):
-                    self.cpp_engine_path = resolved_path
-                    logger.info(f"Found valid C++ engine at: {self.cpp_engine_path}")
-                    break
-                else:
-                    logger.warning(f"C++ engine not found at: {resolved_path}")
+        # Always assume Docker environment - simplified configuration
+        # C++ engine is accessible via shared volume in Docker
+        self.cpp_engine_path = Path("/shared/cpp-engine-build/trading_engine")
+        logger.info(f"Using Docker C++ engine path: {self.cpp_engine_path}")
                     
         self.active_simulations: Dict[str, Dict[str, Any]] = {}
         self.results_storage: Dict[str, SimulationResults] = {}
         
-    def _validate_cpp_engine(self) -> bool:
-        # Check if C++ engine executable exists and is accessible
-        validation = self._validate_cpp_engine_detailed()
-        return validation['is_valid']
-    
-    def _validate_cpp_engine_detailed(self) -> Dict[str, Any]:
-        # Detailed validation of C++ engine with specific error messages
+    def _validate_cpp_engine(self) -> Dict[str, Any]:
+        # Detailed validation of C++ engine with Docker-specific error messages
         if self.cpp_engine_path is None:
             return {
                 'is_valid': False,
-                'error': 'C++ engine not found in any expected locations',
-                'error_code': 'ENGINE_NOT_FOUND',
+                'error': 'C++ engine path not configured',
+                'error_code': 'ENGINE_NOT_CONFIGURED',
                 'suggestions': [
-                    'Ensure the C++ engine is compiled',
-                    'Check Docker volume mounts if running in container',
-                    'Verify build directory exists'
+                    'Ensure Docker containers are running',
+                    'Check Docker volume mounts are properly configured',
+                    'Verify C++ engine was compiled in build container'
                 ]
             }
         
@@ -68,9 +43,9 @@ class SimulationEngine:
                 'error': f'C++ engine executable not found at {self.cpp_engine_path}',
                 'error_code': 'ENGINE_FILE_NOT_FOUND',
                 'suggestions': [
-                    'Run the build process to compile the engine',
-                    'Check if the build succeeded',
-                    f'Verify the file exists at {self.cpp_engine_path}'
+                    'Ensure C++ engine container has built successfully',
+                    'Check Docker volume mount configuration',
+                    'Verify shared volume is accessible between containers'
                 ]
             }
         
@@ -80,9 +55,9 @@ class SimulationEngine:
                 'error': f'C++ engine not executable at {self.cpp_engine_path}',
                 'error_code': 'ENGINE_NOT_EXECUTABLE',
                 'suggestions': [
-                    f'Run: chmod +x {self.cpp_engine_path}',
-                    'Check file permissions',
-                    'Verify the file is not corrupted'
+                    'Check Docker volume mount permissions',
+                    'Verify C++ engine was built with correct permissions',
+                    'Ensure shared volume allows executable files'
                 ]
             }
         
@@ -175,7 +150,7 @@ class SimulationEngine:
     async def start_simulation(self, config: SimulationConfig) -> str:
         # Start a new simulation and return simulation ID
         # Enhanced engine validation with detailed error messages
-        engine_validation = self._validate_cpp_engine_detailed()
+        engine_validation = self._validate_cpp_engine()
         if not engine_validation['is_valid']:
             raise RuntimeError(f"C++ trading engine validation failed: {engine_validation['error']}")
         
@@ -222,10 +197,7 @@ class SimulationEngine:
             if not working_dir.exists() or not working_dir.is_dir():
                 raise RuntimeError(f"Invalid working directory for C++ engine: {working_dir}")
             
-            logger.error(f"Starting simulation {simulation_id} with command: {' '.join(cmd)}")
-            logger.error(f"Working directory: {working_dir}")
-            logger.error(f"Engine path exists: {self.cpp_engine_path.exists()}")
-            logger.error(f"Command build time: {build_time:.2f}ms")
+            logger.debug(f"Starting simulation {simulation_id}: {' '.join(cmd)} (build_time: {build_time:.2f}ms)")
             
             # Run subprocess with validated working directory
             process = await asyncio.create_subprocess_exec(
@@ -510,10 +482,6 @@ class SimulationEngine:
             progress_info["current_date"] = sim_info.get("current_date")
             progress_info["current_value"] = sim_info.get("current_value")
             
-            # Calculate estimated remaining time based on actual progress
-            if actual_progress > 5:  # Only estimate after 5% completion
-                estimated_total = elapsed / (actual_progress / 100.0)
-                progress_info["estimated_remaining"] = max(0, estimated_total - elapsed)
         elif result.status.value == "completed":
             # For completed simulations, show 100% progress
             progress_info["progress_pct"] = 100.0

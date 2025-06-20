@@ -18,19 +18,6 @@ services:
       - trading_network
     restart: unless-stopped
 
-  redis:
-    env_file:
-      - ../.env
-    container_name: trading-cache
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - trading_network
-    restart: unless-stopped
-
   fastapi:
     env_file:
       - ../.env
@@ -42,10 +29,8 @@ services:
       - "8000:8000"
     depends_on:
       - postgres
-      - redis
     environment:
       DATABASE_URL: postgresql://trading_user:trading_password@postgres:5432/simulated_trading_platform
-      REDIS_URL: redis://redis:6379
     networks:
       - trading_network
     restart: unless-stopped
@@ -85,7 +70,6 @@ services:
 
 volumes:
   postgres_data:
-  redis_data:
 
 networks:
   trading_network:

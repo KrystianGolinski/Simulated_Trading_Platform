@@ -1,17 +1,5 @@
 ### Notes:
 
-**Redis**
-
-Current approach does not cache using Redis, consider removal or migration. Docker container for Redis has been removed, scrub Redis information from codebase and information
-
-**Simulation.py**
-
-Code repetition - When starting a simulation it performs validity checks exactly to '/simulation/validate'
-
-HTPP Code - When returning validation errors the HTTP code is 400 not 500
-
-Simulation cancelling endpoint - Would we ever need to cancel a simulation? (Possible bloat?)
-
 **Stocks.py**
 
 Data retrieval - When retrieving stock data is only daily data considered? Missing intraday?
@@ -36,95 +24,102 @@ TODO: optimize_multi_symbol_simulation and execute_parallel_simulation_groups (L
 
 Possible bloat - PerformanceOptimizer is not accessed/used?
 
-Docker - Always assume we are in docker, reduce code
-
-Code repetition - 2 methods to validate cpp engine?
-
 Line 146 - Implement multi-symbol simulation
-
-Line 159+ - RSI is not implemented?
 
 Line 194 - Not that useful at the moment (Singular symbol support and singular strategy support)
 
-Line 220 - This way used to fix a bug with incorrect directory creation, is it still needed and can it be optimised?
-
-Line 386 - Are suggestions necessary?
-
-Line 513 - Estimation is not going to be accurate, very variable. Consider removal
-
-Line 529 - Would we ever need to cancel a simulation? (Possible bloat?) (Line 11 of this file)
-
-**test_startup.py**
-
-Necessity - Is it necessary? Can it be integrated with the comprehensive test file to avoid bloat? It is never called or used externally
-
 **validation.py**
-
-Imports - datetime and timedelta seem obsolete from datetime
-
-Early exit - validate_simulation_config checks all parameters even if symbol is incorrect, possible inefficiency. Maybe implement an early exit strategy with hindered error returns?
-
-Line 94 - Why suggests stock if it's a checkbox from a pre-defined list?
 
 Line 177 - As strategies get developed with multi-symbolic execution consider lowering this amount
 
-Line 214 - RSI is not implemented?
-
-Line 251 - When optimised, at full release, will become obsolete as simulations of 10/15 years will be the norm
-
-Line 281 - Why are we using suggested stocks, what is the purpose of this code?
-
-**Backend/cpp-engine/tests**
-
-Tests - Comprehensive shell tests and basic cpp testing, merge into one test file to cover all?
-
-**Database/test_connection.py**
-
-Unnecessary config paths, use default: localhost, simulated_trading_platform, trading_user, trading_password
-
-**Database/CSVtoPostgres.py**
-
-Do we need to set a refresh policy if we only use historical data? (Line 330, 408, 409 etc ...)
-
-**Database/data_cleaning.py**
-
-data_cleaning.py and data_integrity_verification.py have overlapping checks, merge and adjust accordingly
-
 **Database/data_utils.py**
 
-In future, ensure consistent DB formatiing between daily and intraday to remove get_date_column and reduce the necessity of this file
+In future, ensure consistent DB formatting between daily and intraday to remove get_date_column and reduce the necessity of this file
 
-**Database/DataGathering.py**
-
-Always save to csv then import to DB with CSVtoPostgres, remove argument and functionality to import straight to DB within the file
-
-**Docker/docker-compose.yml**
-
-Remove Redis as not used currently and docker-compose.dev.yml has it removed
 
 **Backend/cpp-engine/trading_engine**
 
-Legacy simulation method and parameterised method, merge or remove legacy. Seems like there are multiple obsolete functions
-
-Line 389 - Allow to increase existing position in the future
+Allow to increase existing position in the future
 
 **Backend/cpp-engine/trading_strategy**
 
-Line 97 - Allow to increase existing position in the future (Line 109 of this file)
+Allow to increase existing position in the future
 
-**Backend/cpp-engine/technical_indicators.cpp**
+## Development Plan to Address Identified Issues
 
-Multiple functions check for 'Period' to be positive (code repetition)
+### Phase 2: Core Feature Implementation
+**Priority: High**
 
-**Backend/cpp-engine/portfolio.cpp**
+4. **Implement Multi-Symbol Simulation Support**
+   - Modify C++ engine to handle multiple symbols simultaneously
+   - Update `simulation_engine.py:146-148` to process all symbols, not just first
+   - Extend database queries to support multi-symbol data retrieval
+   - Update validation logic for multi-symbol configurations
 
-Usage/necessity of toDetailedString?
+5. **Complete RSI Strategy Implementation**
+   - Verify RSI is fully connected to simulation execution pipeline
+   - Test RSI parameter validation and execution
+   - Ensure RSI signals are properly generated and acted upon
 
-**Backend/cpp-engine/database_connection.cpp**
+6. **Activate Performance Optimizer Usage**
+   - Implement actual parallel processing for multi-symbol simulations
+   - Complete `optimize_multi_symbol_simulation()` and `execute_parallel_simulation_groups()`
+   - Add performance monitoring and caching optimizations
 
-Lines 283 onwards: always ran within docker with known credentials, possibly reduction/merging to reduce code?
+### Phase 4: Enhanced Features
+**Priority: Low**
+
+10. **Intraday Data Support**
+    - Extend stock data retrieval to include intraday timeframes
+    - Update frontend to allow intraday simulation selection
+    - Modify validation to support intraday date ranges
+
+11. **Advanced Position Management**
+    - Allow position increases in existing holdings
+    - Implement more sophisticated portfolio rebalancing
+
+### Codebase Improvements
+
+#### **High Priority Security & Performance Fixes**
+
+3. **Memory Leak in Simulation Loop** - `Backend/cpp-engine/src/trading_engine.cpp:160-188`
+   - Pre-allocate data structures instead of creating new historical windows repeatedly
+   - Use sliding window approach for historical data processing
+   - Significant memory usage optimization
+
+#### **Architecture & Code Quality**
 
 
-**TODO:**
+7. **Configuration Management** - `Docker/docker-compose.yml:33,48`
+   - Fix database URL inconsistencies between services
+   - Centralize configuration with environment variable validation
 
-/Backend/cpp-engine/*
+8. **Separation of Concerns** - `Backend/api/simulation_engine.py:178-301`
+   - Split simulation engine into separate services (ExecutionService, ResultProcessor, ErrorHandler)
+   - Current tight coupling makes testing and maintenance difficult
+
+#### **Error Handling & Monitoring**
+
+9. **Missing Error Context** - `Backend/api/validation.py:63-69`
+   - Implement structured error handling with specific error codes
+   - Generic exception handling loses debugging context
+
+10. **Logging Standardization** - Multiple files
+    - Standardize on structured logging with correlation IDs
+    - Replace print statements with proper logger usage
+    - Add log levels and filtering
+
+11. **Health Checks Missing** - Docker configuration
+    - Add health check endpoints for all services
+    - Implement graceful service startup ordering
+    - Add monitoring and alerting capabilities
+
+#### **API & Testing Improvements**
+
+15. **Response Format Consistency** - Various router files
+    - Standardize API response format across all endpoints
+    - Implement proper error response structure
+
+18. **Comprehensive Testing** - Test coverage gaps
+    - Add unit tests for all components
+    - Implement integration test suite
