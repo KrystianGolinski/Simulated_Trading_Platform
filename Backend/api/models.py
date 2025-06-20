@@ -61,6 +61,7 @@ class TradeRecord(BaseModel):
     total_value: float
 
 class PerformanceMetrics(BaseModel):
+    # Core metrics that C++ engine provides
     total_return_pct: float
     sharpe_ratio: Optional[float] = None
     max_drawdown_pct: float
@@ -68,6 +69,23 @@ class PerformanceMetrics(BaseModel):
     total_trades: int
     winning_trades: int
     losing_trades: int
+    
+    # Additional metrics that C++ engine provides but we weren't using
+    final_balance: Optional[float] = None
+    starting_capital: Optional[float] = None
+    max_drawdown: Optional[float] = None  # Absolute value, not percentage
+    
+    # Computed metrics we could add
+    profit_factor: Optional[float] = None  # winning_trades_value / losing_trades_value
+    average_win: Optional[float] = None
+    average_loss: Optional[float] = None
+    
+    # Fields that might be useful but C++ doesn't provide yet
+    annualized_return: Optional[float] = None
+    volatility: Optional[float] = None
+    
+    # Signals-related metrics
+    signals_generated: Optional[int] = None
 
 class ValidationError(BaseModel):
     field: str

@@ -34,7 +34,7 @@ services:
       DOCKER_ENV: "true"
     volumes:
       - ../Backend/api:/app
-      - cpp_engine_build:/shared/cpp-engine-build
+      - cpp_engine_shared:/shared
     networks:
       - trading_network
     command: ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
@@ -55,7 +55,15 @@ services:
       DB_USER: trading_user
       DB_PASSWORD: trading_password
     volumes:
-      - cpp_engine_build:/app/build
+      - cpp_engine_shared:/shared
+    command: >
+      sh -c "
+        mkdir -p /shared &&
+        cp /app/build/trading_engine /shared/ &&
+        chmod +x /shared/trading_engine &&
+        echo 'C++ engine binary copied to /shared/trading_engine' &&
+        tail -f /dev/null
+      "
     networks:
       - trading_network
 
@@ -82,7 +90,7 @@ services:
 
 volumes:
   postgres_data:
-  cpp_engine_build:
+  cpp_engine_shared:
 
 networks:
   trading_network:

@@ -94,20 +94,7 @@ Allow to increase existing position in the future
    - Fix database URL inconsistencies between services
    - Centralize configuration with environment variable validation
 
-8. **Separation of Concerns** - `Backend/api/simulation_engine.py:178-301`
-   - Split simulation engine into separate services (ExecutionService, ResultProcessor, ErrorHandler)
-   - Current tight coupling makes testing and maintenance difficult
-
 #### **Error Handling & Monitoring**
-
-9. **Missing Error Context** - `Backend/api/validation.py:63-69`
-   - Implement structured error handling with specific error codes
-   - Generic exception handling loses debugging context
-
-10. **Logging Standardization** - Multiple files
-    - Standardize on structured logging with correlation IDs
-    - Replace print statements with proper logger usage
-    - Add log levels and filtering
 
 11. **Health Checks Missing** - Docker configuration
     - Add health check endpoints for all services

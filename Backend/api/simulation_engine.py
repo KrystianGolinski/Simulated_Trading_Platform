@@ -10,105 +10,25 @@ import logging
 
 from models import SimulationConfig, SimulationResults, SimulationStatus, PerformanceMetrics, TradeRecord
 from performance_optimizer import performance_optimizer, PerformanceOptimizer
+from services.execution_service import ExecutionService
+from services.result_processor import ResultProcessor
+from services.error_handler import ErrorHandler
 
 logger = logging.getLogger(__name__)
 
 class SimulationEngine:
     def __init__(self):
-        # Always assume Docker environment - simplified configuration
         # C++ engine is accessible via shared volume in Docker
-        self.cpp_engine_path = Path("/shared/cpp-engine-build/trading_engine")
-        logger.info(f"Using Docker C++ engine path: {self.cpp_engine_path}")
-                    
-        self.active_simulations: Dict[str, Dict[str, Any]] = {}
-        self.results_storage: Dict[str, SimulationResults] = {}
+        self.cpp_engine_path = Path("/shared/trading_engine")
+        logger.info(f"Using shared C++ engine path: {self.cpp_engine_path}")
+        
+        # Initialize separated services
+        self.execution_service = ExecutionService(self.cpp_engine_path)
+        self.result_processor = ResultProcessor()
+        self.error_handler = ErrorHandler()
         
     def _validate_cpp_engine(self) -> Dict[str, Any]:
-        # Detailed validation of C++ engine with Docker-specific error messages
-        if self.cpp_engine_path is None:
-            return {
-                'is_valid': False,
-                'error': 'C++ engine path not configured',
-                'error_code': 'ENGINE_NOT_CONFIGURED',
-                'suggestions': [
-                    'Ensure Docker containers are running',
-                    'Check Docker volume mounts are properly configured',
-                    'Verify C++ engine was compiled in build container'
-                ]
-            }
-        
-        if not self.cpp_engine_path.exists():
-            return {
-                'is_valid': False,
-                'error': f'C++ engine executable not found at {self.cpp_engine_path}',
-                'error_code': 'ENGINE_FILE_NOT_FOUND',
-                'suggestions': [
-                    'Ensure C++ engine container has built successfully',
-                    'Check Docker volume mount configuration',
-                    'Verify shared volume is accessible between containers'
-                ]
-            }
-        
-        if not os.access(self.cpp_engine_path, os.X_OK):
-            return {
-                'is_valid': False,
-                'error': f'C++ engine not executable at {self.cpp_engine_path}',
-                'error_code': 'ENGINE_NOT_EXECUTABLE',
-                'suggestions': [
-                    'Check Docker volume mount permissions',
-                    'Verify C++ engine was built with correct permissions',
-                    'Ensure shared volume allows executable files'
-                ]
-            }
-        
-        # Test engine execution (local)
-        try:
-            result = subprocess.run(
-                [str(self.cpp_engine_path), '--help'],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            
-            if result.returncode != 0:
-                return {
-                    'is_valid': False,
-                    'error': f'C++ engine test execution failed (return code: {result.returncode})',
-                    'error_code': 'ENGINE_EXECUTION_FAILED',
-                    'stderr': result.stderr,
-                    'suggestions': [
-                        'Check if all dependencies are installed',
-                        'Verify the engine was compiled correctly',
-                        'Check for missing shared libraries'
-                    ]
-                }
-                
-        except subprocess.TimeoutExpired:
-            return {
-                'is_valid': False,
-                'error': 'C++ engine test execution timed out',
-                'error_code': 'ENGINE_TIMEOUT',
-                'suggestions': [
-                    'Check if the engine is hanging',
-                    'Verify system resources are available'
-                ]
-            }
-        except Exception as e:
-            return {
-                'is_valid': False,
-                'error': f'C++ engine test failed: {str(e)}',
-                'error_code': 'ENGINE_TEST_ERROR',
-                'suggestions': [
-                    'Check system logs for more details',
-                    'Verify the engine binary is valid'
-                ]
-            }
-        
-        return {
-            'is_valid': True,
-            'error': None,
-            'path': str(self.cpp_engine_path)
-        }
+        return self.execution_service.validate_cpp_engine()
     
     def _build_cpp_command(self, config: SimulationConfig) -> list:
         # Build command line arguments for engine
@@ -156,15 +76,8 @@ class SimulationEngine:
         
         simulation_id = str(uuid.uuid4())
         
-        # Create simulation results object
-        simulation_result = SimulationResults(
-            simulation_id=simulation_id,
-            status=SimulationStatus.PENDING,
-            config=config,
-            created_at=datetime.now()
-        )
-        
-        self.results_storage[simulation_id] = simulation_result
+        # Initialize simulation result using result processor
+        self.result_processor.initialize_simulation_result(simulation_id, config)
         
         # Optimize simulation based on configuration
         optimization_info = await performance_optimizer.optimize_multi_symbol_simulation(config)
@@ -176,183 +89,47 @@ class SimulationEngine:
         return simulation_id
     
     async def _run_simulation(self, simulation_id: str, config: SimulationConfig, optimization_info: Dict[str, Any] = None):
-        # Run the simulation in a subprocess with optimizations
         try:
             # Update status to running
-            self.results_storage[simulation_id].status = SimulationStatus.RUNNING
-            self.results_storage[simulation_id].started_at = datetime.now()
-            
-            # Build command with optimization info
-            start_time = performance_optimizer.start_timer("command_building")
-            cmd = self._build_cpp_command(config)
-            
-            # Add performance optimizations to command
-            if optimization_info and optimization_info.get("optimization") == "thread_parallel":
-                cmd.extend(["--parallel-threads", str(optimization_info.get("parallel_tasks", 1))])
-            
-            build_time = performance_optimizer.end_timer("command_building", start_time)
-            
-            # Validate working directory before subprocess execution
-            working_dir = self.cpp_engine_path.parent
-            if not working_dir.exists() or not working_dir.is_dir():
-                raise RuntimeError(f"Invalid working directory for C++ engine: {working_dir}")
-            
-            logger.debug(f"Starting simulation {simulation_id}: {' '.join(cmd)} (build_time: {build_time:.2f}ms)")
-            
-            # Run subprocess with validated working directory
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=working_dir
+            self.result_processor.update_simulation_status(
+                simulation_id, SimulationStatus.RUNNING, datetime.now()
             )
             
-            # Store process for status tracking
-            self.active_simulations[simulation_id] = {
-                "process": process,
-                "start_time": datetime.now(),
-                "progress_pct": 0.0,
-                "current_date": None,
-                "current_value": None
-            }
+            # Execute simulation using execution service
+            execution_result = await self.execution_service.execute_simulation(
+                simulation_id, config, optimization_info
+            )
             
-            # Read output streams manually to handle progress updates
-            stdout_data = []
-            stderr_data = []
-            
-            async def read_stdout():
-                while True:
-                    line = await process.stdout.readline()
-                    if not line:
-                        break
-                    stdout_data.append(line)
-            
-            async def read_stderr():
-                while True:
-                    line = await process.stderr.readline()
-                    if not line:
-                        break
-                    stderr_data.append(line)
-                    
-                    # Process progress updates
-                    line_text = line.decode().strip()
-                    try:
-                        progress_data = json.loads(line_text)
-                        if progress_data.get("type") == "progress":
-                            if simulation_id in self.active_simulations:
-                                sim_info = self.active_simulations[simulation_id]
-                                sim_info["progress_pct"] = progress_data.get("progress_pct", 0)
-                                sim_info["current_date"] = progress_data.get("current_date")
-                                sim_info["current_value"] = progress_data.get("current_value")
-                                
-                                
-                                logger.info(f"Simulation {simulation_id} progress: {progress_data.get('progress_pct', 0):.1f}%")
-                    except json.JSONDecodeError:
-                        # Not JSON, just regular stderr output
-                        pass
-            
-            # Start reading both streams
-            stdout_task = asyncio.create_task(read_stdout())
-            stderr_task = asyncio.create_task(read_stderr())
-            
-            # Wait for process completion
-            await process.wait()
-            
-            # Wait for all data to be read
-            await stdout_task
-            await stderr_task
-            
-            # Combine the data
-            stdout = b''.join(stdout_data)
-            stderr = b''.join(stderr_data)
-            
-            # Log the raw output for debugging
-            stdout_text = stdout.decode() if stdout else ""
-            stderr_text = stderr.decode() if stderr else ""
-            logger.error(f"Simulation {simulation_id} - Return code: {process.returncode}")
-            logger.error(f"Simulation {simulation_id} - STDOUT: '{stdout_text}'")
-            logger.error(f"Simulation {simulation_id} - STDERR: '{stderr_text}'")
-            logger.error(f"Simulation {simulation_id} - Command was: {cmd}")
-            
-            if process.returncode == 0:
-                # Parse results
+            # Process results based on execution outcome
+            if execution_result["return_code"] == 0:
                 try:
-                    if not stdout_text.strip():
-                        raise json.JSONDecodeError("Empty output", "", 0)
-                    result_data = json.loads(stdout_text)
-                    await self._process_simulation_results(simulation_id, result_data)
+                    result_data = self.result_processor.parse_json_result(execution_result["stdout"])
+                    if self.result_processor.validate_result_data(result_data):
+                        self.result_processor.process_simulation_results(simulation_id, result_data)
+                    else:
+                        error = self.error_handler.create_validation_error(
+                            "Invalid result data structure",
+                            {"stdout_preview": execution_result["stdout"][:200]}
+                        )
+                        self.result_processor.mark_simulation_failed(simulation_id, error.message)
                 except json.JSONDecodeError as e:
-                    logger.error(f"Failed to parse JSON output for simulation {simulation_id}: {e}")
-                    error_msg = self._format_cpp_engine_error("JSON_PARSE_ERROR", str(e), stdout_text, stderr_text)
-                    self._mark_simulation_failed(simulation_id, error_msg)
+                    error = self.error_handler.create_json_parse_error(str(e), execution_result["stdout"])
+                    self.result_processor.mark_simulation_failed(simulation_id, error.message)
             else:
-                # Enhanced error handling with specific error types
-                error_msg = self._categorize_cpp_engine_error(process.returncode, stdout_text, stderr_text)
-                logger.error(f"Simulation {simulation_id} failed: {error_msg}")
-                self._mark_simulation_failed(simulation_id, error_msg)
+                # Handle execution failure
+                error = self.error_handler.categorize_cpp_engine_error(
+                    execution_result["return_code"],
+                    execution_result["stdout"],
+                    execution_result["stderr"]
+                )
+                self.result_processor.mark_simulation_failed(simulation_id, error.message)
                 
         except Exception as e:
-            logger.error(f"Exception in simulation {simulation_id}: {e}")
-            self._mark_simulation_failed(simulation_id, str(e))
-        finally:
-            # Clean up
-            if simulation_id in self.active_simulations:
-                del self.active_simulations[simulation_id]
-    
-    async def _process_simulation_results(self, simulation_id: str, result_data: dict):
-        # Process and store simulation results from engine
-        try:
-            simulation_result = self.results_storage[simulation_id]
-            
-            # Update basic results
-            simulation_result.starting_capital = result_data.get("starting_capital")
-            simulation_result.ending_value = result_data.get("ending_value")
-            simulation_result.total_return_pct = result_data.get("total_return_pct")
-            
-            # Process performance metrics
-            if "performance_metrics" in result_data:
-                metrics_data = result_data["performance_metrics"]
-                simulation_result.performance_metrics = PerformanceMetrics(
-                    total_return_pct=metrics_data.get("total_return_pct", 0.0),
-                    sharpe_ratio=metrics_data.get("sharpe_ratio"),
-                    max_drawdown_pct=metrics_data.get("max_drawdown_pct", 0.0),
-                    win_rate=metrics_data.get("win_rate", 0.0),
-                    total_trades=metrics_data.get("total_trades", 0),
-                    winning_trades=metrics_data.get("winning_trades", 0),
-                    losing_trades=metrics_data.get("losing_trades", 0)
-                )
-            
-            # Process trades
-            if "trades" in result_data:
-                trades = []
-                trades_data = result_data["trades"]
-                # Handle case where trades might be an integer (count) or array
-                if isinstance(trades_data, list):
-                    for trade_data in trades_data:
-                        trade = TradeRecord(
-                            date=trade_data["date"],
-                            symbol=trade_data["symbol"],
-                            action=trade_data["action"],
-                            shares=trade_data["shares"],
-                            price=trade_data["price"],
-                            total_value=trade_data["total_value"]
-                        )
-                        trades.append(trade)
-                # If trades is just a count (integer), leave trades as empty list
-                simulation_result.trades = trades
-            
-            # Process equity curve
-            simulation_result.equity_curve = result_data.get("equity_curve", [])
-            
-            # Mark as completed
-            simulation_result.status = SimulationStatus.COMPLETED
-            simulation_result.completed_at = datetime.now()
-            
-            logger.info(f"Simulation {simulation_id} completed successfully")
-            
-        except Exception as e:
-            logger.error(f"Failed to process results for simulation {simulation_id}: {e}")
-            self._mark_simulation_failed(simulation_id, f"Result processing error: {e}")
+            error = self.error_handler.create_generic_error(
+                f"Unexpected error in simulation {simulation_id}: {str(e)}",
+                {"simulation_id": simulation_id}
+            )
+            self.result_processor.mark_simulation_failed(simulation_id, error.message)
     
     def _categorize_cpp_engine_error(self, return_code: int, stdout: str, stderr: str) -> str:
         # Categorize C++ engine errors and provide helpful messages
@@ -445,21 +222,17 @@ class SimulationEngine:
     
     def _mark_simulation_failed(self, simulation_id: str, error_message: str):
         # Mark simulation as failed with error message
-        if simulation_id in self.results_storage:
-            self.results_storage[simulation_id].status = SimulationStatus.FAILED
-            self.results_storage[simulation_id].error_message = error_message
-            self.results_storage[simulation_id].completed_at = datetime.now()
+        self.result_processor.mark_simulation_failed(simulation_id, error_message)
     
     def get_simulation_status(self, simulation_id: str) -> Optional[SimulationResults]:
         # Get current status of a simulation
-        return self.results_storage.get(simulation_id)
+        return self.result_processor.get_simulation_result(simulation_id)
     
     def get_simulation_progress(self, simulation_id: str) -> Dict[str, Any]:
         # Get detailed progress information for a running simulation
-        if simulation_id not in self.results_storage:
+        result = self.result_processor.get_simulation_result(simulation_id)
+        if not result:
             return {"error": "Simulation not found"}
-        
-        result = self.results_storage[simulation_id]
         progress_info = {
             "simulation_id": simulation_id,
             "status": result.status.value,
@@ -470,17 +243,17 @@ class SimulationEngine:
         }
         
         
-        if simulation_id in self.active_simulations:
-            sim_info = self.active_simulations[simulation_id]
-            start_time = sim_info["start_time"]
-            elapsed = (datetime.now() - start_time).total_seconds()
-            progress_info["elapsed_time"] = elapsed
+        # Get progress from execution service
+        execution_progress = self.execution_service.get_simulation_progress(simulation_id)
+        if execution_progress["status"] == "running":
+            progress_info["progress_pct"] = execution_progress.get("progress_pct", 0)
+            progress_info["current_date"] = execution_progress.get("current_date")
+            progress_info["current_value"] = execution_progress.get("current_value")
             
-            # Use actual progress from C++ engine
-            actual_progress = sim_info.get("progress_pct", 0)
-            progress_info["progress_pct"] = actual_progress
-            progress_info["current_date"] = sim_info.get("current_date")
-            progress_info["current_value"] = sim_info.get("current_value")
+            start_time = execution_progress.get("start_time")
+            if start_time:
+                elapsed = (datetime.now() - start_time).total_seconds()
+                progress_info["elapsed_time"] = elapsed
             
         elif result.status.value == "completed":
             # For completed simulations, show 100% progress
@@ -492,30 +265,28 @@ class SimulationEngine:
     
     def list_simulations(self) -> Dict[str, SimulationResults]:
         # List all simulations
-        return self.results_storage.copy()
+        return self.result_processor.get_all_simulation_results()
     
     async def cancel_simulation(self, simulation_id: str) -> bool:
-        # Cancel a running simulation
-        if simulation_id in self.active_simulations:
-            try:
-                process = self.active_simulations[simulation_id]["process"]
-                process.terminate()
-                
-                # Wait for termination with timeout
-                try:
-                    await asyncio.wait_for(process.wait(), timeout=5.0)
-                except asyncio.TimeoutError:
-                    # Force kill if terminate didn't work
-                    process.kill()
-                    await process.wait()
-                
-                self._mark_simulation_failed(simulation_id, "Simulation cancelled by user")
+        # Cancel a running simulation using the execution service
+        try:
+            # Try to cancel the running process
+            cancelled = await self.execution_service.cancel_simulation(simulation_id)
+            
+            if cancelled:
+                # Mark as failed in result processor
+                self.result_processor.mark_simulation_failed(simulation_id, "Simulation cancelled by user")
+                logger.info(f"Simulation {simulation_id} successfully cancelled")
                 return True
-            except Exception as e:
-                logger.error(f"Failed to cancel simulation {simulation_id}: {e}")
-                return False
-        
-        return False
+            else:
+                # Process not found or already completed, just mark as cancelled
+                self.result_processor.mark_simulation_failed(simulation_id, "Simulation cancellation requested")
+                logger.info(f"Simulation {simulation_id} marked as cancelled (process not active)")
+                return True
+                
+        except Exception as e:
+            logger.error(f"Failed to cancel simulation {simulation_id}: {e}")
+            return False
 
 # Global simulation engine instance
 simulation_engine = SimulationEngine()

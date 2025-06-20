@@ -214,7 +214,7 @@ std::vector<std::map<std::string, std::string>> DatabaseConnection::getStockPric
     const std::string& end_date) {
     
     std::stringstream query;
-    query << "SELECT time, symbol, open, high, low, close, volume "
+    query << "SELECT to_char(time, 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') as time, symbol, open, high, low, close, volume "
           << "FROM stock_prices_daily "
           << "WHERE symbol = '" << symbol << "' "
           << "AND time >= '" << start_date << "' "

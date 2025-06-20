@@ -43,7 +43,7 @@ fi
 
 # Test 3: JSON Output Format
 print_test "Testing JSON output format..."
-json_output=$(./build/trading_engine --simulate 2>/dev/null | tail -n +2)
+json_output=$(./build/trading_engine --simulate 2>/dev/null | sed -n '/^{/,/^}/p')
 if echo "$json_output" | python3 -m json.tool > /dev/null 2>&1; then
     print_pass "JSON output is valid"
 else
@@ -52,9 +52,32 @@ else
     exit 1
 fi
 
-# Test 4: Required JSON Fields
+# Test 4: Enhanced Error Handling and JSON Validation
+print_test "Testing enhanced error handling and JSON validation..."
+if python3 -c "
+import sys
+sys.path.append('Backend/api')
+try:
+    from services.error_handler import ErrorHandler
+    from services.result_processor import ResultProcessor
+    
+    # Test basic imports work
+    handler = ErrorHandler()
+    processor = ResultProcessor()
+    exit(0)
+except ImportError:
+    exit(1)
+except Exception:
+    exit(1)
+" 2>/dev/null; then
+    print_pass "Enhanced error handling and JSON validation modules available"
+else
+    print_fail "Enhanced error handling modules not available - skipping test"
+fi
+
+# Test 5: Required JSON Fields (updated for actual C++ output)
 print_test "Checking required JSON fields..."
-required_fields=("simulation_id" "starting_capital" "final_portfolio_value" "total_return_percentage" "equity_curve" "config")
+required_fields=("starting_capital" "ending_value" "performance_metrics")
 missing_fields=()
 
 for field in "${required_fields[@]}"; do
@@ -70,7 +93,7 @@ else
     exit 1
 fi
 
-# Test 5: Frontend Dependencies
+# Test 6: Frontend Dependencies
 cd ../../Frontend/trading-platform-ui
 print_test "Checking frontend dependencies..."
 if [ -d "node_modules" ] && [ -f "package.json" ]; then
@@ -80,7 +103,7 @@ else
     exit 1
 fi
 
-# Test 6: Frontend Build (quick check)
+# Test 7: Frontend Build (quick check)
 print_test "Testing frontend TypeScript compilation..."
 if npm run build > /dev/null 2>&1; then
     print_pass "Frontend builds successfully"

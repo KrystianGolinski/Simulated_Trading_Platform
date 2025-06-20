@@ -1,12 +1,16 @@
 #include <iostream>
 #include <string>
 #include <algorithm>
+#include <fstream>
+#include <nlohmann/json.hpp>
 #include "database_connection.h"
 #include "market_data.h"
 #include "trading_engine.h"
 
+using json = nlohmann::json;
+
 // Helper function to parse command line arguments
-void parseArguments(int argc, char* argv[], std::string& symbol, std::string& start_date, std::string& end_date, double& capital, int& short_ma, int& long_ma, bool& enable_progress) {
+void parseArguments(int argc, char* argv[], std::string& symbol, std::string& start_date, std::string& end_date, double& capital, int& short_ma, int& long_ma) {
     std::cerr << "[DEBUG] Parsing " << argc << " arguments:" << std::endl;
     for (int i = 0; i < argc; ++i) {
         std::cerr << "[DEBUG] argv[" << i << "] = '" << argv[i] << "'" << std::endl;
@@ -55,9 +59,6 @@ void parseArguments(int argc, char* argv[], std::string& symbol, std::string& st
         } else if (arg == "--long-ma" && i + 1 < argc) {
             long_ma = std::stoi(argv[++i]);
             std::cerr << "[DEBUG] Set long_ma = " << long_ma << std::endl;
-        } else if (arg == "--progress") {
-            enable_progress = true;
-            std::cerr << "[DEBUG] Progress reporting enabled" << std::endl;
         }
     }
     
@@ -68,7 +69,74 @@ void parseArguments(int argc, char* argv[], std::string& symbol, std::string& st
     std::cerr << "[DEBUG]   capital = " << capital << std::endl;
     std::cerr << "[DEBUG]   short_ma = " << short_ma << std::endl;
     std::cerr << "[DEBUG]   long_ma = " << long_ma << std::endl;
-    std::cerr << "[DEBUG]   enable_progress = " << (enable_progress ? "true" : "false") << std::endl;
+}
+
+// Function to run simulation from JSON config file
+bool runSimulationFromConfig(const std::string& config_file) {
+    try {
+        // Read JSON config file
+        std::ifstream file(config_file);
+        if (!file.is_open()) {
+            std::cerr << "Error: Cannot open config file: " << config_file << std::endl;
+            return false;
+        }
+        
+        json config;
+        file >> config;
+        file.close();
+        
+        // Extract configuration parameters
+        std::string symbol = config.value("symbol", "AAPL");
+        std::string start_date = config.value("start_date", "2023-01-01");
+        std::string end_date = config.value("end_date", "2023-12-31");
+        double capital = config.value("starting_capital", 10000.0);
+        std::string strategy = config.value("strategy", "ma_crossover");
+        
+        // Strategy-specific parameters
+        int short_ma = config.value("short_ma", 20);
+        int long_ma = config.value("long_ma", 50);
+        int rsi_period = config.value("rsi_period", 14);
+        double rsi_oversold = config.value("rsi_oversold", 30.0);
+        double rsi_overbought = config.value("rsi_overbought", 70.0);
+        
+        std::cerr << "[DEBUG] Config loaded successfully:" << std::endl;
+        std::cerr << "[DEBUG]   symbol = '" << symbol << "'" << std::endl;
+        std::cerr << "[DEBUG]   start_date = '" << start_date << "'" << std::endl;
+        std::cerr << "[DEBUG]   end_date = '" << end_date << "'" << std::endl;
+        std::cerr << "[DEBUG]   capital = " << capital << std::endl;
+        std::cerr << "[DEBUG]   strategy = '" << strategy << "'" << std::endl;
+        
+        // Create trading engine
+        TradingEngine engine(capital);
+        
+        // Configure strategy
+        if (strategy == "ma_crossover") {
+            engine.setMovingAverageStrategy(short_ma, long_ma);
+            std::cerr << "[DEBUG]   short_ma = " << short_ma << std::endl;
+            std::cerr << "[DEBUG]   long_ma = " << long_ma << std::endl;
+        } else if (strategy == "rsi") {
+            engine.setRSIStrategy(rsi_period, rsi_oversold, rsi_overbought);
+            std::cerr << "[DEBUG]   rsi_period = " << rsi_period << std::endl;
+            std::cerr << "[DEBUG]   rsi_oversold = " << rsi_oversold << std::endl;
+            std::cerr << "[DEBUG]   rsi_overbought = " << rsi_overbought << std::endl;
+        }
+        
+        // Run simulation
+        std::string result = engine.runSimulationWithParams(symbol, start_date, end_date, capital);
+        std::cout << result << std::endl;
+        
+        // Clean up config file (optional)
+        if (config.value("cleanup", true)) {
+            std::remove(config_file.c_str());
+            std::cerr << "[DEBUG] Config file cleaned up" << std::endl;
+        }
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "Error parsing config file: " << e.what() << std::endl;
+        return false;
+    }
 }
 
 // Function to run backtest
@@ -172,7 +240,7 @@ int main(int argc, char* argv[]) {
                 double capital = 10000.0;
                 int short_ma = 20, long_ma = 50;
                 bool enable_progress = false;
-                parseArguments(argc, argv, symbol, start_date, end_date, capital, short_ma, long_ma, enable_progress);
+                parseArguments(argc, argv, symbol, start_date, end_date, capital, short_ma, long_ma);
                 
                 // Set defaults if not provided
                 if (symbol.empty()) symbol = "AAPL";
@@ -187,7 +255,7 @@ int main(int argc, char* argv[]) {
                 double capital = 10000.0;
                 int short_ma = 20, long_ma = 50;
                 bool enable_progress = false;
-                parseArguments(argc, argv, symbol, start_date, end_date, capital, short_ma, long_ma, enable_progress);
+                parseArguments(argc, argv, symbol, start_date, end_date, capital, short_ma, long_ma);
                 
                 // Set defaults if not provided
                 if (symbol.empty()) symbol = "AAPL";
@@ -200,20 +268,30 @@ int main(int argc, char* argv[]) {
         }
         
         if (argc > 1 && std::string(argv[1]) == "--simulate") {
-            // Parse command line arguments for simulation
-            std::string symbol, start_date, end_date;
-            double capital = 10000.0;
-            int short_ma = 20, long_ma = 50;
-            bool enable_progress = false;
-            parseArguments(argc, argv, symbol, start_date, end_date, capital, short_ma, long_ma, enable_progress);
-            
-            // Create trading engine with parsed capital instead of hardcoded value
-            TradingEngine engine(capital);
-            
-            // Set defaults if not provided
-            if (symbol.empty()) symbol = "AAPL";
-            if (start_date.empty()) start_date = "2023-01-01";
-            if (end_date.empty()) end_date = "2023-12-31";
+            // Check if using JSON config file
+            if (argc > 3 && std::string(argv[2]) == "--config") {
+                std::string config_file = argv[3];
+                std::cerr << "[DEBUG] Using JSON config file: " << config_file << std::endl;
+                
+                if (!runSimulationFromConfig(config_file)) {
+                    std::cerr << "Error: Failed to run simulation from config file" << std::endl;
+                    return 1;
+                }
+                return 0;
+            } else {
+                // Fallback to command line arguments for backward compatibility
+                std::string symbol, start_date, end_date;
+                double capital = 10000.0;
+                int short_ma = 20, long_ma = 50;
+                parseArguments(argc, argv, symbol, start_date, end_date, capital, short_ma, long_ma);
+                
+                // Create trading engine with parsed capital instead of hardcoded value
+                TradingEngine engine(capital);
+                
+                // Set defaults if not provided
+                if (symbol.empty()) symbol = "AAPL";
+                if (start_date.empty()) start_date = "2023-01-01";
+                if (end_date.empty()) end_date = "2023-12-31";
             
             std::cerr << "[DEBUG] About to run simulation with:" << std::endl;
             std::cerr << "[DEBUG]   symbol = '" << symbol << "'" << std::endl;
@@ -226,14 +304,10 @@ int main(int argc, char* argv[]) {
             // Configure strategy with parsed parameters
             engine.setMovingAverageStrategy(short_ma, long_ma);
             
-            // Run simulation with or without progress based on flag
-            std::string result;
-            if (enable_progress) {
-                result = engine.runSimulationWithProgress(symbol, start_date, end_date, capital);
-            } else {
-                result = engine.runSimulationWithParams(symbol, start_date, end_date, capital);
-            }
+            // Run simulation - runSimulationWithParams already includes progress functionality
+            std::string result = engine.runSimulationWithParams(symbol, start_date, end_date, capital);
             std::cout << result << std::endl;
+            }
         } else if (argc > 1 && std::string(argv[1]) == "--status") {
             // Create default trading engine for status
             TradingEngine engine(10000.0);

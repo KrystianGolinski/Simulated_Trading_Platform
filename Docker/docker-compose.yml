@@ -23,14 +23,17 @@ services:
       - ../.env
     container_name: trading-api
     build:
-      context: ./Backend/api
+      context: ../Backend/api
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
     depends_on:
       - postgres
+      - cpp-engine
     environment:
       DATABASE_URL: postgresql://trading_user:trading_password@postgres:5432/simulated_trading_platform
+    volumes:
+      - cpp_engine_shared:/shared
     networks:
       - trading_network
     restart: unless-stopped
@@ -40,22 +43,36 @@ services:
       - ../.env
     container_name: trading-engine
     build:
-      context: ./Backend/cpp-engine
+      context: ../Backend/cpp-engine
       dockerfile: Dockerfile
     depends_on:
       - postgres
     environment:
       DATABASE_URL: postgresql://trading_user:trading_password@postgres:5432/trading_platform
+    volumes:
+      - cpp_engine_shared:/shared
     networks:
       - trading_network
     restart: unless-stopped
+    command: >
+      sh -c "
+        ls -la / &&
+        ls -la /app/build/ &&
+        mkdir -p /shared &&
+        ls -la /shared &&
+        cp /app/build/trading_engine /shared/ &&
+        chmod +x /shared/trading_engine &&
+        echo 'C++ engine binary copied to /shared/trading_engine' &&
+        ls -la /shared/ &&
+        tail -f /dev/null
+      "
 
   frontend:
     env_file:
       - ../.env
     container_name: trading-ui
     build:
-      context: ./Frontend/trading-platform-ui
+      context: ../Frontend/trading-platform-ui
       dockerfile: Dockerfile
       target: production
       args:
@@ -70,6 +87,7 @@ services:
 
 volumes:
   postgres_data:
+  cpp_engine_shared:
 
 networks:
   trading_network:

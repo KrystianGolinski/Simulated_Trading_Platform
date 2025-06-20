@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 from datetime import date
 from database import DatabaseManager
 from models import SimulationConfig, ValidationError, ValidationResult, StrategyType
+from services.error_handler import ErrorHandler, ErrorCode, ErrorSeverity
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,7 @@ class SimulationValidator:
     
     def __init__(self, db: DatabaseManager):
         self.db = db
+        self.error_handler = ErrorHandler()
     
     async def validate_simulation_config(self, config: SimulationConfig) -> ValidationResult:
         # Comprehensive validation of simulation configuration
@@ -61,11 +63,23 @@ class SimulationValidator:
                 warnings.extend(config_warnings)
             
         except Exception as e:
-            logger.error(f"Validation error: {e}")
+            # Use structured error handling with detailed context
+            error = self.error_handler.create_generic_error(
+                message=f"Validation system error: {str(e)}",
+                context={
+                    "config_symbols": getattr(config, 'symbols', None),
+                    "config_dates": f"{getattr(config, 'start_date', None)} to {getattr(config, 'end_date', None)}",
+                    "exception_type": type(e).__name__,
+                    "original_error": str(e)
+                },
+                severity=ErrorSeverity.HIGH
+            )
+            
+            logger.error(f"Validation error: {error.message} | Context: {error.context}")
             errors.append(ValidationError(
                 field="general",
-                message=f"Validation system error: {str(e)}",
-                error_code="VALIDATION_SYSTEM_ERROR"
+                message=error.message,
+                error_code=error.error_code.value
             ))
         
         return ValidationResult(
@@ -109,7 +123,18 @@ class SimulationValidator:
                     ))
                     
         except Exception as e:
-            logger.error(f"Error validating symbols: {e}")
+            # Structured error handling for database validation errors
+            error = self.error_handler.create_generic_error(
+                message=f"Database error during symbol validation: {str(e)}",
+                context={
+                    "symbols": symbols,
+                    "exception_type": type(e).__name__,
+                    "database_operation": "symbol_validation"
+                },
+                severity=ErrorSeverity.MEDIUM
+            )
+            
+            logger.error(f"Symbol validation error: {error.message} | Context: {error.context}")
             errors.append(ValidationError(
                 field="symbols",
                 message="Unable to validate symbols due to database error",
@@ -154,7 +179,19 @@ class SimulationValidator:
                     )
                 
             except Exception as e:
-                logger.error(f"Error validating date range for {symbol}: {e}")
+                # Structured error handling for date range validation
+                error = self.error_handler.create_generic_error(
+                    message=f"Error validating date range for {symbol}: {str(e)}",
+                    context={
+                        "symbol": symbol,
+                        "date_range": f"{config.start_date} to {config.end_date}",
+                        "exception_type": type(e).__name__,
+                        "validation_step": "data_availability_check"
+                    },
+                    severity=ErrorSeverity.MEDIUM
+                )
+                
+                logger.error(f"Date range validation error: {error.message} | Context: {error.context}")
                 errors.append(ValidationError(
                     field="date_range",
                     message=f"Unable to validate data availability for {symbol}",
@@ -308,7 +345,18 @@ class SimulationValidator:
                     warnings.append(f"Limited historical data available ({records_count} records)")
                     
         except Exception as e:
-            logger.error(f"Database connection check failed: {e}")
+            # Structured error handling for database connection issues
+            error = self.error_handler.create_generic_error(
+                message=f"Database connection check failed: {str(e)}",
+                context={
+                    "exception_type": type(e).__name__,
+                    "database_operation": "connection_health_check",
+                    "error_details": str(e)
+                },
+                severity=ErrorSeverity.CRITICAL
+            )
+            
+            logger.error(f"Database connection error: {error.message} | Context: {error.context}")
             errors.append(ValidationError(
                 field="database",
                 message=f"Unable to connect to database: {str(e)}",
