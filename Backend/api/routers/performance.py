@@ -1,13 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from datetime import datetime
+from typing import Dict, Any
 
 from database import DatabaseManager, get_database
 from performance_optimizer import performance_optimizer
+from response_models import StandardResponse, create_success_response, create_error_response, ApiError
 
 router = APIRouter(tags=["performance"])
 
 @router.get("/performance/stats")
-async def get_performance_stats(db: DatabaseManager = Depends(get_database)):
+async def get_performance_stats(db: DatabaseManager = Depends(get_database)) -> StandardResponse[Dict[str, Any]]:
     # Get performance stats
     try:
         # Get optimizer performance stats
@@ -16,16 +18,21 @@ async def get_performance_stats(db: DatabaseManager = Depends(get_database)):
         # Get database performance stats
         db_perf_stats = await db.get_performance_stats()
         
-        return {
+        stats_data = {
             "optimization": optimizer_stats,
             "database": db_perf_stats,
             "timestamp": performance_optimizer.operation_times.get("performance_stats", [])
         }
+        
+        return create_success_response(stats_data, "Performance statistics retrieved successfully")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get performance stats: {str(e)}")
+        return create_error_response(
+            "Failed to get performance stats",
+            [ApiError(code="PERFORMANCE_STATS_ERROR", message=str(e))]
+        )
 
 @router.post("/performance/clear-cache")
-async def clear_performance_cache(db: DatabaseManager = Depends(get_database)):
+async def clear_performance_cache(db: DatabaseManager = Depends(get_database)) -> StandardResponse[Dict[str, str]]:
     # Clear all performance caches
     try:
         # Clear database cache
@@ -35,21 +42,32 @@ async def clear_performance_cache(db: DatabaseManager = Depends(get_database)):
         performance_optimizer.metrics = performance_optimizer.PerformanceMetrics()
         performance_optimizer.operation_times.clear()
         
-        return {"message": "Performance caches cleared successfully"}
+        return create_success_response(
+            {"cache_status": "cleared"},
+            "Performance caches cleared successfully"
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to clear caches: {str(e)}")
+        return create_error_response(
+            "Failed to clear caches",
+            [ApiError(code="CACHE_CLEAR_ERROR", message=str(e))]
+        )
 
 @router.get("/performance/cache-stats")
-async def get_cache_stats(db: DatabaseManager = Depends(get_database)):
+async def get_cache_stats(db: DatabaseManager = Depends(get_database)) -> StandardResponse[Dict[str, Any]]:
     # Get cache performance statistics
     try:
         cache_stats = performance_optimizer.get_cache_statistics()
         db_perf = await db.get_performance_stats()
         
-        return {
+        cache_data = {
             "optimizer_cache": cache_stats,
             "database_cache": db_perf.get("cache_stats", {}),
             "timestamp": datetime.now().isoformat()
         }
+        
+        return create_success_response(cache_data, "Cache statistics retrieved successfully")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get cache stats: {str(e)}")
+        return create_error_response(
+            "Failed to get cache stats",
+            [ApiError(code="CACHE_STATS_ERROR", message=str(e))]
+        )

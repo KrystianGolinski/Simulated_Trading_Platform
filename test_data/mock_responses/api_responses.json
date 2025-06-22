@@ -1,0 +1,74 @@
+{
+  "health_healthy": {
+    "status": "healthy",
+    "database_connected": true,
+    "stocks_count": 150,
+    "daily_records_count": 500000,
+    "minute_records_count": 10000000
+  },
+  "health_database_down": {
+    "status": "degraded",
+    "database_connected": false,
+    "stocks_count": 0,
+    "daily_records_count": 0,
+    "minute_records_count": 0,
+    "error": "Database connection failed"
+  },
+  "stocks_list": [
+    "AAPL", "GOOGL", "MSFT", "TSLA", "AMZN", "META", "NVDA", "AMD", "INTC", "CRM"
+  ],
+  "stock_data_aapl": [
+    {
+      "time": "2023-01-03",
+      "symbol": "AAPL",
+      "open": 130.28,
+      "high": 130.90,
+      "low": 124.17,
+      "close": 125.07,
+      "volume": 112117471
+    },
+    {
+      "time": "2023-01-04",
+      "symbol": "AAPL",
+      "open": 126.89,
+      "high": 128.66,
+      "low": 125.08,
+      "close": 126.36,
+      "volume": 89113634
+    },
+    {
+      "time": "2023-01-05",
+      "symbol": "AAPL",
+      "open": 127.13,
+      "high": 127.77,
+      "low": 124.76,
+      "close": 125.02,
+      "volume": 80962746
+    }
+  ],
+  "error_responses": {
+    "not_found": {
+      "message": "Resource not found",
+      "status": 404
+    },
+    "validation_error": {
+      "message": "Validation failed",
+      "errors": ["Invalid parameter value"],
+      "error_details": [
+        {
+          "field": "symbols",
+          "message": "Symbol 'INVALID' not found",
+          "error_code": "SYMBOL_NOT_FOUND"
+        }
+      ]
+    },
+    "server_error": {
+      "message": "Internal server error",
+      "status": 500
+    },
+    "database_error": {
+      "message": "Database connection failed",
+      "status": 503
+    }
+  }
+}

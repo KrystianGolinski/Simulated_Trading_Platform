@@ -130,7 +130,7 @@ class ResultProcessor:
         return len(to_remove)
     
     def _convert_signals_to_trades(self, signals_data: List[Dict[str, Any]], result_data: Dict[str, Any]) -> List[TradeRecord]:
-        """Convert trading signals into proper trade pairs with profit/loss calculations."""
+        # Convert trading signals into proper trade pairs with profit/loss calculations
         trades = []
         open_positions = {}  # symbol -> {entry_signal, shares}
         symbol = result_data.get("symbol", "UNKNOWN")
@@ -193,7 +193,7 @@ class ResultProcessor:
         return trades
     
     def _calculate_position_size(self, price: float, result_data: Dict[str, Any]) -> int:
-        """Calculate how many shares to buy based on available capital and strategy."""
+        # Calculate how many shares to buy based on available capital and strategy
         starting_capital = result_data.get("starting_capital", 10000.0)
         
         # Simple strategy: use a fixed percentage of capital per trade
@@ -206,7 +206,7 @@ class ResultProcessor:
         return 1
     
     def parse_json_result(self, json_text: str) -> Dict[str, Any]:
-        """Parse and validate JSON result from C++ engine with comprehensive error handling."""
+        # Parse and validate JSON result from C++ engine with comprehensive error handling
         try:
             if not json_text.strip():
                 raise json.JSONDecodeError("Empty output", "", 0)
@@ -230,7 +230,7 @@ class ResultProcessor:
             raise json.JSONDecodeError(str(e), json_text, 0)
     
     def validate_result_data(self, result_data: Dict[str, Any]) -> bool:
-        """Comprehensive validation of C++ engine result data structure and content."""
+        # Comprehensive validation of C++ engine result data structure and content
         try:
             # Check for basic required fields
             required_fields = ["ending_value", "starting_capital"]
@@ -282,7 +282,7 @@ class ResultProcessor:
             return False
     
     def _pre_validate_json_text(self, json_text: str):
-        """Lightweight pre-validation checks for obvious JSON corruption."""
+        # Lightweight pre-validation checks for obvious JSON corruption
         
         # Check for C++ runtime errors in output
         if "terminate called" in json_text or "segmentation fault" in json_text:
@@ -304,7 +304,7 @@ class ResultProcessor:
             raise ValueError(f"Unbalanced brackets in JSON (difference: {bracket_count})")
     
     def _validate_parsed_json_structure(self, result_data: Dict[str, Any]):
-        """Validate the basic structure of parsed JSON data."""
+        # Validate the basic structure of parsed JSON data
         if not isinstance(result_data, dict):
             raise ValueError(f"Root JSON must be object/dict, got {type(result_data)}")
         
@@ -321,7 +321,7 @@ class ResultProcessor:
                 raise ValueError(f"Critical field '{key}' is null")
     
     def _validate_performance_metrics(self, performance_metrics: Any) -> bool:
-        """Validate performance_metrics structure and content."""
+        # Validate performance_metrics structure and content
         if not isinstance(performance_metrics, dict):
             logger.error("performance_metrics must be a dictionary")
             return False
@@ -368,7 +368,7 @@ class ResultProcessor:
         return True
     
     def _validate_signals(self, signals: Any) -> bool:
-        """Validate signals array structure and content."""
+        # Validate signals array structure and content
         if not isinstance(signals, list):
             logger.error("signals must be a list")
             return False
@@ -405,7 +405,7 @@ class ResultProcessor:
         return True
     
     def _validate_equity_curve(self, equity_curve: Any) -> bool:
-        """Validate equity_curve array structure and content."""
+        # Validate equity_curve array structure and content
         if not isinstance(equity_curve, list):
             logger.error("equity_curve must be a list")
             return False
@@ -436,7 +436,7 @@ class ResultProcessor:
         return True
     
     def _validate_cross_field_consistency(self, result_data: Dict[str, Any]) -> bool:
-        """Validate consistency between different fields in the result data."""
+        # Validate consistency between different fields in the result data
         try:
             # Validate starting vs ending capital consistency
             starting_capital = result_data.get("starting_capital")

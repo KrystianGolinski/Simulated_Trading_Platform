@@ -285,7 +285,7 @@ class ErrorHandler:
         logger.info("Error history cleared")
     
     def _extract_cpp_error_details(self, stderr: str, stdout: str) -> Dict[str, Any]:
-        """Extract detailed C++ error information from stderr and stdout."""
+        # Extract detailed C++ error information from stderr and stdout
         
         details = {
             "exception_type": None,

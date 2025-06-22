@@ -1,0 +1,215 @@
+/* Layout Utilities*/
+.container-sm {
+  @apply p-3 md:p-4 max-w-2xl mx-auto min-h-0;
+}
+
+.container-md {
+  @apply p-3 md:p-4 max-w-4xl mx-auto min-h-0;
+}
+
+.container-lg {
+  @apply p-3 md:p-4 max-w-7xl mx-auto min-h-0;
+}
+
+.container-xl {
+  @apply p-3 md:p-4 max-w-6xl mx-auto;
+}
+
+/* Card Utilities*/
+.card-sm {
+  @apply bg-white rounded-lg shadow p-2;
+}
+
+.card-md {
+  @apply bg-white rounded-lg shadow p-3;
+}
+
+.card-lg {
+  @apply bg-white rounded-lg shadow p-4;
+}
+
+.card-xl {
+  @apply bg-white rounded-lg shadow p-4 md:p-6;
+}
+
+.card-base {
+  @apply bg-white rounded-lg shadow;
+}
+
+/* Numbered Card Utilities (for backward compatibility) */
+.card-3 {
+  @apply bg-white rounded-lg shadow p-2;
+}
+
+.card-4 {
+  @apply bg-white rounded-lg shadow p-3;
+}
+
+.card-6 {
+  @apply bg-white rounded-lg shadow p-3 md:p-4;
+}
+
+.card-8 {
+  @apply bg-white rounded-lg shadow p-4 md:p-6;
+}
+
+/* Grid Utilities - Reduced gaps for better viewport fit */
+.grid-responsive-2 {
+  @apply grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3;
+}
+
+.grid-responsive-4 {
+  @apply grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 md:gap-3;
+}
+
+.grid-stock-selector {
+  @apply grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2;
+}
+
+.grid-metrics {
+  @apply grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3;
+}
+
+/* Typography Utilities */
+.page-title {
+  @apply text-2xl md:text-3xl font-bold text-gray-900 mb-2 md:mb-3;
+}
+
+.section-title {
+  @apply text-base md:text-lg font-semibold mb-2 md:mb-3;
+}
+
+.form-label {
+  @apply block text-sm font-medium text-gray-700 mb-1;
+}
+
+.metric-header {
+  @apply text-xs md:text-sm font-medium text-gray-500 uppercase tracking-wider;
+}
+
+.metric-value {
+  @apply text-lg md:text-xl font-bold;
+}
+
+/* Interactive Utilities */
+.form-input {
+  @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500;
+}
+
+.btn-primary {
+  @apply bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors;
+}
+
+.btn-secondary {
+  @apply bg-gray-600 text-white px-6 py-2 rounded-md hover:bg-gray-700 transition-colors;
+}
+
+.btn-success {
+  @apply bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition-colors;
+}
+
+.btn-danger {
+  @apply bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors;
+}
+
+/* Flexbox Utilities */
+.flex-center {
+  @apply flex justify-center items-center;
+}
+
+.flex-between {
+  @apply flex justify-between;
+}
+
+.flex-col-center {
+  @apply flex flex-col items-center;
+}
+
+/* Spinner Utilities */
+.spinner-lg-blue {
+  @apply animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600;
+}
+
+.spinner-md-blue {
+  @apply animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600;
+}
+
+.spinner-sm-white {
+  @apply animate-spin rounded-full h-4 w-4 border-b-2 border-white;
+}
+
+/* Color/Status Utilities */
+.text-profit {
+  @apply text-green-600;
+}
+
+.text-loss {
+  @apply text-red-600;
+}
+
+.text-success {
+  @apply text-green-600;
+}
+
+.text-danger {
+  @apply text-red-600;
+}
+
+.text-warning {
+  @apply text-yellow-600;
+}
+
+.text-info {
+  @apply text-blue-600;
+}
+
+/* Progress Bar Utilities */
+.progress-bar {
+  @apply w-full bg-gray-200 rounded-full h-2;
+}
+
+.progress-fill {
+  @apply h-2 bg-blue-600 rounded-full transition-all duration-300;
+}
+
+/* Alert/Status Utilities */
+.status-indicator {
+  @apply inline-flex px-2 py-1 text-xs font-semibold rounded-full;
+}
+
+.status-running {
+  @apply bg-blue-100 text-blue-800;
+}
+
+.status-completed {
+  @apply bg-green-100 text-green-800;
+}
+
+.status-failed {
+  @apply bg-red-100 text-red-800;
+}
+
+.status-pending {
+  @apply bg-yellow-100 text-yellow-800;
+}
+
+/* Viewport-specific utilities for better scaling */
+.viewport-container {
+  @apply min-h-screen;
+}
+
+.viewport-content {
+  @apply w-full;
+}
+
+.chart-container {
+  @apply h-64 md:h-72 lg:h-80;
+}
+
+.compact-spacing {
+  @apply space-y-2 md:space-y-3;
+}
+
+.compact-grid {
+  @apply gap-2 md:gap-3;
+}

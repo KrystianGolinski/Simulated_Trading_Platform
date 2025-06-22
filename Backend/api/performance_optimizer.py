@@ -5,21 +5,20 @@ import time
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from typing import Dict, List, Any
 import logging
-from dataclasses import dataclass
 
 from models import SimulationConfig
 
 logger = logging.getLogger(__name__)
 
-@dataclass
-class PerformanceMetrics:
-    # Metrics for performance monitoring
-    cache_hits: int = 0
-    cache_misses: int = 0
-    query_time_ms: float = 0.0
-    simulation_time_ms: float = 0.0
-    memory_usage_mb: float = 0.0
-    parallel_tasks: int = 0
+class InternalMetrics:
+    # Internal performance tracking metrics for the optimizer
+    def __init__(self):
+        self.cache_hits = 0
+        self.cache_misses = 0
+        self.query_time_ms = 0.0
+        self.simulation_time_ms = 0.0
+        self.memory_usage_mb = 0.0
+        self.parallel_tasks = 0
 
 class PerformanceOptimizer:
     # Handles performance optimizations for trading simulations
@@ -31,7 +30,7 @@ class PerformanceOptimizer:
         self.max_workers = 4
         
         # Performance tracking
-        self.metrics = PerformanceMetrics()
+        self.metrics = InternalMetrics()
         self.operation_times: Dict[str, List[float]] = {}
         
         # Executors for parallel processing

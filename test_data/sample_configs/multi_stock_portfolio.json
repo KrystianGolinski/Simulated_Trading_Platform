@@ -1,0 +1,10 @@
+{
+  "symbols": ["AAPL", "GOOGL", "MSFT", "TSLA"],
+  "start_date": "2023-01-01",
+  "end_date": "2023-12-31",
+  "starting_capital": 50000,
+  "strategy": "ma_crossover",
+  "short_ma": 10,
+  "long_ma": 30,
+  "description": "Multi-stock portfolio test configuration for comprehensive testing"
+}

@@ -57,7 +57,7 @@ class ExecutionService:
         return {'is_valid': True}
     
     def create_config_file(self, config: SimulationConfig) -> str:
-        """Create a temporary JSON config file for the C++ engine."""
+        # Create a temporary JSON config file for the C++ engine
         config_data = {
             "symbol": config.symbols[0] if config.symbols else "AAPL",
             "start_date": config.start_date.isoformat(),
@@ -95,7 +95,7 @@ class ExecutionService:
             raise
     
     def build_cpp_command(self, config: SimulationConfig) -> tuple[List[str], str]:
-        """Build command using JSON config file approach."""
+        # Build command using JSON config file approach
         config_file = self.create_config_file(config)
         
         cmd = [
@@ -227,7 +227,7 @@ class ExecutionService:
         return stdout_data, stderr_data
     
     def check_simulation_health(self, simulation_id: str) -> Dict[str, Any]:
-        """Check if a simulation is healthy based on heartbeat and process status."""
+        # Check if a simulation is healthy based on heartbeat and process status
         if simulation_id not in self.active_simulations:
             return {"status": "not_found"}
         
@@ -260,7 +260,7 @@ class ExecutionService:
         }
     
     def get_unhealthy_simulations(self) -> List[str]:
-        """Get list of simulation IDs that are unhealthy (crashed or stalled)."""
+        # Get list of simulation IDs that are unhealthy (crashed or stalled)
         unhealthy = []
         
         for sim_id in list(self.active_simulations.keys()):
@@ -295,7 +295,7 @@ class ExecutionService:
         }
     
     async def cancel_simulation(self, simulation_id: str) -> bool:
-        """Cancel a running simulation by terminating its process."""
+        # Cancel a running simulation by terminating its process
         if simulation_id not in self.active_simulations:
             logger.warning(f"Cannot cancel simulation {simulation_id}: not found in active simulations")
             return False
@@ -333,7 +333,7 @@ class ExecutionService:
             return False
     
     def list_active_simulations(self) -> Dict[str, Dict[str, Any]]:
-        """Get a list of all currently active simulations."""
+        # Get a list of all currently active simulations
         return {
             sim_id: {
                 "start_time": sim_info.get("start_time"),

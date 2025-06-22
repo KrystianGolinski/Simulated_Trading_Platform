@@ -123,8 +123,14 @@ BacktestResult TradingEngine::runBacktest(const BacktestConfig& config) {
         return result;
     }
     
-    // Initialize equity curve
+    // Initialize equity curve with pre-allocated capacity
+    result.equity_curve.reserve(price_data.size());
     result.equity_curve.push_back(config.starting_capital);
+    
+    // Pre-allocate containers to avoid repeated allocations
+    std::vector<PriceData> historical_window;
+    historical_window.reserve(price_data.size());
+    std::map<std::string, double> current_prices;
     
     std::cerr << "[DEBUG] Starting backtest loop with " << price_data.size() << " data points" << std::endl;
     std::cerr << "[DEBUG] Initial portfolio value: " << portfolio_.getTotalValue({}) << std::endl;
@@ -136,7 +142,7 @@ BacktestResult TradingEngine::runBacktest(const BacktestConfig& config) {
         // Progress reporting every 5% of completion
         if (i % (price_data.size() / 20) == 0 || i == price_data.size() - 1 || price_data.size() <= 20) {
             double progress_pct = (static_cast<double>(i) / (price_data.size() - 1)) * 100.0;
-            std::map<std::string, double> current_prices;
+            current_prices.clear();
             current_prices[config.symbol] = data_point.close;
             double current_value = portfolio_.getTotalValue(current_prices);
             
@@ -158,7 +164,9 @@ BacktestResult TradingEngine::runBacktest(const BacktestConfig& config) {
                       << ", Portfolio = " << portfolio_.getTotalValue({{config.symbol, data_point.close}}) << std::endl;
         }
         
-        std::vector<PriceData> historical_window(price_data.begin(), price_data.begin() + i + 1);
+        // Use sliding window approach - reuse pre-allocated vector
+        historical_window.clear();
+        historical_window.assign(price_data.begin(), price_data.begin() + i + 1);
         
         // Create a copy of portfolio for strategy evaluation (to avoid modifying original)
         Portfolio portfolio_copy = portfolio_;
@@ -180,8 +188,8 @@ BacktestResult TradingEngine::runBacktest(const BacktestConfig& config) {
             }
         }
         
-        // Update equity curve
-        std::map<std::string, double> current_prices;
+        // Update equity curve - reuse pre-allocated map
+        current_prices.clear();
         current_prices[config.symbol] = data_point.close;
         double portfolio_value = portfolio_.getTotalValue(current_prices);
         result.equity_curve.push_back(portfolio_value);

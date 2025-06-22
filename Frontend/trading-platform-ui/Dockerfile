@@ -21,6 +21,9 @@ RUN npm run build
 # Production stage with nginx for better performance
 FROM nginx:alpine AS production
 
+# Install wget for health checks
+RUN apk add --no-cache wget
+
 # Copy custom nginx config
 COPY --from=build /app/build /usr/share/nginx/html
 
@@ -41,10 +44,17 @@ RUN echo 'server { \
 
 EXPOSE 3000
 
+# Health check for production frontend
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1
+
 CMD ["nginx", "-g", "daemon off;"]
 
 # Development stage with hot reload
 FROM node:20-alpine AS development
+
+# Install wget for health checks
+RUN apk add --no-cache wget
 
 WORKDIR /app
 
@@ -60,5 +70,9 @@ EXPOSE 3000
 # Enable hot reload
 ENV WATCHPACK_POLLING=true
 ENV FAST_REFRESH=true
+
+# Health check for development frontend
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1
 
 CMD ["npm", "start"]

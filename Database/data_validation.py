@@ -10,18 +10,17 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class DataValidator:
-    #Comprehensive data validation and cleaning system.
-    #Combines data cleaning and integrity verification in one module.
-    
+    #Comprehensive data validation and cleaning system
+    #Combines data cleaning and integrity verification
     
     def __init__(self, data_dir: str = "historical_data"):
         self.data_dir = data_dir
         self.daily_dir = os.path.join(data_dir, "daily")
         self.intraday_dir = os.path.join(data_dir, "intraday")
 
-    # DATA CLEANING METHODS
+    # Data cleaning methods
     def handle_stock_splits_and_dividends(self, df: pd.DataFrame) -> pd.DataFrame:
-        # Handle stock splits and dividends by adjusting OHLCV data.
+        # Handle stock splits and dividends by adjusting OHLCV data
         df = df.copy()
         
         date_col = get_date_column(df)
@@ -53,7 +52,7 @@ class DataValidator:
         return df
     
     def adjust_missing_trading_days(self, df: pd.DataFrame) -> pd.DataFrame:
-        # Adjust for missing trading days and remove obvious gaps.
+        # Adjust for missing trading days and remove obvious gaps
         df = df.copy()
         
         date_col = get_date_column(df)
@@ -77,7 +76,7 @@ class DataValidator:
         return df
     
     def normalize_price_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        # Normalize price data and validate OHLC relationships.
+        # Normalize price data and validate OHLC relationships
         df = df.copy()
         
         # Round price columns to 4 decimal places
@@ -114,7 +113,7 @@ class DataValidator:
         return df
     
     def clean_csv_file(self, file_path: str, output_path: str = None) -> pd.DataFrame:
-        # Clean a single CSV file with all cleaning routines.
+        # Clean a single CSV file with all cleaning routines
         df = pd.read_csv(file_path)
         
         # Apply all cleaning routines
@@ -128,10 +127,10 @@ class DataValidator:
         
         return df
     
-    # DATA INTEGRITY VERIFICATION
+    # Data integrity validation
     def _create_test_result(self, test_name: str, symbol: str, total_rows: int, invalid_rows: int, 
                            details: Dict = None, passed: bool = None) -> Dict:
-        # Helper method to create standardized test result dictionaries.
+        # Helper method to create standardized test result dictionaries
         if passed is None:
             passed = invalid_rows == 0
             
@@ -146,7 +145,7 @@ class DataValidator:
         }
     
     def test_ohlc_relationships(self, df: pd.DataFrame, symbol: str) -> Dict:
-        # Test that OHLC relationships are valid.
+        # Test that OHLC relationships are valid
         valid_high = (df['high'] >= df['open']) & (df['high'] >= df['close'])
         valid_low = (df['low'] <= df['open']) & (df['low'] <= df['close'])
         valid_range = df['high'] >= df['low']
@@ -160,7 +159,7 @@ class DataValidator:
         )
     
     def test_price_positivity(self, df: pd.DataFrame, symbol: str) -> Dict:
-        # Test that all prices are positive.
+        # Test that all prices are positive
         price_columns = ['open', 'high', 'low', 'close', 'adj_close']
         negative_prices = 0
         zero_prices = 0
@@ -187,7 +186,7 @@ class DataValidator:
         }
     
     def test_volume_validity(self, df: pd.DataFrame, symbol: str) -> Dict:
-        # Test that volume is non-negative.
+        # Test that volume is non-negative
         negative_volume = (df['volume'] < 0).sum()
         return self._create_test_result(
             f"Volume Validity - {symbol}", symbol, len(df), negative_volume,
@@ -195,7 +194,7 @@ class DataValidator:
         )
     
     def test_data_completeness(self, df: pd.DataFrame, symbol: str) -> Dict:
-        # Test for missing values in critical columns.
+        # Test for missing values in critical columns
         critical_columns = ['open', 'high', 'low', 'close', 'volume']
         missing_values = 0
         total_values = 0
@@ -218,9 +217,9 @@ class DataValidator:
             'details': column_details
         }
 
-    # COMBINED OPERATIONS  
+    # Combined Operations
     def clean_and_validate_file(self, file_path: str, output_path: str = None) -> Dict:
-        # Clean a file and run integrity validation, returning combined results.
+        # Clean a file and run integrity validation, returning combined results
         filename = os.path.basename(file_path)
         symbol = filename.split('_')[0]
         
@@ -259,7 +258,7 @@ class DataValidator:
             }
     
     def process_all_files(self, data_type: str = "daily") -> Dict:
-        # Process all files with cleaning and validation.
+        # Process all files with cleaning and validation
         if data_type == "daily":
             source_dir = self.daily_dir
         elif data_type == "intraday":
@@ -292,7 +291,7 @@ class DataValidator:
         }
     
     def print_processing_summary(self, results: list, data_type: str):
-        # Print a comprehensive summary of cleaning and validation.
+        # Print a summary of cleaning and validation
         print(f"\n{'='*60}")
         print(f"DATA PROCESSING SUMMARY - {data_type.upper()} DATA")
         print(f"{'='*60}")
@@ -322,7 +321,7 @@ class DataValidator:
             print("-" * 70)
             
             for result in sorted(successful_files, key=lambda x: x['symbol']):
-                validation_status = "✓" if result.get('validation_passed', False) else "✗"
+                validation_status = "[PASS]" if result.get('validation_passed', False) else "[FAIL]"
                 print(f"{result['symbol']:<8} {result['original_rows']:<10,} {result['cleaned_rows']:<10,} "
                       f"{result['rows_removed']:<8,} {result['removal_percentage']:<10.2f}% {validation_status:<6}")
         

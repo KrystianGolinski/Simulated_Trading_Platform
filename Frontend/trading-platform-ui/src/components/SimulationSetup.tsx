@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useStocks } from '../hooks/useStockData';
 import { SimulationConfig, ValidationError, apiService } from '../services/api';
+import { Card, FormInput, Spinner, Alert, Button } from './common';
 
 interface SimulationSetupProps {
   onStartSimulation: (config: SimulationConfig) => Promise<void>;
@@ -96,161 +97,111 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
   };
 
   return (
-    <div className="p-6">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">
-          Trading Simulation Setup
-        </h1>
+    <div className="container-md">
+      <h1 className="page-title">
+        Trading Simulation Setup
+      </h1>
 
         {/* Validation Errors */}
         {validation.errors.length > 0 && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
-            <div className="flex">
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">Configuration Errors</h3>
-                <div className="mt-2 space-y-1">
-                  {validation.errors.map((error, index) => (
-                    <div key={index} className="text-sm text-red-700">
-                      <strong>{error.field}:</strong> {error.message}
-                    </div>
-                  ))}
+          <Alert
+            type="error"
+            title="Configuration Errors"
+            onDismiss={() => setValidation(prev => ({ ...prev, errors: [] }))}
+            className="mb-6"
+          >
+            <div className="space-y-1">
+              {validation.errors.map((error, index) => (
+                <div key={index}>
+                  <strong>{error.field}:</strong> {error.message}
                 </div>
-                <div className="mt-4">
-                  <button
-                    type="button"
-                    onClick={() => setValidation(prev => ({ ...prev, errors: [] }))}
-                    className="bg-red-100 px-2 py-1 text-xs rounded text-red-800 hover:bg-red-200"
-                  >
-                    Dismiss
-                  </button>
-                </div>
-              </div>
+              ))}
             </div>
-          </div>
+          </Alert>
         )}
 
         {/* Validation Warnings */}
         {validation.warnings.length > 0 && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-6">
-            <div className="flex">
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-yellow-800">Configuration Warnings</h3>
-                <div className="mt-2 space-y-1">
-                  {validation.warnings.map((warning, index) => (
-                    <div key={index} className="text-sm text-yellow-700">
-                      {warning}
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4">
-                  <button
-                    type="button"
-                    onClick={() => setValidation(prev => ({ ...prev, warnings: [] }))}
-                    className="bg-yellow-100 px-2 py-1 text-xs rounded text-yellow-800 hover:bg-yellow-200"
-                  >
-                    Dismiss
-                  </button>
-                </div>
-              </div>
+          <Alert
+            type="warning"
+            title="Configuration Warnings"
+            onDismiss={() => setValidation(prev => ({ ...prev, warnings: [] }))}
+            className="mb-6"
+          >
+            <div className="space-y-1">
+              {validation.warnings.map((warning, index) => (
+                <div key={index}>{warning}</div>
+              ))}
             </div>
-          </div>
+          </Alert>
         )}
 
         {/* General Errors */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
-            <div className="flex">
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">Error Starting Simulation</h3>
-                <div className="mt-2 text-sm text-red-700">
-                  <p>{error}</p>
-                </div>
-                <div className="mt-4">
-                  <button
-                    type="button"
-                    onClick={onClearError}
-                    className="bg-red-100 px-2 py-1 text-xs rounded text-red-800 hover:bg-red-200"
-                  >
-                    Dismiss
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <Alert
+            type="error"
+            title="Error Starting Simulation"
+            onDismiss={onClearError}
+            className="mb-6"
+          >
+            {error}
+          </Alert>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="compact-spacing">
           {/* Starting Capital */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Portfolio Settings</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Starting Capital ($)
-                </label>
-                <input
-                  type="number"
-                  min="1000"
-                  max="1000000"
-                  step="100"
-                  value={config.starting_capital}
-                  onChange={(e) => setConfig(prev => ({ ...prev, starting_capital: Number(e.target.value) }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
+          <Card title="Portfolio Settings">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <FormInput
+                label="Starting Capital ($)"
+                type="number"
+                min="1000"
+                max="1000000"
+                step="100"
+                value={config.starting_capital}
+                onChange={(e) => setConfig(prev => ({ ...prev, starting_capital: Number(e.target.value) }))}
+                required
+              />
             </div>
-          </div>
+          </Card>
 
           {/* Date Range */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Simulation Period</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Start Date
-                </label>
-                <input
-                  type="date"
-                  value={config.start_date}
-                  onChange={(e) => setConfig(prev => ({ ...prev, start_date: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  min="2015-06-17"
-                  max="2025-06-13"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  End Date
-                </label>
-                <input
-                  type="date"
-                  value={config.end_date}
-                  onChange={(e) => setConfig(prev => ({ ...prev, end_date: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  min="2015-06-17"
-                  max="2025-06-13"
-                  required
-                />
-              </div>
+          <Card title="Simulation Period">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <FormInput
+                label="Start Date"
+                type="date"
+                value={config.start_date}
+                onChange={(e) => setConfig(prev => ({ ...prev, start_date: e.target.value }))}
+                min="2015-06-17"
+                max="2025-06-13"
+                required
+              />
+              <FormInput
+                label="End Date"
+                type="date"
+                value={config.end_date}
+                onChange={(e) => setConfig(prev => ({ ...prev, end_date: e.target.value }))}
+                min="2015-06-17"
+                max="2025-06-13"
+                required
+              />
             </div>
-          </div>
+          </Card>
 
           {/* Stock Selection */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Stock Selection</h2>
-            <p className="text-sm text-gray-600 mb-4">
+          <Card title="Stock Selection">
+            <p className="text-sm text-gray-600 mb-2">
               Select stocks to include in your simulation ({config.symbols.length} selected)
             </p>
             {stocksLoading ? (
-              <div className="flex justify-center py-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              <div className="flex justify-center py-2">
+                <Spinner size="md" />
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 max-h-60 overflow-y-auto">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 max-h-32 overflow-y-auto">
                 {stocks.map(symbol => (
-                  <label key={symbol} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                  <label key={symbol} className="flex items-center space-x-1 cursor-pointer hover:bg-gray-50 p-1 rounded">
                     <input
                       type="checkbox"
                       checked={config.symbols.includes(symbol)}
@@ -263,97 +214,87 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
               </div>
             )}
             {config.symbols.length === 0 && (
-              <p className="text-red-500 text-sm mt-2">Please select at least one stock</p>
+              <p className="text-red-500 text-sm mt-1">Please select at least one stock</p>
             )}
-          </div>
+          </Card>
 
           {/* Strategy Parameters */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Moving Average Crossover Strategy</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Short MA Period (days)
-                </label>
-                <input
-                  type="number"
-                  min="5"
-                  max="50"
-                  value={config.short_ma}
-                  onChange={(e) => setConfig(prev => ({ ...prev, short_ma: Number(e.target.value) }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Long MA Period (days)
-                </label>
-                <input
-                  type="number"
-                  min="20"
-                  max="200"
-                  value={config.long_ma}
-                  onChange={(e) => setConfig(prev => ({ ...prev, long_ma: Number(e.target.value) }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
+          <Card title="Moving Average Crossover Strategy">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <FormInput
+                label="Short MA Period (days)"
+                type="number"
+                min="5"
+                max="50"
+                value={config.short_ma}
+                onChange={(e) => setConfig(prev => ({ ...prev, short_ma: Number(e.target.value) }))}
+                required
+              />
+              <FormInput
+                label="Long MA Period (days)"
+                type="number"
+                min="20"
+                max="200"
+                value={config.long_ma}
+                onChange={(e) => setConfig(prev => ({ ...prev, long_ma: Number(e.target.value) }))}
+                required
+              />
             </div>
-            <p className="text-sm text-gray-600 mt-2">
+            <p className="text-sm text-gray-600 mt-1">
               Buy signal: Short MA crosses above Long MA. Sell signal: Short MA crosses below Long MA.
             </p>
-          </div>
+          </Card>
 
           {/* Validate Button */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="space-y-3">
-              <button
+          <Card title="Simulation Controls">
+            <div className="space-y-2">
+              <Button
                 type="button"
                 onClick={validateConfiguration}
                 disabled={config.symbols.length === 0 || validation.isValidating}
-                className="w-full bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium flex items-center justify-center"
+                variant="secondary"
+                className="w-full text-sm py-2"
               >
                 {validation.isValidating ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    <Spinner size="sm" className="mr-2" />
                     Validating Configuration...
                   </>
                 ) : (
                   'Validate Configuration'
                 )}
-              </button>
+              </Button>
               
-              <button
+              <Button
                 type="submit"
                 disabled={config.symbols.length === 0 || config.short_ma! >= config.long_ma! || isLoading || validation.errors.length > 0}
-                className="w-full bg-blue-600 text-white py-3 px-6 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold flex items-center justify-center"
+                variant="primary"
+                className="w-full py-2 font-semibold text-sm"
               >
                 {isLoading ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    <Spinner size="sm" className="mr-2" />
                     Starting Simulation...
                   </>
                 ) : (
                   'Start Simulation'
                 )}
-              </button>
+              </Button>
             </div>
             
             {config.short_ma! >= config.long_ma! && (
-              <p className="text-red-500 text-sm mt-2">Short MA period must be less than Long MA period</p>
+              <p className="text-red-500 text-sm mt-1">Short MA period must be less than Long MA period</p>
             )}
             
             {validation.errors.length > 0 && (
-              <p className="text-red-500 text-sm mt-2">Please fix configuration errors before starting simulation</p>
+              <p className="text-red-500 text-sm mt-1">Please fix configuration errors before starting simulation</p>
             )}
             
             {validation.warnings.length > 0 && validation.errors.length === 0 && (
-              <p className="text-yellow-600 text-sm mt-2">Configuration has warnings but can still be run</p>
+              <p className="text-yellow-600 text-sm mt-1">Configuration has warnings but can still be run</p>
             )}
-          </div>
+          </Card>
         </form>
-      </div>
     </div>
   );
 };

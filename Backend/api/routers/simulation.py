@@ -12,6 +12,7 @@ from models import (
 )
 from simulation_engine import simulation_engine
 from validation import SimulationValidator
+from response_models import StandardResponse, create_success_response, create_error_response, create_warning_response, ApiError
 
 router = APIRouter(tags=["simulation"])
 logger = logging.getLogger(__name__)
@@ -31,12 +32,32 @@ def _handle_validation_warnings(validation_result: ValidationResult) -> None:
         for warning in validation_result.warnings:
             logger.warning(f"Simulation validation warning: {warning}")
 
-@router.post("/simulation/validate", response_model=ValidationResult)
+@router.post("/simulation/validate", response_model=StandardResponse[ValidationResult])
 async def validate_simulation_config(config: SimulationConfig, db: DatabaseManager = Depends(get_database)):
     # Validate simulation configuration without starting simulation
-    return await _validate_config(config, db)
+    try:
+        validation_result = await _validate_config(config, db)
+        if validation_result.is_valid:
+            if validation_result.warnings:
+                return create_warning_response(
+                    validation_result,
+                    "Configuration is valid with warnings",
+                    validation_result.warnings
+                )
+            else:
+                return create_success_response(validation_result, "Configuration is valid")
+        else:
+            return create_error_response(
+                "Configuration validation failed",
+                [ApiError(code="VALIDATION_FAILED", message=error.message, field=error.field) for error in validation_result.errors]
+            )
+    except Exception as e:
+        return create_error_response(
+            "Validation system error",
+            [ApiError(code="VALIDATION_SYSTEM_ERROR", message=str(e))]
+        )
 
-@router.post("/simulation/start", response_model=SimulationResponse)
+@router.post("/simulation/start", response_model=StandardResponse[SimulationResponse])
 async def start_simulation(config: SimulationConfig, db: DatabaseManager = Depends(get_database)):
     # Start a new trading simulation with validation
     try:
@@ -65,11 +86,20 @@ async def start_simulation(config: SimulationConfig, db: DatabaseManager = Depen
         if validation_result.warnings:
             message += f" (with {len(validation_result.warnings)} warnings)"
         
-        return SimulationResponse(
+        response_data = SimulationResponse(
             simulation_id=simulation_id,
             status="pending",
             message=message
         )
+        
+        if validation_result.warnings:
+            return create_warning_response(
+                response_data,
+                message,
+                validation_result.warnings
+            )
+        else:
+            return create_success_response(response_data, message)
         
     except HTTPException:
         # Re-raise HTTP exceptions (validation errors)
@@ -77,39 +107,89 @@ async def start_simulation(config: SimulationConfig, db: DatabaseManager = Depen
     except Exception as e:
         # Handle unexpected errors
         logger.error(f"Unexpected error starting simulation: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to start simulation: {str(e)}")
+        return create_error_response(
+            "Failed to start simulation",
+            [ApiError(code="SIMULATION_START_ERROR", message=str(e))]
+        )
 
-@router.get("/simulation/{simulation_id}/status", response_model=SimulationStatusResponse)
+@router.get("/simulation/{simulation_id}/status", response_model=StandardResponse[SimulationStatusResponse])
 async def get_simulation_status(simulation_id: str):
     # Get the current status of a simulation
     progress = simulation_engine.get_simulation_progress(simulation_id)
     
     if "error" in progress:
-        raise HTTPException(status_code=404, detail="Simulation not found")
+        return create_error_response(
+            "Simulation not found",
+            [ApiError(code="SIMULATION_NOT_FOUND", message="Simulation not found", field="simulation_id")]
+        )
     
-    return SimulationStatusResponse(**progress)
+    # Handle case where execution service doesn't have the simulation (completed/failed simulations)
+    if progress.get("status") == "not_found":
+        # Check if simulation exists in result processor
+        result = simulation_engine.get_simulation_status(simulation_id)
+        if not result:
+            return create_error_response(
+                "Simulation not found",
+                [ApiError(code="SIMULATION_NOT_FOUND", message="Simulation not found", field="simulation_id")]
+            )
+        
+        # Convert result to progress format
+        progress = {
+            "simulation_id": simulation_id,
+            "status": result.status.value,
+            "progress_pct": 100.0 if result.status.value == "completed" else 0.0,
+            "current_date": None,
+            "elapsed_time": (result.completed_at - result.started_at).total_seconds() if result.completed_at and result.started_at else None,
+            "estimated_remaining": None
+        }
+    else:
+        # Add simulation_id to the progress data
+        progress["simulation_id"] = simulation_id
+    
+    status_response = SimulationStatusResponse(**progress)
+    return create_success_response(status_response, "Simulation status retrieved successfully")
 
-@router.get("/simulation/{simulation_id}/results", response_model=SimulationResults)
+@router.get("/simulation/{simulation_id}/results", response_model=StandardResponse[SimulationResults])
 async def get_simulation_results(simulation_id: str):
     # Get the complete results of a simulation
     result = simulation_engine.get_simulation_status(simulation_id)
     
     if not result:
-        raise HTTPException(status_code=404, detail="Simulation not found")
+        return create_error_response(
+            "Simulation not found",
+            [ApiError(code="SIMULATION_NOT_FOUND", message="Simulation not found", field="simulation_id")]
+        )
     
-    return result
+    return create_success_response(result, "Simulation results retrieved successfully")
 
 @router.get("/simulation/{simulation_id}/cancel")
-async def cancel_simulation(simulation_id: str):
+async def cancel_simulation(simulation_id: str) -> StandardResponse[Dict[str, str]]:
     # Cancel a running simulation
     success = await simulation_engine.cancel_simulation(simulation_id)
     
     if not success:
-        raise HTTPException(status_code=400, detail="Failed to cancel simulation or simulation not running")
+        return create_error_response(
+            "Failed to cancel simulation",
+            [ApiError(code="SIMULATION_CANCEL_FAILED", message="Failed to cancel simulation or simulation not running", field="simulation_id")]
+        )
     
-    return {"message": "Simulation cancelled successfully"}
+    return create_success_response(
+        {"status": "cancelled"},
+        "Simulation cancelled successfully"
+    )
 
-@router.get("/simulations", response_model=Dict[str, SimulationResults])
+@router.get("/simulations", response_model=StandardResponse[Dict[str, SimulationResults]])
 async def list_simulations():
     # List all simulations with status
-    return simulation_engine.list_simulations()
+    try:
+        simulations = simulation_engine.list_simulations()
+        return create_success_response(
+            simulations,
+            f"Retrieved {len(simulations)} simulations",
+            metadata={"count": len(simulations)}
+        )
+    except Exception as e:
+        return create_error_response(
+            "Failed to list simulations",
+            [ApiError(code="SIMULATION_LIST_ERROR", message=str(e))]
+        )

@@ -207,8 +207,7 @@ void test_technical_indicators() {
     
     // Test Moving Average Crossover detection
     auto crossover_signals = indicators.detectMACrossover(3, 5);
-    // With continuously rising prices, we might get buy signals
-    
+
     std::cout << "SMA(5) values: ";
     for (size_t i = 0; i < std::min(sma_5.size(), size_t(3)); ++i) {
         std::cout << sma_5[i] << " ";

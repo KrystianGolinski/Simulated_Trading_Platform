@@ -22,22 +22,21 @@ export const SimulationProgress: React.FC<SimulationProgressProps> = ({
   if (!isRunning) return null;
 
   return (
-    <div className="p-6">
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-white rounded-lg shadow p-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-6 text-center">
+    <div className="container-sm">
+        <div className="card-xl">
+          <h1 className="section-title text-center">
             Simulation in Progress
           </h1>
 
           {/* Progress Bar */}
           <div className="mb-6">
-            <div className="flex justify-between text-sm text-gray-600 mb-2">
+            <div className="flex-between text-sm text-gray-600 mb-2">
               <span>Progress</span>
               <span>{Math.round(progress)}%</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-4">
+            <div className="progress-bar">
               <div
-                className="bg-blue-600 h-4 rounded-full transition-all duration-500 ease-out"
+                className="progress-fill"
                 style={{ width: `${progress}%` }}
               ></div>
             </div>
@@ -69,12 +68,12 @@ export const SimulationProgress: React.FC<SimulationProgressProps> = ({
           </div>
 
           {/* Loading Animation and Cancel Button */}
-          <div className="flex flex-col items-center space-y-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <div className="flex-col-center space-y-4">
+            <div className="spinner-lg-blue"></div>
             {onCancel && (
               <button
                 onClick={onCancel}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+                className="btn-danger text-sm"
               >
                 Cancel Simulation
               </button>
@@ -115,7 +114,6 @@ export const SimulationProgress: React.FC<SimulationProgressProps> = ({
             </div>
           </div>
         </div>
-      </div>
     </div>
   );
 };

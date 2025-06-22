@@ -66,6 +66,7 @@ package-lock.json
 
 # IDE and Editor files
 .vscode/
+.VSCodeCounter/
 .idea/
 *.swp
 *.swo

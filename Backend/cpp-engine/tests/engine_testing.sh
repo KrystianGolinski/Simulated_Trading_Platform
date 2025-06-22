@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Comprehensive trading platform engine testing
+# Engine testing
 # Tests all parts: Core functionality, Progress tracking, and Performance optimizations
 
 set -e  # Exit on error
 
-echo "=== Trading Platform Comprehensive Test Suite ==="
+echo "Trading Platform Comprehensive Test Suite"
 echo "Testing all parts: Core functionality, Progress tracking, Performance optimizations"
 echo
 
@@ -39,9 +39,9 @@ check_api_availability() {
     echo
 }
 
-# CORE FUNCTIONALITY TESTS
+# Core functionality tests
 
-echo "CORE FUNCTIONALITY TESTS"
+echo "Core functionality tests"
 
 test_parameter_validation() {
     echo "Testing parameter variations produce different results..."
@@ -93,7 +93,7 @@ test_basic_simulation() {
     
     if [ -n "$SIMULATION_ID" ]; then
         echo "Created simulation: $SIMULATION_ID"
-        # Wait a moment and check status
+        # Wait and check status
         sleep 3
         STATUS=$(curl -s "$API_BASE/simulation/$SIMULATION_ID/status" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null)
         echo "Simulation status: $STATUS"
@@ -110,9 +110,9 @@ run_test "Parameter Validation" test_parameter_validation
 run_test "Input Validation System" test_validation_system  
 run_test "Basic Simulation Execution" test_basic_simulation
 
-# PROGRESS TRACKING TESTS
+# Progress tracking tests
 
-echo "PROGRESS TRACKING TESTS"
+echo "Progress tracking tests"
 
 test_progress_tracking() {
     echo "Testing simulation progress tracking..."
@@ -154,14 +154,14 @@ test_progress_tracking() {
 # Run progress tests
 run_test "Progress Tracking" test_progress_tracking
 
-# VALIDATION & ERROR HANDLING TESTS
+# Validation and error handling tests
 
-echo "VALIDATION & ERROR HANDLING TESTS"
+echo "Validation and error handling tests"
 
 test_comprehensive_validation() {
     echo "Testing comprehensive validation system..."
-    # Test various invalid inputs
-
+    
+    # Test invalid inputs
     TESTS_PASSED=0
     
     # Invalid date range
@@ -195,9 +195,9 @@ test_comprehensive_validation() {
 # Run validation and error handling tests
 run_test "Comprehensive Validation" test_comprehensive_validation
 
-# PERFORMANCE OPTIMIZATION TESTS
+# Performance optimisation tests
 
-echo "PERFORMANCE OPTIMIZATION TESTS"
+echo "Performance optimisation tests"
 
 test_performance_endpoints() {
     echo "Testing performance monitoring endpoints..."
@@ -265,9 +265,9 @@ run_test "Performance Endpoints" test_performance_endpoints
 run_test "Data Caching" test_data_caching
 run_test "Enhanced Health Check" test_enhanced_health_check
 
-# INTEGRATION TESTS
+# Integration tests
 
-echo "INTEGRATION TESTS"
+echo "Integration tests"
 
 test_end_to_end_simulation() {
     echo "Testing complete end-to-end simulation flow..."
@@ -328,9 +328,177 @@ test_end_to_end_simulation() {
 # Run integration tests
 run_test "End-to-End Simulation Flow" test_end_to_end_simulation
 
-# SUMMARY
+# Database failure and recovery tests
 
-echo "ENGINE TESTING SUMMARY"
+echo "Database failure and recovery tests"
+
+test_database_failure_scenarios() {
+    echo "Testing database failure scenarios and recovery..."
+    
+    # Test health endpoint for database status
+    HEALTH_RESPONSE=$(curl -s "$API_BASE/health")
+    DB_STATUS=$(echo "$HEALTH_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('database_connected','unknown'))" 2>/dev/null)
+    
+    echo "Current database status: $DB_STATUS"
+    
+    if [ "$DB_STATUS" = "true" ]; then
+        echo "Database is connected - testing graceful degradation"
+        
+        # Test if API handles database queries gracefully
+        STOCKS_RESPONSE=$(curl -s "$API_BASE/stocks")
+        if echo "$STOCKS_RESPONSE" | python3 -c "import sys,json; json.load(sys.stdin)" > /dev/null 2>&1; then
+            echo "Database queries working normally"
+        else
+            echo "Database query issues detected"
+        fi
+        
+        return 0
+    elif [ "$DB_STATUS" = "false" ]; then
+        echo "Database disconnected - testing error handling"
+        
+        # Verify API returns appropriate error responses
+        STOCKS_RESPONSE=$(curl -s -w "%{http_code}" "$API_BASE/stocks")
+        HTTP_CODE=$(echo "$STOCKS_RESPONSE" | tail -c 4)
+        
+        if [ "$HTTP_CODE" -ge 500 ] && [ "$HTTP_CODE" -lt 600 ]; then
+            echo "API correctly returns server error when database is down"
+            return 0
+        else
+            echo "API should return 5xx error when database is down"
+            return 1
+        fi
+    else
+        echo "Could not determine database status"
+        return 1
+    fi
+}
+
+test_data_consistency_checks() {
+    echo "Testing data consistency and integrity checks..."
+    
+    # Test stock data endpoint with various parameters
+    CONSISTENCY_CHECKS=0
+    
+    # Check data format consistency
+    DATA_RESPONSE=$(curl -s "$API_BASE/stocks/AAPL/data?start_date=2023-01-01&end_date=2023-01-02")
+    if echo "$DATA_RESPONSE" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    if isinstance(data, list) and len(data) > 0:
+        required_fields = ['time', 'symbol', 'open', 'high', 'low', 'close', 'volume']
+        first_record = data[0]
+        if all(field in first_record for field in required_fields):
+            print('Data format consistent')
+            exit(0)
+    exit(1)
+except:
+    exit(1)
+" 2>/dev/null; then
+        CONSISTENCY_CHECKS=$((CONSISTENCY_CHECKS + 1))
+        echo "Stock data format validation passed"
+    fi
+    
+    # Test date range validation
+    INVALID_DATE_RESPONSE=$(curl -s "$API_BASE/stocks/AAPL/data?start_date=2025-01-01&end_date=2025-01-02")
+    if echo "$INVALID_DATE_RESPONSE" | grep -q "error\|invalid\|not found" || [ -z "$INVALID_DATE_RESPONSE" ]; then
+        CONSISTENCY_CHECKS=$((CONSISTENCY_CHECKS + 1))
+        echo "Future date handling validation passed"
+    fi
+    
+    if [ $CONSISTENCY_CHECKS -ge 1 ]; then
+        return 0
+    else
+        echo "Data consistency checks failed"
+        return 1
+    fi
+}
+
+test_comprehensive_error_scenarios() {
+    echo "Testing comprehensive error scenarios..."
+    
+    ERROR_SCENARIOS_PASSED=0
+    
+    # Test malformed JSON
+    MALFORMED_RESPONSE=$(curl -s -X POST "$API_BASE/simulation/validate" \
+        -H "Content-Type: application/json" \
+        -d '{invalid json}' 2>/dev/null)
+    
+    if echo "$MALFORMED_RESPONSE" | grep -q "error\|invalid\|bad request" || [ -z "$MALFORMED_RESPONSE" ]; then
+        ERROR_SCENARIOS_PASSED=$((ERROR_SCENARIOS_PASSED + 1))
+        echo "Malformed JSON handling: PASS"
+    fi
+    
+    # Test missing required fields
+    MISSING_FIELDS_RESPONSE=$(curl -s -X POST "$API_BASE/simulation/validate" \
+        -H "Content-Type: application/json" \
+        -d '{"symbols":[]}' 2>/dev/null)
+    
+    if echo "$MISSING_FIELDS_RESPONSE" | grep -q '"is_valid":false\|error'; then
+        ERROR_SCENARIOS_PASSED=$((ERROR_SCENARIOS_PASSED + 1))
+        echo "Missing required fields handling: PASS"
+    fi
+    
+    # Test extremely large values
+    LARGE_VALUES_RESPONSE=$(curl -s -X POST "$API_BASE/simulation/validate" \
+        -H "Content-Type: application/json" \
+        -d '{"symbols":["AAPL"],"start_date":"2023-01-01","end_date":"2023-01-31","starting_capital":999999999999,"strategy":"ma_crossover"}' 2>/dev/null)
+    
+    if echo "$LARGE_VALUES_RESPONSE" | grep -q '"is_valid":false\|warning\|error'; then
+        ERROR_SCENARIOS_PASSED=$((ERROR_SCENARIOS_PASSED + 1))
+        echo "Large values handling: PASS"
+    fi
+    
+    # Test invalid strategy
+    INVALID_STRATEGY_RESPONSE=$(curl -s -X POST "$API_BASE/simulation/validate" \
+        -H "Content-Type: application/json" \
+        -d '{"symbols":["AAPL"],"start_date":"2023-01-01","end_date":"2023-01-31","starting_capital":10000,"strategy":"invalid_strategy"}' 2>/dev/null)
+    
+    if echo "$INVALID_STRATEGY_RESPONSE" | grep -q '"is_valid":false'; then
+        ERROR_SCENARIOS_PASSED=$((ERROR_SCENARIOS_PASSED + 1))
+        echo "Invalid strategy handling: PASS"
+    fi
+    
+    if [ $ERROR_SCENARIOS_PASSED -ge 3 ]; then
+        echo "Comprehensive error scenario testing: PASS"
+        return 0
+    else
+        echo "Some error scenarios not handled properly"
+        return 1
+    fi
+}
+
+test_api_timeout_handling() {
+    echo "Testing API timeout and resilience..."
+    
+    # Test multiple concurrent requests
+    echo "Testing concurrent request handling..."
+    
+    for i in {1..3}; do
+        curl -s "$API_BASE/health" > /dev/null &
+    done
+    wait
+    
+    # Check if API is still responsive
+    HEALTH_CHECK=$(curl -s "$API_BASE/health")
+    if echo "$HEALTH_CHECK" | python3 -c "import sys,json; json.load(sys.stdin)" > /dev/null 2>&1; then
+        echo "API handles concurrent requests: PASS"
+        return 0
+    else
+        echo "API struggles with concurrent requests"
+        return 1
+    fi
+}
+
+# Run database failure and recovery tests
+run_test "Database Failure Scenarios" test_database_failure_scenarios
+run_test "Data Consistency Checks" test_data_consistency_checks
+run_test "Comprehensive Error Scenarios" test_comprehensive_error_scenarios
+run_test "API Timeout Handling" test_api_timeout_handling
+
+# Summary
+
+echo "Engine testing summary"
 echo "Total tests run: $TOTAL_TESTS"
 echo "Tests passed: $((TOTAL_TESTS - FAILED_TESTS))"
 echo "Tests failed: $FAILED_TESTS"
@@ -338,10 +506,8 @@ echo
 
 if [ $FAILED_TESTS -eq 0 ]; then
     echo "ALL TESTS PASSED"
-    echo "Trading platform is functioning correctly across all parts"
     exit 0
 else
     echo "NOT ALL TESTS PASSED"
-    echo "Review the failed tests above and check system logs"
     exit 1
 fi

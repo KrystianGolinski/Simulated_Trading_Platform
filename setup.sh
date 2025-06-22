@@ -178,7 +178,6 @@ setup_environment() {
     mkdir -p Backend/cpp-engine/{include,src,tests,build}
     mkdir -p Backend/api
     mkdir -p Frontend/trading-platform-ui
-    mkdir -p logs
     
     # Create .env file if it doesn't exist
     if [ ! -f .env ]; then

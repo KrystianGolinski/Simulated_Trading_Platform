@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     nlohmann-json3-dev \
     pkg-config \
+    curl \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -28,6 +29,10 @@ RUN chmod +x build.sh && ./build.sh
 
 # Run tests to verify build
 RUN ./build/test_basic
+
+# Health check for the C++ engine
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD test -x /shared/trading_engine || exit 1
 
 # Keep container running for volume sharing
 CMD ["tail", "-f", "/dev/null"]

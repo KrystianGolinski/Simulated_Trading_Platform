@@ -1,0 +1,58 @@
+{
+  "test_cases": [
+    {
+      "name": "missing_symbols",
+      "config": {
+        "start_date": "2023-01-01",
+        "end_date": "2023-01-31",
+        "starting_capital": 10000,
+        "strategy": "ma_crossover"
+      },
+      "expected_error": "symbols field is required"
+    },
+    {
+      "name": "negative_capital",
+      "config": {
+        "symbols": ["AAPL"],
+        "start_date": "2023-01-01",
+        "end_date": "2023-01-31",
+        "starting_capital": -5000,
+        "strategy": "ma_crossover"
+      },
+      "expected_error": "starting_capital must be positive"
+    },
+    {
+      "name": "invalid_date_range",
+      "config": {
+        "symbols": ["AAPL"],
+        "start_date": "2023-12-31",
+        "end_date": "2023-01-01",
+        "starting_capital": 10000,
+        "strategy": "ma_crossover"
+      },
+      "expected_error": "start_date must be before end_date"
+    },
+    {
+      "name": "future_dates",
+      "config": {
+        "symbols": ["AAPL"],
+        "start_date": "2025-01-01",
+        "end_date": "2025-12-31",
+        "starting_capital": 10000,
+        "strategy": "ma_crossover"
+      },
+      "expected_error": "dates cannot be in the future"
+    },
+    {
+      "name": "invalid_strategy",
+      "config": {
+        "symbols": ["AAPL"],
+        "start_date": "2023-01-01",
+        "end_date": "2023-01-31",
+        "starting_capital": 10000,
+        "strategy": "unknown_strategy"
+      },
+      "expected_error": "invalid trading strategy"
+    }
+  ]
+}

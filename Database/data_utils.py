@@ -1,6 +1,6 @@
-"""
-Shared utilities for data processing scripts
-"""
+
+# Shared utilities for data processing scripts
+
 import pandas as pd
 
 def get_date_column(df: pd.DataFrame) -> str:

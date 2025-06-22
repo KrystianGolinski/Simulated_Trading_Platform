@@ -85,6 +85,21 @@ export interface ApiErrorResponse {
   error_details?: ValidationError[];
 }
 
+// Standardized response format
+export interface StandardResponse<T> {
+  status: 'success' | 'error' | 'warning';
+  message: string;
+  data?: T;
+  errors?: Array<{
+    code: string;
+    message: string;
+    field?: string;
+    details?: any;
+  }>;
+  warnings?: string[];
+  metadata?: any;
+}
+
 export interface SimulationResults {
   simulation_id: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
@@ -105,20 +120,23 @@ class ApiService {
   private async fetchWithErrorHandling<T>(url: string, options?: RequestInit): Promise<T> {
     try {
       const response = await fetch(`${API_BASE_URL}${url}`, options);
-      if (!response.ok) {
-        // Try to parse error response for detailed validation errors
-        try {
-          const errorData: ApiErrorResponse = await response.json();
-          const error = new Error(errorData.message || `HTTP error! status: ${response.status}`);
-          (error as any).errorDetails = errorData.error_details;
-          (error as any).errors = errorData.errors;
-          (error as any).status = response.status;
-          throw error;
-        } catch (parseError) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+      const responseData: StandardResponse<T> = await response.json();
+      
+      if (!response.ok || responseData.status === 'error') {
+        const error = new Error(responseData.message || `HTTP error! status: ${response.status}`);
+        (error as any).errorDetails = responseData.errors;
+        (error as any).errors = responseData.errors?.map(e => e.message);
+        (error as any).status = response.status;
+        throw error;
       }
-      return await response.json();
+      
+      // For success responses, extract the data field
+      if (responseData.status === 'success' || responseData.status === 'warning') {
+        return responseData.data as T;
+      }
+      
+      // Fallback for any non-standard responses
+      return responseData as unknown as T;
     } catch (error) {
       console.error('API Error:', error);
       throw error;
@@ -127,7 +145,15 @@ class ApiService {
 
   // Get system health and database statistics
   async getHealth(): Promise<HealthData> {
-    return this.fetchWithErrorHandling<HealthData>('/health');
+    const response = await this.fetchWithErrorHandling<any>('/health');
+    // Transform the standardized health response to the expected format
+    return {
+      status: response.service ? 'healthy' : 'unhealthy',
+      database_connected: response.database?.status === 'healthy',
+      stocks_count: response.stocks_count || 0,
+      daily_records_count: 0,
+      minute_records_count: 0
+    };
   }
 
   // Get list of available stock symbols

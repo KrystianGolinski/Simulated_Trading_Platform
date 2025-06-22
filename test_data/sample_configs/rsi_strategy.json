@@ -1,0 +1,11 @@
+{
+  "symbols": ["AAPL", "GOOGL"],
+  "start_date": "2023-06-01",
+  "end_date": "2023-08-31",
+  "starting_capital": 25000,
+  "strategy": "rsi",
+  "rsi_period": 14,
+  "rsi_oversold": 30,
+  "rsi_overbought": 70,
+  "description": "RSI strategy test configuration for momentum-based trading"
+}
