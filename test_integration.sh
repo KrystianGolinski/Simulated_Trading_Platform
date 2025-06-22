@@ -4,11 +4,11 @@ echo "Integration Test"
 
 cd "$(dirname "$0")"
 
-# Colors
+# Colours
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 BLUE='\033[0;34m'
-NC='\033[0m'
+NC='\033[0m' # No colour
 
 print_test() {
     echo -e "${BLUE}[TEST]${NC} $1"

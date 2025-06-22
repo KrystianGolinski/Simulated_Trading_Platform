@@ -7,12 +7,12 @@ echo "Trading Platform Complete Setup"
 # Change to script directory (project root)
 cd "$(dirname "$0")"
 
-# Colors for output
+# Colours for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m' # No Colour
 
 print_status() {
     echo -e "${BLUE}[INFO]${NC} $1"

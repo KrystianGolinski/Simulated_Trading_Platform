@@ -220,7 +220,7 @@ class FreeDataCollector:
             json.dump(summary, f, indent=2)
         
         # Print summary
-        print("\n=== Data Collection Summary ===")
+        print("\nData Collection Summary")
         print(f"Daily data collected for {len(summary['daily'])} symbols")
         print(f"Intraday data collected for {len(summary['intraday'])} symbols")
         

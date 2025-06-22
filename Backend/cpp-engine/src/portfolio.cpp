@@ -227,7 +227,7 @@ std::string Portfolio::toDetailedString(const std::map<std::string, double>& cur
     std::ostringstream oss;
     oss << std::fixed << std::setprecision(2);
     
-    oss << "=== Portfolio Details ===\n";
+    oss << "Portfolio Details\n";
     oss << "Cash Balance: $" << cash_balance_ << "\n";
     oss << "Initial Capital: $" << initial_capital_ << "\n";
     oss << "Total Value: $" << getTotalValue(current_prices) << "\n";

@@ -335,7 +335,7 @@ class CSVToPostgreSQLLoader:
             """)
             
             daily_stats = cur.fetchone()
-            print("\n=== Daily Data Statistics ===")
+            print("\nDaily Data Statistics")
             print(f"Symbols: {daily_stats[0]}")
             print(f"Total Records: {daily_stats[1]:,}")
             print(f"Date Range: {daily_stats[2]} to {daily_stats[3]}")
@@ -351,7 +351,7 @@ class CSVToPostgreSQLLoader:
             """)
             
             intraday_stats = cur.fetchone()
-            print("\n=== Intraday Data Statistics ===")
+            print("\nIntraday Data Statistics")
             print(f"Symbols: {intraday_stats[0]}")
             print(f"Total Records: {intraday_stats[1]:,}")
             print(f"Date Range: {intraday_stats[2]} to {intraday_stats[3]}")
