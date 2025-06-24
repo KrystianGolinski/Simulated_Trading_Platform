@@ -1,90 +1,40 @@
 # Simulated Trading Platform - Current Status Report
 
-**Last Updated:** June 15, 2025  
+**Last Updated:** June 24, 2025  
 
-## What's Currently Working 
+## Version 1.0 
 
-### 1. Database Infrastructure
-- **Database:** PostgreSQL with TimescaleDB extension (`simulated_trading_platform`)
-- **Data Volume:** 76,192 total records across 25 stocks
-  - 62,850 daily price records (10 years of data)
-  - 13,342 intraday minute-level records
-- **Stock Coverage:** AAPL, MSFT, GOOGL, AMZN, META, TSLA, NVDA, JPM, V, JNJ, WMT, PG, UNH, HD, DIS, MA, BAC, ADBE, CRM, NFLX, X, T, QCOM, ^SPX, ^NYA
+**Brief:** 
+Currently the project fulfills phase 1 of the implementation roadmap and goes quite past it but not at phase 2 yet. Heading into phase 2 now. Roadmap = 'Project_Documentation/Idea.md @ lines 115 onward'
 
-**Database Schema:**
-```sql
--- Core tables (implemented and populated)
-stock_prices_daily     -- Historical daily OHLCV data
-stock_prices_1min      -- Intraday minute-level data
 
--- Trading tables (schema ready, empty)
-stocks                 -- Stock metadata
-trading_sessions       -- Simulation session tracking  
-trades_log            -- Individual trade execution log
-```
+**Trading Strategies**
 
-### 2. Data Pipeline
-- **Data Source:** Yahoo Finance API integration
-- **Scripts:**
-  - `DataGathering.py` - Automated data collection
-  - `data_cleaning.py` - Data normalization and validation
-  - `data_integrity_verification.py` - Quality assurance
-  - `CSVtoPostgres.py` - Database import with TimescaleDB optimization
+Completed Strategies: MA_Crossover
 
-**Data Quality Features:**
-- Stock split and dividend adjustments
-- Missing data interpolation
-- Outlier detection and correction
-- Automated data validation tests
+Limitation: Only 1 stock can be used in simulations so far
 
-### 3. FastAPI Backend
-- **Base URL:** `http://localhost:8000`
-- **Database Connection:** Async connection pooling with asyncpg
-- **Environment:** Configurable via `.env` file
+**API**
 
-**Available Endpoints:**
-```http
-GET /health           # Database health check and statistics
-GET /stocks          # List all available stock symbols  
-GET /stocks/{symbol}/data?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD&timeframe=daily
-GET /docs            # Interactive API documentation
-```
+The Python FastAPI is operational and tested
 
-### 4. Development Environment
-- **Containerization:** Docker Compose configuration for all services
-- **Languages:** Python (FastAPI), C++ (CMake), TypeScript (React)
-- **Version Control:** Git with comprehensive `.gitignore`
-- **Documentation:** Extensive project documentation and diagrams
+**Engine**
 
-**Services Available:**
-```yaml
-# docker-compose.dev.yml
-postgres     # TimescaleDB (port 5432)
-fastapi      # Python API (port 8000)
-cpp-engine   # C++ trading engine
-frontend     # React UI (port 3000)
-```
+The engine succesfully runs 1 stock simulations and communicates via API with extensive testing architecture and optimisations
 
-### 4. React Frontend
-- Currently shows default React template
-- No trading-specific UI components
-- No API integration
-- No data visualization
+**Frontend**
 
-## Technical Specifications
+The frontend is okay looking, takes in inputs and shows outputs via API so good enough
 
-**Performance Requirements:**
-- Target: 1-year backtest on 5 stocks in <10 seconds
-- Database: Optimized with TimescaleDB hypertables
-- Connection pooling for concurrent API requests
+**Data**
 
-**Achieved Data Requirements:**
-- 10+ years historical data
-- Daily and intraday timeframes
-- 25+ stock symbols including market indices
+Limited data (only like 10 years daily and like a week of intraday), sufficient for testing and short simulations
 
-**Scalability Considerations:**
-- Docker containerization for easy deployment
-- Async Python backend for high concurrency
-- C++ engine for computational performance
-- TimescaleDB for time-series optimization
+**Testing**
+
+Sufficient testing throughout each part of the platform
+
+**Docker**
+
+Works on Linux, not sure about Windows at the minute
+
