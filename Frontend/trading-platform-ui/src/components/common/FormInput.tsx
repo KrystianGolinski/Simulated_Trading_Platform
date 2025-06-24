@@ -12,19 +12,26 @@ export const FormInput: React.FC<FormInputProps> = ({
   ...props 
 }) => {
   return (
-    <div>
-      {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          {label}
-        </label>
-      )}
-      <input
-        className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
-        {...props}
-      />
-      {error && (
-        <p className="mt-1 text-sm text-red-600">{error}</p>
-      )}
-    </div>
-  );
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {label && (
+          <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', minWidth: '130px' }}>
+            {label}
+          </label>
+        )}
+        <input
+          style={{
+            padding: '6px 10px',
+            border: '1px solid #d1d5db',
+            borderRadius: '4px',
+            fontSize: '13px',
+            outline: 'none',
+            width: '140px'
+          }}
+          {...props}
+        />
+        {error && (
+          <p style={{ marginLeft: '6px', fontSize: '12px', color: '#ef4444' }}>{error}</p>
+        )}
+      </div>
+    );
 };

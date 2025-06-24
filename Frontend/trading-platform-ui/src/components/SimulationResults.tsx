@@ -47,9 +47,15 @@ export const SimulationResults: React.FC<SimulationResultsProps> = ({
 
   if (!results) {
     return (
-      <div className="container-md text-center">
-          <h1 className="page-title">No Results Available</h1>
-          <p className="text-gray-600">Please run a simulation to see results.</p>
+      <div style={{ padding: '12px' }}>
+        <div style={{ maxWidth: '900px', margin: '0 auto', textAlign: 'center' }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#111827' }}>
+            No Results Available
+          </h1>
+          <div style={{ backgroundColor: 'white', borderRadius: '8px', padding: '24px', boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)' }}>
+            <p style={{ color: '#6b7280', fontSize: '1rem' }}>Please run a simulation to see results.</p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -57,28 +63,65 @@ export const SimulationResults: React.FC<SimulationResultsProps> = ({
   // Handle cases where simulation failed or is incomplete
   if (results.status === 'failed') {
     return (
-      <div className="container-md">
-          <h1 className="page-title">Simulation Failed</h1>
-          <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
-            <p className="text-red-700">{results.error_message || 'Unknown error occurred'}</p>
+      <div style={{ padding: '12px' }}>
+        <div style={{ maxWidth: '900px', margin: '0 auto', textAlign: 'center' }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#111827' }}>
+            Simulation Failed
+          </h1>
+          <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '16px', marginBottom: '1.5rem' }}>
+            <p style={{ color: '#dc2626', fontSize: '1rem' }}>
+              {results.error_message || 'Unknown error occurred'}
+            </p>
           </div>
           {onStartNew && (
             <button 
               onClick={onStartNew}
-              className="btn-primary"
+              style={{
+                backgroundColor: '#2563eb',
+                color: 'white',
+                padding: '8px 16px',
+                borderRadius: '6px',
+                border: 'none',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer'
+              }}
             >
               Try New Simulation
             </button>
           )}
+        </div>
       </div>
     );
   }
 
   if (results.status !== 'completed') {
     return (
-      <div className="container-md text-center">
-          <h1 className="page-title">Simulation In Progress</h1>
-          <p className="text-gray-600">Status: {results.status}</p>
+      <div style={{ padding: '12px' }}>
+        <div style={{ maxWidth: '900px', margin: '0 auto', textAlign: 'center' }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#111827' }}>
+            Simulation In Progress
+          </h1>
+          <div style={{ backgroundColor: 'white', borderRadius: '8px', padding: '24px', boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)' }}>
+            <div style={{ marginBottom: '1rem' }}>
+              <div style={{ width: '100%', height: '8px', backgroundColor: '#e5e7eb', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{ 
+                  width: '60%', 
+                  height: '100%', 
+                  backgroundColor: '#3b82f6', 
+                  borderRadius: '4px',
+                  animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+                }}></div>
+              </div>
+            </div>
+            <p style={{ color: '#374151', fontSize: '1rem', fontWeight: '500', marginBottom: '0.5rem' }}>
+              Processing your simulation...
+            </p>
+            <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+              Status: <span style={{ fontWeight: '600', textTransform: 'capitalize' }}>{results.status}</span>
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -107,12 +150,18 @@ export const SimulationResults: React.FC<SimulationResultsProps> = ({
         borderWidth: 2,
         fill: true,
         tension: 0.1,
+        pointRadius: 0,
+        pointHoverRadius: 6,
       }
     ],
   };
 
   const chartOptions = {
     responsive: true,
+    interaction: {
+      mode: 'index' as const,
+      intersect: false,
+    },
     plugins: {
       legend: {
         position: 'top' as const,
@@ -148,135 +197,164 @@ export const SimulationResults: React.FC<SimulationResultsProps> = ({
   };
 
   return (
-    <div className="container-xl py-4">
-      <h1 className="page-title">
-        Simulation Results
-      </h1>
+    <div style={{ padding: '12px' }}>
+      <div style={{ maxWidth: '900px', margin: '0 auto', textAlign: 'center' }}>
+        <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#111827' }}>
+          Simulation Results
+        </h1>
 
-      {/* Key Metrics */}
-      <div className="grid-responsive-4 mb-4">
-        <div className="card-4">
-          <h3 className="metric-header">
-            Starting Capital
-          </h3>
-          <p className="metric-value text-gray-900 mt-1">
-            ${startingCapital.toLocaleString()}
-          </p>
-        </div>
-        
-        <div className="card-4">
-          <h3 className="metric-header">
-            Final Value
-          </h3>
-          <p className="metric-value text-gray-900 mt-1">
-            ${finalPortfolioValue.toLocaleString()}
-          </p>
-        </div>
-        
-        <div className="card-4">
-          <h3 className="metric-header">
-            Total Return
-          </h3>
-          <p className={`metric-value mt-1 ${
-            totalReturnPercentage >= 0 ? 'text-profit' : 'text-loss'
-          }`}>
-            {totalReturnPercentage >= 0 ? '+' : ''}{totalReturnPercentage.toFixed(2)}%
-          </p>
-        </div>
-        
-        <div className="card-4">
-          <h3 className="metric-header">
-            Profit/Loss
-          </h3>
-          <p className={`metric-value mt-1 ${
-            profitLoss >= 0 ? 'text-profit' : 'text-loss'
-          }`}>
-            {profitLoss >= 0 ? '+' : ''}${profitLoss.toLocaleString()}
-          </p>
-        </div>
-      </div>
-
-      {/* Equity Curve Chart */}
-      <div className="card-4 mb-4">
-        <div className="chart-container">
-          <Line ref={chartRef} data={chartData} options={chartOptions} />
-        </div>
-      </div>
-
-      {/* Trading Statistics and Configuration */}
-      <div className="grid-metrics mb-4">
-        <div className="card-4">
-          <h3 className="section-title">Trading Statistics</h3>
-          <div className="space-y-2">
-            <div className="flex-between">
-              <span className="text-gray-600">Total Trades:</span>
-              <span className="font-semibold">{totalTrades}</span>
-            </div>
-            <div className="flex-between">
-              <span className="text-gray-600">Winning Trades:</span>
-              <span className="font-semibold text-profit">{winningTrades}</span>
-            </div>
-            <div className="flex-between">
-              <span className="text-gray-600">Losing Trades:</span>
-              <span className="font-semibold text-loss">{losingTrades}</span>
-            </div>
-            <div className="flex-between">
-              <span className="text-gray-600">Win Rate:</span>
-              <span className="font-semibold">{winRate}%</span>
+        {/* Top Sections Row */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+          {/* Performance Summary */}
+          <div>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>Performance Summary</h2>
+            <div style={{ backgroundColor: 'white', borderRadius: '8px', padding: '16px', boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Starting Capital:</span>
+                  <span style={{ fontWeight: '600' }}>${startingCapital.toLocaleString()}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Final Value:</span>
+                  <span style={{ fontWeight: '600' }}>${finalPortfolioValue.toLocaleString()}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Total Return:</span>
+                  <span style={{ 
+                    fontWeight: '600', 
+                    color: totalReturnPercentage >= 0 ? '#059669' : '#dc2626' 
+                  }}>
+                    {totalReturnPercentage >= 0 ? '+' : ''}{totalReturnPercentage.toFixed(2)}%
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Profit/Loss:</span>
+                  <span style={{ 
+                    fontWeight: '600', 
+                    color: profitLoss >= 0 ? '#059669' : '#dc2626' 
+                  }}>
+                    {profitLoss >= 0 ? '+' : ''}${profitLoss.toLocaleString()}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="card-4">
-          <h3 className="section-title">Simulation Configuration</h3>
-          <div className="space-y-2">
-            <div className="flex-between">
-              <span className="text-gray-600">Period:</span>
-              <span className="font-semibold text-sm">{results.config.start_date} to {results.config.end_date}</span>
+          {/* Trading Statistics */}
+          <div>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>Trading Statistics</h2>
+            <div style={{ backgroundColor: 'white', borderRadius: '8px', padding: '16px', boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Total Trades:</span>
+                  <span style={{ fontWeight: '600' }}>{totalTrades}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Winning Trades:</span>
+                  <span style={{ fontWeight: '600', color: '#059669' }}>{winningTrades}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Losing Trades:</span>
+                  <span style={{ fontWeight: '600', color: '#dc2626' }}>{losingTrades}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Win Rate:</span>
+                  <span style={{ fontWeight: '600' }}>{winRate}%</span>
+                </div>
+              </div>
             </div>
-            <div className="flex-between">
-              <span className="text-gray-600">Stocks:</span>
-              <span className="font-semibold">{results.config.symbols.length} symbols</span>
-            </div>
-            <div className="flex-between">
-              <span className="text-gray-600">Strategy:</span>
-              <span className="font-semibold">{results.config.strategy}</span>
-            </div>
-            <div className="flex-between">
-              <span className="text-gray-600">Short MA:</span>
-              <span className="font-semibold">{results.config.short_ma} days</span>
-            </div>
-            <div className="flex-between">
-              <span className="text-gray-600">Long MA:</span>
-              <span className="font-semibold">{results.config.long_ma} days</span>
-            </div>
-            <div className="mt-3">
-              <span className="text-gray-600">Selected Stocks:</span>
-              <div className="mt-1">
-                <span className="font-semibold text-sm">{results.config.symbols.join(', ')}</span>
+          </div>
+
+          {/* Configuration */}
+          <div>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>Configuration</h2>
+            <div style={{ backgroundColor: 'white', borderRadius: '8px', padding: '16px', boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Strategy:</span>
+                  <span style={{ fontWeight: '600' }}>{results.config.strategy}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Stocks:</span>
+                  <span style={{ fontWeight: '600' }}>{results.config.symbols.length} symbols</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Short MA:</span>
+                  <span style={{ fontWeight: '600' }}>{results.config.short_ma} days</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Long MA:</span>
+                  <span style={{ fontWeight: '600' }}>{results.config.long_ma} days</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Action Buttons */}
-      <div className="card-4">
-        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
-          {onStartNew && (
-            <button 
-              onClick={onStartNew}
-              className="btn-primary"
-            >
-              Run New Simulation
-            </button>
-          )}
-          <button className="btn-secondary">
-            Export Results
-          </button>
-          <button className="btn-success">
-            Save Simulation
-          </button>
+        {/* Chart */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <h2 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.5rem', color: '#374151', textAlign: 'center' }}>Portfolio Growth</h2>
+          <div style={{ backgroundColor: 'white', borderRadius: '8px', padding: '16px', boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)', height: '400px' }}>
+            <div style={{ height: '100%' }}>
+              <Line ref={chartRef} data={chartData} options={chartOptions} />
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div style={{ marginBottom: '1rem' }}>
+          <h2 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>Actions</h2>
+          <div style={{ backgroundColor: 'white', borderRadius: '8px', padding: '16px', boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                {onStartNew && (
+                  <button 
+                    onClick={onStartNew}
+                    style={{
+                      backgroundColor: '#2563eb',
+                      color: 'white',
+                      padding: '8px 16px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Run New Simulation
+                  </button>
+                )}
+                <button 
+                  style={{
+                    backgroundColor: '#6b7280',
+                    color: 'white',
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Export Results
+                </button>
+                <button 
+                  style={{
+                    backgroundColor: '#059669',
+                    color: 'white',
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Save Simulation
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

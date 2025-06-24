@@ -18,16 +18,9 @@ A website application featuring simulated stock market trading that allows users
 - C++ for core algorithmic processing and performance-critical calculations  
 - FastAPI (Python) as the bridge between C++ backend and web frontend  
 
-### Data Sources:
-
-- **Primary:** Polygon.io (comprehensive historical data)  
-- **Alternative:** Alpaca API or Yahoo Finance  
-- Local data preprocessing and storage for optimal performance  
-
 ### Database:
 
 - PostgreSQL for time-series historical market data (with TimescaleDB extension)  
-- Redis for caching frequently accessed data and session management  
 
 ## Market Data
 
@@ -152,10 +145,3 @@ A website application featuring simulated stock market trading that allows users
 - UI/UX improvements  
 - Strategy parameter optimization tools  
 - Community features (strategy sharing, leaderboards)  
-
-## Additional Considerations
-
-- **Data Quality:** Implement checks for splits, dividends, and corporate actions  
-- **Scalability:** Design for parallel processing of multiple simulations  
-- **User Education:** Include tooltips and documentation for financial metrics  
-- **Legal:** Clear disclaimers about simulated vs real trading  

@@ -131,7 +131,7 @@ export const StockChart: React.FC<StockChartProps> = ({
   };
 
   return (
-    <div className="w-full h-96 p-4">
+    <div style={{ width: '100%', height: '600px', padding: '16px' }}>
       <Line ref={chartRef} data={chartData} options={options} />
     </div>
   );

@@ -79,68 +79,77 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Fixed Navigation Bar */}
-      <nav className="bg-white shadow-sm border-b sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex justify-between items-center h-16">
-            <h1 className="text-xl font-bold text-gray-900">Trading Platform</h1>
-            <div className="flex items-center space-x-6">
-              {/* Simulation Status Indicator */}
-              {simulation.isLoading && (
-                <div className="flex items-center space-x-2 text-sm text-orange-600">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-600"></div>
-                  <span>Simulation Running</span>
-                </div>
-              )}
-              {simulation.error && (
-                <div className="flex items-center space-x-2 text-sm text-red-600">
-                  <span>Error</span>
-                </div>
-              )}
-              {simulation.currentSimulation?.status === 'completed' && (
-                <div className="flex items-center space-x-2 text-sm text-green-600">
-                  <span>Complete</span>
-                </div>
-              )}
-              
-              {/* Navigation Buttons */}
+      {/* Header */}
+      <header style={{ backgroundColor: 'white', boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)', borderBottom: '1px solid #e5e7eb', position: 'sticky', top: 0, zIndex: 10, padding: '12px 0' }}>
+        <div style={{ width: '100%', padding: '0 24px' }}>
+          {/* Title */}
+          <div style={{ display: 'flex', justifyContent: 'center', width: '100%', marginBottom: '4px' }}>
+            <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#111827' }}>Krystian's Trading Platform</h1>
+          </div>
+          
+          {/* Simulation Error Indicator */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '4px' }}>
+            {simulation.error && (
+              <div className="flex items-center space-x-2 text-sm text-red-600">
+                <span>Error</span>
+              </div>
+            )}
+          </div>
+          
+          {/* Nav Buttons */}
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '24px' }}>
+            <button
+              onClick={handleResetSimulation}
+              disabled={simulation.isLoading}
+              style={{
+                padding: '12px 24px',
+                borderRadius: '6px',
+                fontSize: '16px',
+                fontWeight: '500',
+                border: 'none',
+                cursor: simulation.isLoading ? 'not-allowed' : 'pointer',
+                backgroundColor: currentView === 'setup' ? '#2563eb' : 'transparent',
+                color: currentView === 'setup' ? 'white' : '#374151',
+                opacity: simulation.isLoading ? 0.5 : 1
+              }}
+            >
+              New Simulation
+            </button>
+            <button
+              onClick={() => setCurrentView('dashboard')}
+              style={{
+                padding: '12px 24px',
+                borderRadius: '6px',
+                fontSize: '16px',
+                fontWeight: '500',
+                border: 'none',
+                cursor: 'pointer',
+                backgroundColor: currentView === 'dashboard' ? '#2563eb' : 'transparent',
+                color: currentView === 'dashboard' ? 'white' : '#374151'
+              }}
+            >
+              Data Dashboard
+            </button>
+            {simulation.currentSimulation && (
               <button
-                onClick={handleResetSimulation}
-                disabled={simulation.isLoading}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  currentView === 'setup'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'
-                } ${simulation.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={() => setCurrentView('results')}
+                style={{
+                  padding: '12px 24px',
+                  borderRadius: '6px',
+                  fontSize: '16px',
+                  fontWeight: '500',
+                  border: 'none',
+                  cursor: 'pointer',
+                  backgroundColor: currentView === 'results' ? '#2563eb' : 'transparent',
+                  color: currentView === 'results' ? 'white' : '#374151'
+                }}
               >
-                New Simulation
+                Results
               </button>
-              {simulation.currentSimulation && (
-                <button
-                  onClick={() => setCurrentView('results')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    currentView === 'results'
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'
-                  }`}
-                >
-                  Results
-                </button>
-              )}
-              <button
-                onClick={() => setCurrentView('dashboard')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  currentView === 'dashboard'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'
-                }`}
-              >
-                Data Dashboard
-              </button>
-            </div>
+            )}
           </div>
         </div>
-      </nav>
+      </header>
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-auto">
