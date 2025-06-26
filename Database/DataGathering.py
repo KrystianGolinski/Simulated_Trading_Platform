@@ -15,16 +15,15 @@ logger = logging.getLogger(__name__)
 
 class FreeDataCollector:
     
-    # Simplified data collector that always uses CSV-to-DB workflow.
-    # Collects data from Yahoo Finance, saves to CSV files, then imports to database.
+    # Simplified data collector
+    # Collects data from Yahoo Finance, saves to CSV files
     
     def __init__(self):
         # Initialize data collector for CSV-only workflow
         self.data_dir = "historical_data"
         os.makedirs(self.data_dir, exist_ok=True)
         os.makedirs(os.path.join(self.data_dir, "daily"), exist_ok=True)
-        os.makedirs(os.path.join(self.data_dir, "intraday"), exist_ok=True)
-    
+
     def fetch_stock_info(self, symbols: List[str]) -> Dict[str, Dict]:
         # Fetch stock metadata from Yahoo Finance
         stock_info = {}
@@ -95,38 +94,6 @@ class FreeDataCollector:
             logger.error(f"Error fetching daily data for {symbol}: {e}")
             return pd.DataFrame()
     
-    def fetch_intraday_data(self, symbol: str, period: str = "7d") -> pd.DataFrame:
-        # Fetch intraday data (limited by API to 7 days for 1-minute data)
-        
-        try:
-            ticker = yf.Ticker(symbol)
-            
-            # Get 7 days of 1-minute data
-            df = ticker.history(
-                period="7d",
-                interval="1m",
-                auto_adjust=False,
-                prepost=False
-            )
-            
-            if df.empty:
-                logger.warning(f"No intraday data found for {symbol}")
-                return pd.DataFrame()
-            
-            # Reset index and add symbol
-            df.reset_index(inplace=True)
-            df['symbol'] = symbol
-            
-            # Rename columns
-            df.columns = [col.lower().replace(' ', '_') for col in df.columns]
-            
-            logger.info(f"Fetched {len(df)} intraday records for {symbol}")
-            return df
-            
-        except Exception as e:
-            logger.error(f"Error fetching intraday data for {symbol}: {e}")
-            return pd.DataFrame()
-    
     def save_to_file(self, df: pd.DataFrame, symbol: str, data_type: str = "daily"):
         # Save DataFrame to CSV file
         if df.empty:
@@ -171,13 +138,6 @@ class FreeDataCollector:
             if not daily_df.empty:
                 self.save_to_file(daily_df, symbol, "daily")
             
-            # Also fetch recent intraday data (last 60 days only)
-            logger.info(f"Fetching recent intraday data for {symbol}...")
-            intraday_df = self.fetch_intraday_data(symbol, "1mo")
-            
-            if not intraday_df.empty:
-                self.save_to_file(intraday_df, symbol, "intraday")
-            
             time.sleep(1)
         
         logger.info("Data collection completed!")
@@ -187,7 +147,7 @@ class FreeDataCollector:
     
     def generate_summary(self):
         # Generate a summary of collected CSV data.
-        summary = {"daily": {}, "intraday": {}}
+        summary = {"daily": {}}
         
         # Check daily files
         daily_dir = os.path.join(self.data_dir, "daily")
@@ -201,20 +161,7 @@ class FreeDataCollector:
                         "start_date": df['date'].min(),
                         "end_date": df['date'].max()
                     }
-        
-        # Check intraday files
-        intraday_dir = os.path.join(self.data_dir, "intraday")
-        if os.path.exists(intraday_dir):
-            for file in os.listdir(intraday_dir):
-                if file.endswith(".csv"):
-                    df = pd.read_csv(os.path.join(intraday_dir, file))
-                    symbol = file.replace("_intraday.csv", "")
-                    summary["intraday"][symbol] = {
-                        "records": len(df),
-                        "start_date": df['datetime'].min(),
-                        "end_date": df['datetime'].max()
-                    }
-        
+    
         # Save summary
         with open(os.path.join(self.data_dir, "summary.json"), 'w') as f:
             json.dump(summary, f, indent=2)
@@ -222,14 +169,11 @@ class FreeDataCollector:
         # Print summary
         print("\nData Collection Summary")
         print(f"Daily data collected for {len(summary['daily'])} symbols")
-        print(f"Intraday data collected for {len(summary['intraday'])} symbols")
         
         for symbol, info in summary['daily'].items():
             print(f"\n{symbol}:")
             print(f"  Daily records: {info['records']}")
             print(f"  Date range: {info['start_date']} to {info['end_date']}")
-        
-        print("\nNext step: Use CSVtoPostgres.py to import data to database")
 
 if __name__ == "__main__":
     # List of stocks to collect
@@ -255,4 +199,3 @@ if __name__ == "__main__":
     collector.collect_all_data(SYMBOLS, START_DATE, END_DATE)
     
     print("\nData collection complete!")
-    print("Run CSVtoPostgres.py to import the collected data to PostgreSQL database")

@@ -3,16 +3,21 @@ import { StockChart } from './StockChart';
 import { useStockData, useStocks } from '../hooks/useStockData';
 import { useDebounce } from '../hooks/useDebounce';
 
+type ChartType = 'line' | 'candlestick' | 'ohlc';
+
 export const Dashboard: React.FC = () => {
   const [selectedSymbol, setSelectedSymbol] = useState<string>('AAPL');
   const [startDate, setStartDate] = useState<string>('2024-01-01');
   const [endDate, setEndDate] = useState<string>('2024-12-31');
-  const [timeframe, setTimeframe] = useState<'daily' | '1min'>('daily');
+  const [timeframe, setTimeframe] = useState<'daily'>('daily');
+  const [chartType, setChartType] = useState<ChartType>('line');
+  const [showVolume, setShowVolume] = useState<boolean>(false);
 
   const debouncedSymbol = useDebounce(selectedSymbol, 500);
   const debouncedStartDate = useDebounce(startDate, 800);
   const debouncedEndDate = useDebounce(endDate, 800);
   const debouncedTimeframe = useDebounce(timeframe, 300);
+  const debouncedChartType = useDebounce(chartType, 200);
 
   const { stocks, loading: stocksLoading } = useStocks();
   const { data, loading, error } = useStockData(
@@ -34,8 +39,12 @@ export const Dashboard: React.FC = () => {
     setEndDate(date);
   }, []);
 
-  const handleTimeframeChange = useCallback((tf: 'daily' | '1min') => {
+  const handleTimeframeChange = useCallback((tf: 'daily') => {
     setTimeframe(tf);
+  }, []);
+
+  const handleChartTypeChange = useCallback((type: ChartType) => {
+    setChartType(type);
   }, []);
 
   const stockOptions = useMemo(() => 
@@ -131,7 +140,7 @@ export const Dashboard: React.FC = () => {
                 </label>
                 <select
                   value={timeframe}
-                  onChange={(e) => handleTimeframeChange(e.target.value as 'daily' | '1min')}
+                  onChange={(e) => handleTimeframeChange(e.target.value as 'daily')}
                   style={{
                     padding: '6px 10px',
                     border: '1px solid #d1d5db',
@@ -142,8 +151,47 @@ export const Dashboard: React.FC = () => {
                   }}
                 >
                   <option value="daily">Daily</option>
-                  <option value="1min">1 Minute</option>
                 </select>
+              </div>
+
+              {/* Chart Type */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', minWidth: '130px' }}>
+                  Chart Type
+                </label>
+                <select
+                  value={chartType}
+                  onChange={(e) => handleChartTypeChange(e.target.value as ChartType)}
+                  style={{
+                    padding: '6px 10px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '4px',
+                    fontSize: '13px',
+                    outline: 'none',
+                    width: '140px'
+                  }}
+                >
+                  <option value="line">Line Chart</option>
+                  <option value="candlestick">Candlestick</option>
+                  <option value="ohlc">OHLC Bars</option>
+                </select>
+              </div>
+
+              {/* Show Volume */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', minWidth: '130px' }}>
+                  Show Volume
+                </label>
+                <input
+                  type="checkbox"
+                  checked={showVolume}
+                  onChange={(e) => setShowVolume(e.target.checked)}
+                  style={{
+                    width: '16px',
+                    height: '16px',
+                    cursor: 'pointer'
+                  }}
+                />
               </div>
             </div>
           </div>
@@ -158,6 +206,8 @@ export const Dashboard: React.FC = () => {
               symbol={selectedSymbol}
               loading={loading}
               error={error}
+              chartType={debouncedChartType}
+              showVolume={showVolume}
             />
           </div>
         </div>

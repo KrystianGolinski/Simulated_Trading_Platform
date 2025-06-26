@@ -27,18 +27,24 @@ ChartJS.register(
   TimeScale
 );
 
+type ChartType = 'line' | 'candlestick' | 'ohlc';
+
 interface StockChartProps {
   data: StockData[];
   symbol: string;
   loading: boolean;
   error: string | null;
+  chartType?: ChartType;
+  showVolume?: boolean;
 }
 
 export const StockChart: React.FC<StockChartProps> = ({ 
   data, 
   symbol, 
   loading, 
-  error 
+  error,
+  chartType = 'line',
+  showVolume = false // Will be used for volume charts later
 }) => {
   const chartRef = useRef(null);
 
@@ -74,23 +80,74 @@ export const StockChart: React.FC<StockChartProps> = ({
     );
   }
 
-  const chartData = {
-    labels: data.map(d => new Date(d.time)),
-    datasets: [
-      {
-        label: `${symbol} Close Price`,
-        data: data.map(d => ({ x: new Date(d.time), y: d.close })),
-        borderColor: 'rgb(59, 130, 246)',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        borderWidth: 2,
-        fill: false,
-        tension: 0.1,
-      }
-    ],
+
+
+  // Use data as-is for daily charts
+  const processedData = data;
+
+  // Prepare data based on chart type
+  const getChartData = (): any => {
+    if (chartType === 'line') {
+      return {
+        datasets: [
+          {
+            label: `${symbol} Close Price`,
+            data: processedData.map(d => ({ x: new Date(d.time), y: d.close })),
+            borderColor: 'rgb(59, 130, 246)',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            borderWidth: 1,
+            fill: false,
+            tension: 0,
+            pointRadius: 0,
+          }
+        ],
+      };
+    } else {
+      // For candlestick and OHLC, show close price with volume-based coloring
+      const candlestickData = processedData.map(d => {
+        const prevClose = processedData[processedData.indexOf(d) - 1]?.close || d.open;
+        const isUp = d.close > prevClose;
+        
+        return {
+          x: new Date(d.time),
+          y: d.close,
+          borderColor: isUp ? 'rgb(34, 197, 94)' : 'rgb(239, 68, 68)',
+          backgroundColor: isUp ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+        };
+      });
+
+      return {
+        datasets: [
+          {
+            label: `${symbol} Price Movement`,
+            data: candlestickData,
+            borderColor: candlestickData.map(d => d.borderColor),
+            backgroundColor: candlestickData.map(d => d.backgroundColor),
+            borderWidth: 1,
+            fill: false,
+            pointRadius: 0,
+            segment: {
+              borderColor: (ctx: any) => {
+                const current = processedData[ctx.p1DataIndex];
+                const previous = processedData[ctx.p0DataIndex];
+                return current && previous && current.close > previous.close ? 
+                  'rgb(34, 197, 94)' : 'rgb(239, 68, 68)';
+              }
+            }
+          }
+        ],
+      };
+    }
   };
+
+  const chartData: any = getChartData();
 
   const options = {
     responsive: true,
+    maintainAspectRatio: false,
+    animation: {
+      duration: 750 // Smooth animations for daily data
+    },
     interaction: {
       mode: 'index' as const,
       intersect: false,
@@ -101,21 +158,52 @@ export const StockChart: React.FC<StockChartProps> = ({
       },
       title: {
         display: true,
-        text: `${symbol} Stock Price & Volume`,
+        text: `${symbol} Stock Price ${chartType === 'line' ? '(Close)' : chartType === 'candlestick' ? '(High-Low with Close)' : '(OHLC Style)'}`,
       },
+      tooltip: {
+        callbacks: {
+          label: function(context: any) {
+            const dataIndex = context.dataIndex;
+            const dataPoint = processedData[dataIndex];
+            
+            if (chartType === 'line') {
+              return `Close: $${context.parsed.y.toFixed(2)}`;
+            } else if (dataPoint) {
+              return [
+                `Open: $${dataPoint.open.toFixed(2)}`,
+                `High: $${dataPoint.high.toFixed(2)}`,
+                `Low: $${dataPoint.low.toFixed(2)}`,
+                `Close: $${dataPoint.close.toFixed(2)}`,
+                `Volume: ${dataPoint.volume.toLocaleString()}`
+              ];
+            }
+            return `Close: $${context.parsed.y.toFixed(2)}`;
+          }
+        }
+      }
     },
     scales: {
       x: {
         type: 'time' as const,
         time: {
           displayFormats: {
+            millisecond: 'HH:mm:ss.SSS',
+            second: 'HH:mm:ss',
+            minute: 'HH:mm',
+            hour: 'MMM dd HH:mm',
             day: 'MMM dd',
-            month: 'MMM yyyy'
+            week: 'MMM dd',
+            month: 'MMM yyyy',
+            quarter: 'MMM yyyy',
+            year: 'yyyy'
           }
         },
         title: {
           display: true,
-          text: 'Date'
+          text: 'Trading Time'
+        },
+        ticks: {
+          maxTicksLimit: 10
         }
       },
       y: {
@@ -130,9 +218,61 @@ export const StockChart: React.FC<StockChartProps> = ({
     },
   };
 
+  // Volume chart data
+  const volumeChartData = {
+    datasets: [
+      {
+        label: `${symbol} Volume`,
+        data: processedData.map(d => ({ x: new Date(d.time), y: d.volume })),
+        backgroundColor: 'rgba(107, 114, 128, 0.6)',
+        borderColor: 'rgba(107, 114, 128, 0.8)',
+        borderWidth: 0,
+        pointRadius: 0,
+      }
+    ],
+  };
+
+  const volumeOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false,
+      },
+    },
+    scales: {
+      x: {
+        type: 'time' as const,
+        display: false,
+      },
+      y: {
+        type: 'linear' as const,
+        title: {
+          display: true,
+          text: 'Volume'
+        }
+      },
+    },
+  };
+
+  const renderChart = () => {
+    // All chart types use Line component for now since we removed the financial package
+    return <Line ref={chartRef} data={chartData} options={options as any} />;
+  };
+
   return (
-    <div style={{ width: '100%', height: '600px', padding: '16px' }}>
-      <Line ref={chartRef} data={chartData} options={options} />
+    <div className="w-full" style={{ padding: '16px' }}>
+      {/* Main price chart */}
+      <div style={{ height: showVolume ? '400px' : '600px', marginBottom: showVolume ? '16px' : '0' }}>
+        {renderChart()}
+      </div>
+      
+      {/* Volume chart */}
+      {showVolume && (
+        <div style={{ height: '150px' }}>
+          <Line data={volumeChartData} options={volumeOptions} />
+        </div>
+      )}
     </div>
   );
 };

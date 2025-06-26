@@ -31,9 +31,11 @@ public:
     
     // Cash management
     double getCashBalance() const;
+    double getCash() const { return getCashBalance(); }
     double getInitialCapital() const;
     void addCash(double amount);
     bool canAfford(double cost) const;
+    void reset(); // Reset portfolio to initial state
     
     // Position management
     bool hasPosition(const std::string& symbol) const;
@@ -51,6 +53,7 @@ public:
     double getTotalStockValue(const std::map<std::string, double>& current_prices) const;
     double getTotalUnrealizedPnL(const std::map<std::string, double>& current_prices) const;
     double getTotalReturnPercentage(const std::map<std::string, double>& current_prices) const;
+    void updateValue(const std::map<std::string, double>& current_prices); // Update internal state with current values
     
     // Utility
     std::string toString() const;

@@ -70,6 +70,11 @@ bool Portfolio::canAfford(double cost) const {
     return cash_balance_ >= cost;
 }
 
+void Portfolio::reset() {
+    positions_.clear();
+    cash_balance_ = initial_capital_;
+}
+
 // Position management
 bool Portfolio::hasPosition(const std::string& symbol) const {
     auto it = positions_.find(symbol);
@@ -83,6 +88,7 @@ Position Portfolio::getPosition(const std::string& symbol) const {
     }
     return Position(); // Return empty position if not found
 }
+
 
 std::vector<std::string> Portfolio::getSymbols() const {
     std::vector<std::string> symbols;
@@ -213,6 +219,13 @@ double Portfolio::getTotalReturnPercentage(const std::map<std::string, double>& 
     
     double current_value = getTotalValue(current_prices);
     return ((current_value - initial_capital_) / initial_capital_) * 100.0;
+}
+
+void Portfolio::updateValue(const std::map<std::string, double>& current_prices) {
+    // This method can be used to update internal state with current market values
+    // For now, it's a placeholder for future functionality like position rebalancing
+    // or portfolio optimization based on current prices
+    // The actual value calculations are handled by the getter methods
 }
 
 // Utility

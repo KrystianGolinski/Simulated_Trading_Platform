@@ -2,6 +2,8 @@
 #include <string>
 #include <algorithm>
 #include <fstream>
+#include <sstream>
+#include <vector>
 #include <nlohmann/json.hpp>
 #include "database_connection.h"
 #include "market_data.h"
@@ -10,7 +12,7 @@
 using json = nlohmann::json;
 
 // Helper function to parse command line arguments
-void parseArguments(int argc, char* argv[], std::string& symbol, std::string& start_date, std::string& end_date, double& capital, int& short_ma, int& long_ma) {
+void parseArguments(int argc, char* argv[], std::vector<std::string>& symbols, std::string& start_date, std::string& end_date, double& capital, int& short_ma, int& long_ma, std::string& strategy, int& rsi_period, double& rsi_oversold, double& rsi_overbought) {
     std::cerr << "[DEBUG] Parsing " << argc << " arguments:" << std::endl;
     for (int i = 0; i < argc; ++i) {
         std::cerr << "[DEBUG] argv[" << i << "] = '" << argv[i] << "'" << std::endl;
@@ -22,8 +24,25 @@ void parseArguments(int argc, char* argv[], std::string& symbol, std::string& st
         
         // Handle --key=value format
         if (arg.find("--symbol=") == 0) {
-            symbol = arg.substr(9); // Remove "--symbol="
-            std::cerr << "[DEBUG] Set symbol = '" << symbol << "'" << std::endl;
+            std::string symbol_list = arg.substr(9); // Remove "--symbol="
+            // Parse comma-separated symbols
+            std::stringstream ss(symbol_list);
+            std::string symbol;
+            symbols.clear();
+            while (std::getline(ss, symbol, ',')) {
+                // Trim whitespace
+                symbol.erase(symbol.find_last_not_of(" \t") + 1);
+                symbol.erase(0, symbol.find_first_not_of(" \t"));
+                if (!symbol.empty()) {
+                    symbols.push_back(symbol);
+                }
+            }
+            std::cerr << "[DEBUG] Set symbols = { ";
+            for (size_t i = 0; i < symbols.size(); ++i) {
+                std::cerr << "'" << symbols[i] << "'";
+                if (i < symbols.size() - 1) std::cerr << ", ";
+            }
+            std::cerr << " }" << std::endl;
         } else if (arg.find("--start=") == 0) {
             start_date = arg.substr(8); // Remove "--start="
             std::cerr << "[DEBUG] Set start_date = '" << start_date << "'" << std::endl;
@@ -39,11 +58,40 @@ void parseArguments(int argc, char* argv[], std::string& symbol, std::string& st
         } else if (arg.find("--long-ma=") == 0) {
             long_ma = std::stoi(arg.substr(10)); // Remove "--long-ma="
             std::cerr << "[DEBUG] Set long_ma = " << long_ma << std::endl;
+        } else if (arg.find("--strategy=") == 0) {
+            strategy = arg.substr(11); // Remove "--strategy="
+            std::cerr << "[DEBUG] Set strategy = '" << strategy << "'" << std::endl;
+        } else if (arg.find("--rsi-period=") == 0) {
+            rsi_period = std::stoi(arg.substr(13)); // Remove "--rsi-period="
+            std::cerr << "[DEBUG] Set rsi_period = " << rsi_period << std::endl;
+        } else if (arg.find("--rsi-oversold=") == 0) {
+            rsi_oversold = std::stod(arg.substr(15)); // Remove "--rsi-oversold="
+            std::cerr << "[DEBUG] Set rsi_oversold = " << rsi_oversold << std::endl;
+        } else if (arg.find("--rsi-overbought=") == 0) {
+            rsi_overbought = std::stod(arg.substr(17)); // Remove "--rsi-overbought="
+            std::cerr << "[DEBUG] Set rsi_overbought = " << rsi_overbought << std::endl;
         }
         // Handle --key value format
         else if (arg == "--symbol" && i + 1 < argc) {
-            symbol = argv[++i];
-            std::cerr << "[DEBUG] Set symbol = '" << symbol << "'" << std::endl;
+            std::string symbol_list = argv[++i];
+            // Parse comma-separated symbols
+            std::stringstream ss(symbol_list);
+            std::string symbol;
+            symbols.clear();
+            while (std::getline(ss, symbol, ',')) {
+                // Trim whitespace
+                symbol.erase(symbol.find_last_not_of(" \t") + 1);
+                symbol.erase(0, symbol.find_first_not_of(" \t"));
+                if (!symbol.empty()) {
+                    symbols.push_back(symbol);
+                }
+            }
+            std::cerr << "[DEBUG] Set symbols = { ";
+            for (size_t i = 0; i < symbols.size(); ++i) {
+                std::cerr << "'" << symbols[i] << "'";
+                if (i < symbols.size() - 1) std::cerr << ", ";
+            }
+            std::cerr << " }" << std::endl;
         } else if (arg == "--start" && i + 1 < argc) {
             start_date = argv[++i];
             std::cerr << "[DEBUG] Set start_date = '" << start_date << "'" << std::endl;
@@ -59,16 +107,37 @@ void parseArguments(int argc, char* argv[], std::string& symbol, std::string& st
         } else if (arg == "--long-ma" && i + 1 < argc) {
             long_ma = std::stoi(argv[++i]);
             std::cerr << "[DEBUG] Set long_ma = " << long_ma << std::endl;
+        } else if (arg == "--strategy" && i + 1 < argc) {
+            strategy = argv[++i];
+            std::cerr << "[DEBUG] Set strategy = '" << strategy << "'" << std::endl;
+        } else if (arg == "--rsi-period" && i + 1 < argc) {
+            rsi_period = std::stoi(argv[++i]);
+            std::cerr << "[DEBUG] Set rsi_period = " << rsi_period << std::endl;
+        } else if (arg == "--rsi-oversold" && i + 1 < argc) {
+            rsi_oversold = std::stod(argv[++i]);
+            std::cerr << "[DEBUG] Set rsi_oversold = " << rsi_oversold << std::endl;
+        } else if (arg == "--rsi-overbought" && i + 1 < argc) {
+            rsi_overbought = std::stod(argv[++i]);
+            std::cerr << "[DEBUG] Set rsi_overbought = " << rsi_overbought << std::endl;
         }
     }
     
     std::cerr << "[DEBUG] Final parsed values:" << std::endl;
-    std::cerr << "[DEBUG]   symbol = '" << symbol << "'" << std::endl;
+    std::cerr << "[DEBUG]   symbols = { ";
+    for (size_t i = 0; i < symbols.size(); ++i) {
+        std::cerr << "'" << symbols[i] << "'";
+        if (i < symbols.size() - 1) std::cerr << ", ";
+    }
+    std::cerr << " }" << std::endl;
     std::cerr << "[DEBUG]   start_date = '" << start_date << "'" << std::endl;
     std::cerr << "[DEBUG]   end_date = '" << end_date << "'" << std::endl;
     std::cerr << "[DEBUG]   capital = " << capital << std::endl;
     std::cerr << "[DEBUG]   short_ma = " << short_ma << std::endl;
     std::cerr << "[DEBUG]   long_ma = " << long_ma << std::endl;
+    std::cerr << "[DEBUG]   strategy = '" << strategy << "'" << std::endl;
+    std::cerr << "[DEBUG]   rsi_period = " << rsi_period << std::endl;
+    std::cerr << "[DEBUG]   rsi_oversold = " << rsi_oversold << std::endl;
+    std::cerr << "[DEBUG]   rsi_overbought = " << rsi_overbought << std::endl;
 }
 
 // Function to run simulation from JSON config file
@@ -86,7 +155,16 @@ bool runSimulationFromConfig(const std::string& config_file) {
         file.close();
         
         // Extract configuration parameters
-        std::string symbol = config.value("symbol", "AAPL");
+        std::vector<std::string> symbols;
+        if (config.contains("symbols") && config["symbols"].is_array()) {
+            for (const auto& s : config["symbols"]) {
+                symbols.push_back(s.get<std::string>());
+            }
+        } else if (config.contains("symbol")) {
+            symbols.push_back(config.value("symbol", "AAPL"));
+        } else {
+            symbols.push_back("AAPL");
+        }
         std::string start_date = config.value("start_date", "2023-01-01");
         std::string end_date = config.value("end_date", "2023-12-31");
         double capital = config.value("starting_capital", 10000.0);
@@ -100,7 +178,12 @@ bool runSimulationFromConfig(const std::string& config_file) {
         double rsi_overbought = config.value("rsi_overbought", 70.0);
         
         std::cerr << "[DEBUG] Config loaded successfully:" << std::endl;
-        std::cerr << "[DEBUG]   symbol = '" << symbol << "'" << std::endl;
+        std::cerr << "[DEBUG]   symbols = { ";
+        for (size_t i = 0; i < symbols.size(); ++i) {
+            std::cerr << "'" << symbols[i] << "'";
+            if (i < symbols.size() - 1) std::cerr << ", ";
+        }
+        std::cerr << " }" << std::endl;
         std::cerr << "[DEBUG]   start_date = '" << start_date << "'" << std::endl;
         std::cerr << "[DEBUG]   end_date = '" << end_date << "'" << std::endl;
         std::cerr << "[DEBUG]   capital = " << capital << std::endl;
@@ -121,8 +204,16 @@ bool runSimulationFromConfig(const std::string& config_file) {
             std::cerr << "[DEBUG]   rsi_overbought = " << rsi_overbought << std::endl;
         }
         
-        // Run simulation
-        std::string result = engine.runSimulationWithParams(symbol, start_date, end_date, capital);
+        // Run simulation (multi-symbol or single symbol)
+        std::string result;
+        if (symbols.size() == 1) {
+            result = engine.runSimulationWithParams(symbols[0], start_date, end_date, capital);
+        } else {
+            // Multi-symbol simulation
+            BacktestResult backtest_result = engine.runBacktestMultiSymbol(symbols, start_date, end_date, capital);
+            nlohmann::json json_result = engine.getBacktestResultsAsJson(backtest_result);
+            result = json_result.dump(2);
+        }
         std::cout << result << std::endl;
         
         // Clean up config file (optional)
@@ -139,32 +230,61 @@ bool runSimulationFromConfig(const std::string& config_file) {
     }
 }
 
-// Function to run backtest
-void runBacktest(const std::string& symbol, const std::string& start_date, const std::string& end_date, double capital) {
+// Function to run backtest (supports multi-symbol)
+void runBacktest(const std::vector<std::string>& symbols, const std::string& start_date, const std::string& end_date, double capital, const std::string& strategy, int short_ma, int long_ma, int rsi_period, double rsi_oversold, double rsi_overbought) {
     std::cout << "Running backtest..." << std::endl;
-    std::cout << "Symbol: " << symbol << std::endl;
+    std::cout << "Symbols: ";
+    for (size_t i = 0; i < symbols.size(); ++i) {
+        std::cout << symbols[i];
+        if (i < symbols.size() - 1) std::cout << ", ";
+    }
+    std::cout << std::endl;
     std::cout << "Period: " << start_date << " to " << end_date << std::endl;
     std::cout << "Starting Capital: $" << capital << std::endl;
+    std::cout << "Strategy: " << strategy << std::endl;
     
     try {
         TradingEngine engine(capital);
         
-        // Configure backtest
-        BacktestConfig config;
-        config.symbol = symbol;
-        config.start_date = start_date;
-        config.end_date = end_date;
-        config.starting_capital = capital;
-        config.strategy_name = "ma_crossover";
+        // Configure strategy
+        if (strategy == "ma_crossover") {
+            std::cout << "MA Crossover Parameters: Short=" << short_ma << ", Long=" << long_ma << std::endl;
+            engine.setMovingAverageStrategy(short_ma, long_ma);
+        } else if (strategy == "rsi") {
+            std::cout << "RSI Parameters: Period=" << rsi_period << ", Oversold=" << rsi_oversold << ", Overbought=" << rsi_overbought << std::endl;
+            engine.setRSIStrategy(rsi_period, rsi_oversold, rsi_overbought);
+        } else {
+            std::cout << "Unknown strategy, defaulting to MA Crossover" << std::endl;
+            engine.setMovingAverageStrategy(short_ma, long_ma);
+        }
         
-        // Set strategy parameters
-        config.strategy_config.setParameter("short_period", 20);
-        config.strategy_config.setParameter("long_period", 50);
-        config.strategy_config.max_position_size = 0.1;
-        config.strategy_config.enable_risk_management = true;
-        
-        // Run backtest
-        BacktestResult result = engine.runBacktest(config);
+        BacktestResult result;
+        if (symbols.size() == 1) {
+            // Single symbol backtest
+            BacktestConfig config;
+            config.symbol = symbols[0];
+            config.start_date = start_date;
+            config.end_date = end_date;
+            config.starting_capital = capital;
+            config.strategy_name = strategy;
+            
+            // Set strategy parameters based on strategy type
+            if (strategy == "ma_crossover") {
+                config.strategy_config.setParameter("short_period", short_ma);
+                config.strategy_config.setParameter("long_period", long_ma);
+            } else if (strategy == "rsi") {
+                config.strategy_config.setParameter("rsi_period", rsi_period);
+                config.strategy_config.setParameter("oversold_threshold", rsi_oversold);
+                config.strategy_config.setParameter("overbought_threshold", rsi_overbought);
+            }
+            config.strategy_config.max_position_size = 0.1;
+            config.strategy_config.enable_risk_management = true;
+            
+            result = engine.runBacktest(config);
+        } else {
+            // Multi-symbol backtest
+            result = engine.runBacktestMultiSymbol(symbols, start_date, end_date, capital);
+        }
         
         // Output results as JSON
         nlohmann::json json_result = engine.getBacktestResultsAsJson(result);
@@ -236,33 +356,41 @@ int main(int argc, char* argv[]) {
             
             if (command == "--test-db") {
                 // Parse additional arguments for database testing
-                std::string symbol, start_date, end_date;
+                std::vector<std::string> symbols;
+                std::string start_date, end_date;
                 double capital = 10000.0;
                 int short_ma = 20, long_ma = 50;
+                std::string strategy = "ma_crossover";
+                int rsi_period = 14;
+                double rsi_oversold = 30.0, rsi_overbought = 70.0;
                 bool enable_progress = false;
-                parseArguments(argc, argv, symbol, start_date, end_date, capital, short_ma, long_ma);
+                parseArguments(argc, argv, symbols, start_date, end_date, capital, short_ma, long_ma, strategy, rsi_period, rsi_oversold, rsi_overbought);
                 
                 // Set defaults if not provided
-                if (symbol.empty()) symbol = "AAPL";
+                if (symbols.empty()) symbols.push_back("AAPL");
                 if (start_date.empty()) start_date = "2023-01-01";
                 if (end_date.empty()) end_date = "2023-12-31";
                 
-                testDatabase(symbol, start_date, end_date);
+                testDatabase(symbols[0], start_date, end_date);
                 return 0;
             } else if (command == "--backtest") {
                 // Parse additional arguments for backtesting
-                std::string symbol, start_date, end_date;
+                std::vector<std::string> symbols;
+                std::string start_date, end_date;
                 double capital = 10000.0;
                 int short_ma = 20, long_ma = 50;
+                std::string strategy = "ma_crossover";
+                int rsi_period = 14;
+                double rsi_oversold = 30.0, rsi_overbought = 70.0;
                 bool enable_progress = false;
-                parseArguments(argc, argv, symbol, start_date, end_date, capital, short_ma, long_ma);
+                parseArguments(argc, argv, symbols, start_date, end_date, capital, short_ma, long_ma, strategy, rsi_period, rsi_oversold, rsi_overbought);
                 
                 // Set defaults if not provided
-                if (symbol.empty()) symbol = "AAPL";
+                if (symbols.empty()) symbols.push_back("AAPL");
                 if (start_date.empty()) start_date = "2023-01-01";
                 if (end_date.empty()) end_date = "2023-12-31";
                 
-                runBacktest(symbol, start_date, end_date, capital);
+                runBacktest(symbols, start_date, end_date, capital, strategy, short_ma, long_ma, rsi_period, rsi_oversold, rsi_overbought);
                 return 0;
             }
         }
@@ -280,32 +408,60 @@ int main(int argc, char* argv[]) {
                 return 0;
             } else {
                 // Fallback to command line arguments for backward compatibility
-                std::string symbol, start_date, end_date;
+                std::vector<std::string> symbols;
+                std::string start_date, end_date;
                 double capital = 10000.0;
                 int short_ma = 20, long_ma = 50;
-                parseArguments(argc, argv, symbol, start_date, end_date, capital, short_ma, long_ma);
+                std::string strategy = "ma_crossover";
+                int rsi_period = 14;
+                double rsi_oversold = 30.0, rsi_overbought = 70.0;
+                parseArguments(argc, argv, symbols, start_date, end_date, capital, short_ma, long_ma, strategy, rsi_period, rsi_oversold, rsi_overbought);
                 
                 // Create trading engine with parsed capital instead of hardcoded value
                 TradingEngine engine(capital);
                 
                 // Set defaults if not provided
-                if (symbol.empty()) symbol = "AAPL";
+                if (symbols.empty()) symbols.push_back("AAPL");
                 if (start_date.empty()) start_date = "2023-01-01";
                 if (end_date.empty()) end_date = "2023-12-31";
             
             std::cerr << "[DEBUG] About to run simulation with:" << std::endl;
-            std::cerr << "[DEBUG]   symbol = '" << symbol << "'" << std::endl;
+            std::cerr << "[DEBUG]   symbols = { ";
+            for (size_t i = 0; i < symbols.size(); ++i) {
+                std::cerr << "'" << symbols[i] << "'";
+                if (i < symbols.size() - 1) std::cerr << ", ";
+            }
+            std::cerr << " }" << std::endl;
             std::cerr << "[DEBUG]   start_date = '" << start_date << "'" << std::endl;
             std::cerr << "[DEBUG]   end_date = '" << end_date << "'" << std::endl;
             std::cerr << "[DEBUG]   capital = " << capital << std::endl;
-            std::cerr << "[DEBUG]   short_ma = " << short_ma << std::endl;
-            std::cerr << "[DEBUG]   long_ma = " << long_ma << std::endl;
+            std::cerr << "[DEBUG]   strategy = '" << strategy << "'" << std::endl;
             
             // Configure strategy with parsed parameters
-            engine.setMovingAverageStrategy(short_ma, long_ma);
+            if (strategy == "ma_crossover") {
+                std::cerr << "[DEBUG]   short_ma = " << short_ma << std::endl;
+                std::cerr << "[DEBUG]   long_ma = " << long_ma << std::endl;
+                engine.setMovingAverageStrategy(short_ma, long_ma);
+            } else if (strategy == "rsi") {
+                std::cerr << "[DEBUG]   rsi_period = " << rsi_period << std::endl;
+                std::cerr << "[DEBUG]   rsi_oversold = " << rsi_oversold << std::endl;
+                std::cerr << "[DEBUG]   rsi_overbought = " << rsi_overbought << std::endl;
+                engine.setRSIStrategy(rsi_period, rsi_oversold, rsi_overbought);
+            } else {
+                std::cerr << "[DEBUG] Unknown strategy '" << strategy << "', defaulting to MA crossover" << std::endl;
+                engine.setMovingAverageStrategy(short_ma, long_ma);
+            }
             
-            // Run simulation - runSimulationWithParams already includes progress functionality
-            std::string result = engine.runSimulationWithParams(symbol, start_date, end_date, capital);
+            // Run simulation - supports both single and multi-symbol
+            std::string result;
+            if (symbols.size() == 1) {
+                result = engine.runSimulationWithParams(symbols[0], start_date, end_date, capital);
+            } else {
+                // Multi-symbol simulation
+                BacktestResult backtest_result = engine.runBacktestMultiSymbol(symbols, start_date, end_date, capital);
+                nlohmann::json json_result = engine.getBacktestResultsAsJson(backtest_result);
+                result = json_result.dump(2);
+            }
             std::cout << result << std::endl;
             }
         } else if (argc > 1 && std::string(argv[1]) == "--status") {
@@ -323,7 +479,7 @@ int main(int argc, char* argv[]) {
             std::cout << "  " << argv[0] << " --backtest [options]    Run backtest with moving average strategy" << std::endl;
             std::cout << "  " << argv[0] << " --help                  Show this help" << std::endl;
             std::cout << "\nOptions:" << std::endl;
-            std::cout << "  --symbol SYMBOL   Stock symbol to analyze (default: AAPL)" << std::endl;
+            std::cout << "  --symbol SYMBOL(S) Stock symbol(s) to analyze, comma-separated for multi-symbol (default: AAPL)" << std::endl;
             std::cout << "  --start DATE      Start date (default: 2023-01-01)" << std::endl;
             std::cout << "  --end DATE        End date (default: 2023-12-31)" << std::endl;
             std::cout << "  --capital AMOUNT  Starting capital (default: 10000)" << std::endl;

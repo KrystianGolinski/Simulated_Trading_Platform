@@ -66,57 +66,6 @@ class CSVToPostgreSQLLoader:
                 );
             """)
             
-            # Create 1-minute price table for recent intraday data
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS stock_prices_1min (
-                    time TIMESTAMPTZ NOT NULL,
-                    symbol VARCHAR(10) NOT NULL,
-                    open DECIMAL(10, 4),
-                    high DECIMAL(10, 4),
-                    low DECIMAL(10, 4),
-                    close DECIMAL(10, 4),
-                    volume BIGINT,
-                    vwap DECIMAL(10, 4),
-                    UNIQUE(time, symbol)
-                );
-            """)
-            
-            # Convert to hypertable
-            cur.execute("""
-                SELECT create_hypertable('stock_prices_1min', 'time', 
-                    chunk_time_interval => INTERVAL '1 week',
-                    if_not_exists => TRUE
-                );
-            """)
-            
-            # Create indexes for C++ engine performance
-            cur.execute("""
-                CREATE INDEX IF NOT EXISTS idx_daily_symbol_time 
-                ON stock_prices_daily (symbol, time DESC);
-                
-                CREATE INDEX IF NOT EXISTS idx_1min_symbol_time 
-                ON stock_prices_1min (symbol, time DESC);
-            """)
-            
-            # Create continuous aggregates for different timeframes
-            # This enables your C++ engine to query different timeframes efficiently
-            cur.execute("""
-                CREATE MATERIALIZED VIEW IF NOT EXISTS stock_prices_hourly
-                WITH (timescaledb.continuous) AS
-                SELECT
-                    time_bucket('1 hour', time) AS time,
-                    symbol,
-                    FIRST(open, time) AS open,
-                    MAX(high) AS high,
-                    MIN(low) AS low,
-                    LAST(close, time) AS close,
-                    SUM(volume) AS volume
-                FROM stock_prices_1min
-                GROUP BY time_bucket('1 hour', time), symbol
-                WITH NO DATA;
-            """)
-            
-            
             # Create tables for backtesting results (matching your architecture)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS trading_sessions (
@@ -190,7 +139,7 @@ class CSVToPostgreSQLLoader:
     
     def load_daily_data(self):
         # Load daily price data from CSV files
-        daily_dir = os.path.join(self.data_dir, "daily")
+        daily_dir = os.path.join(self.data_dir, "daily", "cleaned")
         
         if not os.path.exists(daily_dir):
             logger.warning("No daily data directory found")
@@ -250,74 +199,6 @@ class CSVToPostgreSQLLoader:
         cur.close()
         conn.close()
     
-    def load_intraday_data(self):
-        # Load intraday (1-minute) data from CSV files
-        intraday_dir = os.path.join(self.data_dir, "intraday")
-        
-        if not os.path.exists(intraday_dir):
-            logger.warning("No intraday data directory found")
-            return
-        
-        conn = psycopg2.connect(**self.db_config)
-        cur = conn.cursor()
-        
-        for filename in os.listdir(intraday_dir):
-            if not filename.endswith('.csv'):
-                continue
-                
-            symbol = filename.replace('_intraday.csv', '')
-            filepath = os.path.join(intraday_dir, filename)
-            
-            try:
-                # Read CSV
-                df = pd.read_csv(filepath, parse_dates=['datetime'])
-                
-                # Calculate VWAP if not present
-                if 'vwap' not in df.columns:
-                    df['vwap'] = (df['close'] * df['volume']).cumsum() / df['volume'].cumsum()
-                
-                # Prepare data for insertion
-                records = []
-                for _, row in df.iterrows():
-                    records.append((
-                        row['datetime'],
-                        symbol,
-                        row['open'],
-                        row['high'],
-                        row['low'],
-                        row['close'],
-                        row['volume'],
-                        row.get('vwap', row['close'])
-                    ))
-                
-                # Bulk insert
-                execute_values(
-                    cur,
-                    """
-                    INSERT INTO stock_prices_1min 
-                    (time, symbol, open, high, low, close, volume, vwap)
-                    VALUES %s
-                    ON CONFLICT (time, symbol) DO UPDATE SET
-                        open = EXCLUDED.open,
-                        high = EXCLUDED.high,
-                        low = EXCLUDED.low,
-                        close = EXCLUDED.close,
-                        volume = EXCLUDED.volume,
-                        vwap = EXCLUDED.vwap;
-                    """,
-                    records
-                )
-                
-                conn.commit()
-                logger.info(f"Loaded {len(records)} intraday records for {symbol}")
-                
-            except Exception as e:
-                logger.error(f"Error loading intraday data for {symbol}: {e}")
-                conn.rollback()
-        
-        cur.close()
-        conn.close()
-    
     def verify_data(self):
         # Verify data was loaded correctly
         conn = psycopg2.connect(**self.db_config)
@@ -340,22 +221,6 @@ class CSVToPostgreSQLLoader:
             print(f"Total Records: {daily_stats[1]:,}")
             print(f"Date Range: {daily_stats[2]} to {daily_stats[3]}")
             
-            # Check intraday data
-            cur.execute("""
-                SELECT 
-                    COUNT(DISTINCT symbol) as symbols,
-                    COUNT(*) as total_records,
-                    MIN(time) as earliest,
-                    MAX(time) as latest
-                FROM stock_prices_1min;
-            """)
-            
-            intraday_stats = cur.fetchone()
-            print("\nIntraday Data Statistics")
-            print(f"Symbols: {intraday_stats[0]}")
-            print(f"Total Records: {intraday_stats[1]:,}")
-            print(f"Date Range: {intraday_stats[2]} to {intraday_stats[3]}")
-            
         finally:
             cur.close()
             conn.close()
@@ -372,10 +237,6 @@ class CSVToPostgreSQLLoader:
         
         # Load daily data
         self.load_daily_data()
-        
-        # Load intraday data
-        self.load_intraday_data()
-        
         
         # Verify
         self.verify_data()
@@ -400,5 +261,4 @@ if __name__ == "__main__":
     # Load all data
     loader.load_all_data()
     
-    print("\nData successfully loaded into PostgreSQL/ DB!")
-    print("Your C++ engine can now connect and query the data.")
+    print("\nData successfully loaded into PostgreSQL!")

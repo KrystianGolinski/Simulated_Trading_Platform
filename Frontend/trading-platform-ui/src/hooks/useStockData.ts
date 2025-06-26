@@ -5,7 +5,7 @@ export const useStockData = (
   symbol: string,
   startDate: string,
   endDate: string,
-  timeframe: 'daily' | '1min' = 'daily'
+  timeframe: 'daily' = 'daily'
 ) => {
   const [data, setData] = useState<StockData[]>([]);
   const [loading, setLoading] = useState<boolean>(false);

@@ -125,6 +125,49 @@ class DatabaseManager:
         
         return stocks
 
+    async def get_stock_data_batch(self, symbols: List[str], start_date: date, end_date: date, timeframe: str = 'daily') -> Dict[str, List[Dict[str, Any]]]:
+        # Get historical stock data for multiple symbols efficiently
+        if not symbols:
+            return {}
+        
+        # Create placeholders for IN clause
+        placeholders = ','.join(f'${i+1}' for i in range(len(symbols)))
+        
+        if timeframe == 'daily':
+            table_name = 'stock_prices_daily'
+        else:
+            table_name = 'stock_prices_intraday'  # Future enhancement
+        
+        query = f"""
+            SELECT symbol, date, open_price, high_price, low_price, close_price, volume 
+            FROM {table_name}
+            WHERE symbol IN ({placeholders})
+            AND date BETWEEN ${len(symbols)+1} AND ${len(symbols)+2}
+            ORDER BY symbol, date
+        """
+        
+        try:
+            results = await self.execute_query(query, *[s.upper() for s in symbols], start_date, end_date)
+            
+            # Group results by symbol
+            symbol_data = {}
+            for row in results:
+                symbol = row['symbol']
+                if symbol not in symbol_data:
+                    symbol_data[symbol] = []
+                symbol_data[symbol].append(row)
+            
+            # Ensure all requested symbols are represented
+            for symbol in symbols:
+                if symbol.upper() not in symbol_data:
+                    symbol_data[symbol.upper()] = []
+            
+            return symbol_data
+            
+        except Exception as e:
+            logger.error(f"Error fetching batch stock data for {symbols}: {e}")
+            return {symbol.upper(): [] for symbol in symbols}
+
     async def get_stock_data(self, symbol: str, start_date: date, end_date: date, timeframe: str = 'daily') -> List[Dict[str, Any]]:
         # Get historical stock data with caching
         
@@ -137,8 +180,6 @@ class DatabaseManager:
         
         if timeframe == 'daily':
             table = 'stock_prices_daily'
-        elif timeframe == '1min':
-            table = 'stock_prices_1min'
         else:
             raise ValueError(f"Unsupported timeframe: {timeframe}")
         
@@ -380,7 +421,6 @@ class DatabaseManager:
                 SELECT 
                     (SELECT COUNT(DISTINCT symbol) FROM stock_prices_daily) as symbols_daily,
                     (SELECT COUNT(*) FROM stock_prices_daily) as daily_records,
-                    (SELECT COUNT(*) FROM stock_prices_1min) as intraday_records,
                     (SELECT COUNT(*) FROM trading_sessions) as total_sessions,
                     (SELECT COUNT(*) FROM trades_log) as total_trades
             """

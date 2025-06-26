@@ -126,28 +126,6 @@ describe('Dashboard Component', () => {
     expect(endDateInput).toHaveValue('2023-12-01');
   });
 
-  it('updates timeframe when dropdown changes', async () => {
-    const user = userEvent.setup();
-    render(<Dashboard />);
-    
-    const timeframeSelect = screen.getByDisplayValue('Daily');
-    await user.selectOptions(timeframeSelect, '1min');
-    
-    expect(screen.getByDisplayValue('1 Minute')).toBeInTheDocument();
-  });
-
-  it('disables stock selection when stocks are loading', () => {
-    mockUseStocks.mockReturnValue({
-      stocks: [],
-      loading: true
-    });
-
-    render(<Dashboard />);
-    
-    // When loading, there should be a disabled select or loading message
-    expect(screen.getByText('Stock Symbol')).toBeInTheDocument();
-  });
-
   it('shows stock options from useStocks hook', () => {
     render(<Dashboard />);
     

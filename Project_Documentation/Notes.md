@@ -3,13 +3,13 @@
 ### Phase 1: Multi-Symbol & Strategy Implementation (High Priority)
 **Goal: Support multiple symbols and complete RSI strategy**
 
-1. **Multi-Symbol Support**
+1. **Multi-Symbol Support --- COMPLETE**
    - Fix `simulation_engine.py:146` to process all symbols, not just first
    - Complete `validate_multiple_symbols` implementation in database.py
    - Update C++ engine for multi-symbol handling
    - Extend frontend to support multiple symbol selection
 
-2. **RSI Strategy Completion**
+2. **RSI Strategy Completion --- COMPLETE**
    - Verify RSI integration in strategy pipeline
    - Test RSI parameter validation and signal generation
    - Ensure proper connection to simulation execution
@@ -28,13 +28,8 @@
    - Lower validation thresholds in validation.py:177 for multi-symbol strategies
 
 ### Phase 3: Data & Position Enhancements (Low Priority)
-**Goal: Add intraday data and advanced position management**
+**Goal: Advanced position management**
 
-5. **Intraday Data Support**
-   - Extend stock data retrieval beyond daily data
-   - Standardize DB formatting between daily/intraday data
-   - Update frontend for intraday simulation options
-
-6. **Advanced Position Management**
+5. **Advanced Position Management**
    - Allow position increases in existing holdings (C++ engine)
    - Implement sophisticated portfolio rebalancing

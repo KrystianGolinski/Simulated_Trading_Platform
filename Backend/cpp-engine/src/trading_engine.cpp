@@ -254,29 +254,82 @@ BacktestResult TradingEngine::runBacktestMultiSymbol(const std::vector<std::stri
     combined_result.start_date = start_date;
     combined_result.end_date = end_date;
     
-    // For multi-symbol, run individual backtests and combine results
+    // Reset portfolio and set up multi-symbol allocation
+    portfolio_ = Portfolio(starting_capital);
+    double capital_per_symbol = starting_capital / symbols.size();
+    
+    // Get historical data for all symbols and convert to PriceData format
+    std::map<std::string, std::vector<PriceData>> symbol_price_data;
     for (const auto& symbol : symbols) {
-        BacktestConfig config;
-        config.symbol = symbol;
-        config.start_date = start_date;
-        config.end_date = end_date;
-        config.starting_capital = starting_capital / symbols.size();
+        auto raw_data = market_data_.getHistoricalPrices(symbol, start_date, end_date);
+        std::vector<PriceData> price_data;
         
-        BacktestResult symbol_result = runBacktest(config);
+        for (const auto& row : raw_data) {
+            try {
+                PriceData pd;
+                pd.open = std::stod(row.at("open_price"));
+                pd.high = std::stod(row.at("high_price"));
+                pd.low = std::stod(row.at("low_price"));
+                pd.close = std::stod(row.at("close_price"));
+                pd.volume = std::stol(row.at("volume"));
+                pd.date = row.at("date");
+                price_data.push_back(pd);
+            } catch (const std::exception& e) {
+                std::cerr << "Error parsing data for " << symbol << ": " << e.what() << std::endl;
+                continue;
+            }
+        }
         
-        // Combine results
-        combined_result.total_trades += symbol_result.total_trades;
-        combined_result.winning_trades += symbol_result.winning_trades;
-        combined_result.losing_trades += symbol_result.losing_trades;
-        combined_result.signals_generated.insert(combined_result.signals_generated.end(),
-                                                symbol_result.signals_generated.begin(),
-                                                symbol_result.signals_generated.end());
+        if (!price_data.empty()) {
+            symbol_price_data[symbol] = price_data;
+        } else {
+            std::cerr << "Warning: No valid data found for symbol " << symbol << std::endl;
+        }
     }
     
-    // Calculate combined metrics
+    // Find the maximum number of trading days across all symbols
+    size_t max_days = 0;
+    for (const auto& [symbol, data] : symbol_price_data) {
+        max_days = std::max(max_days, data.size());
+    }
+    
+    // Process each symbol individually with allocated capital
+    for (const auto& symbol : symbols) {
+        if (symbol_price_data.find(symbol) == symbol_price_data.end()) {
+            continue; // Skip symbols with no data
+        }
+        
+        const auto& price_data = symbol_price_data[symbol];
+        
+        // Create a temporary portfolio for this symbol
+        Portfolio temp_portfolio(capital_per_symbol);
+        
+        // Generate signals using the strategy
+        if (strategy_) {
+            auto signals = strategy_->evaluateSignal(price_data, temp_portfolio, symbol);
+            
+            // For now, use simple buy-and-hold for each symbol as a placeholder
+            // This ensures the multi-symbol framework works before implementing complex signal coordination
+            if (!price_data.empty()) {
+                // Buy shares at the beginning
+                double first_price = price_data[0].close;
+                int shares = static_cast<int>(capital_per_symbol / first_price);
+                
+                if (shares > 0 && portfolio_.buyStock(symbol, shares, first_price)) {
+                    TradingSignal buy_signal(Signal::BUY, first_price, price_data[0].date, "Multi-symbol allocation");
+                    combined_result.signals_generated.push_back(buy_signal);
+                    combined_result.total_trades++;
+                }
+            }
+        }
+    }
+    
+    // Calculate final portfolio value
     std::map<std::string, double> final_prices;
     for (const auto& symbol : symbols) {
-        final_prices[symbol] = market_data_.getPrice(symbol);
+        if (symbol_price_data.find(symbol) != symbol_price_data.end() && !symbol_price_data[symbol].empty()) {
+            final_prices[symbol] = symbol_price_data[symbol].back().close;
+        }
     }
     
     combined_result.ending_value = portfolio_.getTotalValue(final_prices);

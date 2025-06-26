@@ -9,7 +9,6 @@ export interface StockData {
   low: number;
   close: number;
   volume: number;
-  vwap?: number; // Only available for 1min data
 }
 
 export interface HealthData {
@@ -166,7 +165,7 @@ class ApiService {
     symbol: string,
     startDate: string,
     endDate: string,
-    timeframe: 'daily' | '1min' = 'daily'
+    timeframe: 'daily'
   ): Promise<StockData[]> {
     const params = new URLSearchParams({
       start_date: startDate,

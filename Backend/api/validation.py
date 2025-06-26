@@ -292,13 +292,6 @@ class SimulationValidator:
                 f"Very long date range ({date_range_days} days). Consider shorter periods for faster execution."
             )
         
-        # Check if end date is recent (might affect strategy performance)
-        days_since_end = (date.today() - config.end_date).days
-        if days_since_end > 365:
-            warnings.append(
-                f"End date is {days_since_end} days ago. Consider using more recent data for relevant results."
-            )
-        
         # Strategy-specific warnings
         if config.strategy == StrategyType.MA_CROSSOVER:
             if config.short_ma and config.long_ma:

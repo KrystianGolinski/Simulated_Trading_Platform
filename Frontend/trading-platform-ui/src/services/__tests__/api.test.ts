@@ -179,46 +179,6 @@ describe('ApiService', () => {
       );
     });
 
-    it('fetches 1min stock data with vwap', async () => {
-      const rawData = [
-        {
-          time: '2023-01-01T09:30:00',
-          symbol: 'AAPL',
-          open: '150.00',
-          high: '150.50',
-          low: '149.75',
-          close: '150.25',
-          volume: '50000',
-          vwap: '150.12'
-        }
-      ];
-
-      const expectedData: StockData[] = [
-        {
-          time: '2023-01-01T09:30:00',
-          symbol: 'AAPL',
-          open: 150.00,
-          high: 150.50,
-          low: 149.75,
-          close: 150.25,
-          volume: 50000,
-          vwap: 150.12
-        }
-      ];
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => rawData,
-      } as Response);
-
-      const result = await apiService.getStockData('AAPL', '2023-01-01', '2023-01-01', '1min');
-      expect(result).toEqual(expectedData);
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:8000/stocks/AAPL/data?start_date=2023-01-01&end_date=2023-01-01&timeframe=1min',
-        undefined
-      );
-    });
-
     it('handles invalid numeric data gracefully', async () => {
       const rawData = [
         {

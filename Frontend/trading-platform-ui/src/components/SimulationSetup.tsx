@@ -234,33 +234,98 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
             </Card>
           </div>
 
-          {/* Strategy Parameters */}
+          {/* Strategy Selection */}
           <div style={{ marginBottom: '1.5rem' }}>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>Moving Average Crossover Strategy</h2>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>Trading Strategy</h2>
             <Card>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', marginBottom: '0.5rem' }}>
-                <FormInput
-                  label="Short MA Period (days)"
-                  type="number"
-                  min="5"
-                  max="50"
-                  value={config.short_ma}
-                  onChange={(e) => setConfig(prev => ({ ...prev, short_ma: Number(e.target.value) }))}
-                  required
-                />
-                <FormInput
-                  label="Long MA Period (days)"
-                  type="number"
-                  min="20"
-                  max="200"
-                  value={config.long_ma}
-                  onChange={(e) => setConfig(prev => ({ ...prev, long_ma: Number(e.target.value) }))}
-                  required
-                />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                <label style={{ fontSize: '0.9rem', fontWeight: '500', color: '#374151' }}>Strategy Type</label>
+                <select
+                  value={config.strategy}
+                  onChange={(e) => setConfig(prev => ({ ...prev, strategy: e.target.value as 'ma_crossover' | 'rsi' }))}
+                  style={{
+                    width: '100%',
+                    maxWidth: '300px',
+                    padding: '8px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    backgroundColor: '#ffffff'
+                  }}
+                >
+                  <option value="ma_crossover">Moving Average Crossover</option>
+                  <option value="rsi">RSI (Relative Strength Index)</option>
+                </select>
               </div>
-              <p style={{ fontSize: '0.75rem', color: '#6b7280', textAlign: 'center' }}>
-                Buy signal: Short MA crosses above Long MA. Sell signal: Short MA crosses below Long MA.
-              </p>
+
+              {/* MA Crossover Parameters */}
+              {config.strategy === 'ma_crossover' && (
+                <div>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151', textAlign: 'center' }}>Moving Average Parameters</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', marginBottom: '0.5rem' }}>
+                    <FormInput
+                      label="Short MA Period (days)"
+                      type="number"
+                      min="5"
+                      max="50"
+                      value={config.short_ma}
+                      onChange={(e) => setConfig(prev => ({ ...prev, short_ma: Number(e.target.value) }))}
+                      required
+                    />
+                    <FormInput
+                      label="Long MA Period (days)"
+                      type="number"
+                      min="20"
+                      max="200"
+                      value={config.long_ma}
+                      onChange={(e) => setConfig(prev => ({ ...prev, long_ma: Number(e.target.value) }))}
+                      required
+                    />
+                  </div>
+                  <p style={{ fontSize: '0.75rem', color: '#6b7280', textAlign: 'center', whiteSpace: 'pre-line' }}>
+                    Buy signal: Short MA crosses above Long MA.{'\n'}Sell signal: Short MA crosses below Long MA.
+                  </p>
+                </div>
+              )}
+
+              {/* RSI Parameters */}
+              {config.strategy === 'rsi' && (
+                <div>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151', textAlign: 'center' }}>RSI Parameters</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', marginBottom: '0.5rem' }}>
+                    <FormInput
+                      label="RSI Period (days)"
+                      type="number"
+                      min="2"
+                      max="50"
+                      value={config.rsi_period}
+                      onChange={(e) => setConfig(prev => ({ ...prev, rsi_period: Number(e.target.value) }))}
+                      required
+                    />
+                    <FormInput
+                      label="Oversold Threshold"
+                      type="number"
+                      min="10"
+                      max="40"
+                      value={config.rsi_oversold}
+                      onChange={(e) => setConfig(prev => ({ ...prev, rsi_oversold: Number(e.target.value) }))}
+                      required
+                    />
+                    <FormInput
+                      label="Overbought Threshold"
+                      type="number"
+                      min="60"
+                      max="90"
+                      value={config.rsi_overbought}
+                      onChange={(e) => setConfig(prev => ({ ...prev, rsi_overbought: Number(e.target.value) }))}
+                      required
+                    />
+                  </div>
+                  <p style={{ fontSize: '0.75rem', color: '#6b7280', textAlign: 'center', whiteSpace: 'pre-line' }}>
+                    Buy signal: RSI crosses above oversold threshold.{'\n'}Sell signal: RSI crosses below overbought threshold.
+                  </p>
+                </div>
+              )}
             </Card>
           </div>
 
@@ -289,7 +354,13 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
                   
                   <Button
                     type="submit"
-                    disabled={config.symbols.length === 0 || config.short_ma! >= config.long_ma! || isLoading || validation.errors.length > 0}
+                    disabled={
+                      config.symbols.length === 0 || 
+                      (config.strategy === 'ma_crossover' && config.short_ma! >= config.long_ma!) ||
+                      (config.strategy === 'rsi' && config.rsi_oversold! >= config.rsi_overbought!) ||
+                      isLoading || 
+                      validation.errors.length > 0
+                    }
                     variant="primary"
                     className="py-2 font-semibold text-sm px-4"
                   >
@@ -304,8 +375,12 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
                   </Button>
                 </div>
                 
-                {config.short_ma! >= config.long_ma! && (
+                {config.strategy === 'ma_crossover' && config.short_ma! >= config.long_ma! && (
                   <p style={{ color: '#ef4444', fontSize: '0.875rem', textAlign: 'center' }}>Short MA period must be less than Long MA period</p>
+                )}
+                
+                {config.strategy === 'rsi' && config.rsi_oversold! >= config.rsi_overbought! && (
+                  <p style={{ color: '#ef4444', fontSize: '0.875rem', textAlign: 'center' }}>Oversold threshold must be less than Overbought threshold</p>
                 )}
                 
                 {validation.errors.length > 0 && (

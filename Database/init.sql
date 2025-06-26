@@ -32,48 +32,6 @@ SELECT create_hypertable('stock_prices_daily', 'time',
     if_not_exists => TRUE
 );
 
--- Create 1-minute intraday price data table
-CREATE TABLE IF NOT EXISTS stock_prices_1min (
-    time TIMESTAMPTZ NOT NULL,
-    symbol VARCHAR(10) NOT NULL,
-    open DECIMAL(10, 4),
-    high DECIMAL(10, 4),
-    low DECIMAL(10, 4),
-    close DECIMAL(10, 4),
-    volume BIGINT,
-    vwap DECIMAL(10, 4),
-    UNIQUE(time, symbol)
-);
-
--- Convert to TimescaleDB hypertable
-SELECT create_hypertable('stock_prices_1min', 'time', 
-    chunk_time_interval => INTERVAL '1 week',
-    if_not_exists => TRUE
-);
-
--- Create continuous aggregate for hourly data (performance optimization)
-CREATE MATERIALIZED VIEW IF NOT EXISTS stock_prices_hourly
-WITH (timescaledb.continuous) AS
-SELECT
-    time_bucket('1 hour', time) AS time,
-    symbol,
-    FIRST(open, time) AS open,
-    MAX(high) AS high,
-    MIN(low) AS low,
-    LAST(close, time) AS close,
-    SUM(volume) AS volume
-FROM stock_prices_1min
-GROUP BY time_bucket('1 hour', time), symbol
-WITH NO DATA;
-
--- Add refresh policy for continuous aggregate
-SELECT add_continuous_aggregate_policy('stock_prices_hourly',
-    start_offset => INTERVAL '3 days',
-    end_offset => INTERVAL '1 hour',
-    schedule_interval => INTERVAL '1 hour',
-    if_not_exists => TRUE
-);
-
 -- Create trading sessions table for backtesting
 CREATE TABLE IF NOT EXISTS trading_sessions (
     id SERIAL PRIMARY KEY,
@@ -101,9 +59,6 @@ CREATE TABLE IF NOT EXISTS trades_log (
 -- Create performance indexes
 CREATE INDEX IF NOT EXISTS idx_daily_symbol_time 
 ON stock_prices_daily (symbol, time DESC);
-
-CREATE INDEX IF NOT EXISTS idx_1min_symbol_time 
-ON stock_prices_1min (symbol, time DESC);
 
 CREATE INDEX IF NOT EXISTS idx_trades_session_id 
 ON trades_log (session_id);
