@@ -41,7 +41,40 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
     isValidating: false
   });
 
+  const [dateRange, setDateRange] = useState<{ min_date: string; max_date: string }>({
+    min_date: '2015-06-17',
+    max_date: '2025-06-13'
+  });
+
   const { stocks, loading: stocksLoading } = useStocks();
+
+  const updateDateRangeForSelectedStocks = async (selectedSymbols: string[]) => {
+    if (selectedSymbols.length === 0) {
+      setDateRange({ min_date: '2015-06-17', max_date: '2025-06-13' });
+      return;
+    }
+
+    try {
+      const dateRanges = await Promise.all(
+        selectedSymbols.map(symbol => apiService.getStockDateRange(symbol))
+      );
+      
+      const minDate = dateRanges.reduce((earliest, range) => 
+        range.min_date < earliest ? range.min_date : earliest, 
+        dateRanges[0].min_date
+      );
+      
+      const maxDate = dateRanges.reduce((latest, range) => 
+        range.max_date > latest ? range.max_date : latest, 
+        dateRanges[0].max_date
+      );
+
+      setDateRange({ min_date: minDate, max_date: maxDate });
+    } catch (error) {
+      console.error('Error fetching date ranges:', error);
+      setDateRange({ min_date: '2015-06-17', max_date: '2025-06-13' });
+    }
+  };
 
   const validateConfiguration = async () => {
     setValidation(prev => ({ ...prev, isValidating: true }));
@@ -165,24 +198,44 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
             <h2 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>Simulation Period</h2>
             <Card>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
-                <FormInput
-                  label="Start Date"
-                  type="date"
-                  value={config.start_date}
-                  onChange={(e) => setConfig(prev => ({ ...prev, start_date: e.target.value }))}
-                  min="2015-06-17"
-                  max="2025-06-13"
-                  required
-                />
-                <FormInput
-                  label="End Date"
-                  type="date"
-                  value={config.end_date}
-                  onChange={(e) => setConfig(prev => ({ ...prev, end_date: e.target.value }))}
-                  min="2015-06-17"
-                  max="2025-06-13"
-                  required
-                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <FormInput
+                    label="Start Date"
+                    type="date"
+                    value={config.start_date}
+                    onChange={(e) => setConfig(prev => ({ ...prev, start_date: e.target.value }))}
+                    min={dateRange.min_date}
+                    max={dateRange.max_date}
+                    required
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => setConfig(prev => ({ ...prev, start_date: dateRange.min_date }))}
+                    variant="secondary"
+                    style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+                  >
+                    Earliest
+                  </Button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <FormInput
+                    label="End Date"
+                    type="date"
+                    value={config.end_date}
+                    onChange={(e) => setConfig(prev => ({ ...prev, end_date: e.target.value }))}
+                    min={dateRange.min_date}
+                    max={dateRange.max_date}
+                    required
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => setConfig(prev => ({ ...prev, end_date: dateRange.max_date }))}
+                    variant="secondary"
+                    style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+                  >
+                    Latest
+                  </Button>
+                </div>
               </div>
             </Card>
           </div>
@@ -199,29 +252,70 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
                   <Spinner size="md" />
                 ) : (
                   <div>
-                    <select
-                      multiple
-                      value={config.symbols}
-                      onChange={(e) => {
-                        const selectedValues = Array.from(e.target.selectedOptions, option => option.value);
-                        setConfig(prev => ({ ...prev, symbols: selectedValues }));
-                      }}
-                      style={{
-                        width: 'auto',
-                        minWidth: '120px',
-                        height: '80px',
-                        padding: '6px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '6px',
-                        fontSize: '13px'
-                      }}
-                    >
-                      {stocks.map(symbol => (
-                        <option key={symbol} value={symbol}>
-                          {symbol}
-                        </option>
-                      ))}
-                    </select>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                      <select
+                        multiple
+                        value={config.symbols}
+                        onChange={(e) => {
+                          const selectedValues = Array.from(e.target.selectedOptions, option => option.value);
+                          setConfig(prev => ({ ...prev, symbols: selectedValues }));
+                          updateDateRangeForSelectedStocks(selectedValues);
+                        }}
+                        style={{
+                          width: 'auto',
+                          minWidth: '120px',
+                          height: '80px',
+                          padding: '6px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          fontSize: '13px'
+                        }}
+                      >
+                        {stocks.map(symbol => (
+                          <option key={symbol} value={symbol}>
+                            {symbol}
+                          </option>
+                        ))}
+                      </select>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setConfig(prev => ({ ...prev, symbols: [...stocks] }));
+                            updateDateRangeForSelectedStocks([...stocks]);
+                          }}
+                          style={{
+                            padding: '4px 8px',
+                            fontSize: '12px',
+                            backgroundColor: '#3b82f6',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Add all
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setConfig(prev => ({ ...prev, symbols: [] }));
+                            updateDateRangeForSelectedStocks([]);
+                          }}
+                          style={{
+                            padding: '4px 8px',
+                            fontSize: '12px',
+                            backgroundColor: '#ef4444',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                    </div>
                     <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem', textAlign: 'center' }}>
                       Hold Ctrl/Cmd to select multiple stocks
                     </p>

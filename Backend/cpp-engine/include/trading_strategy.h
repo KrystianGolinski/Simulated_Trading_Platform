@@ -15,6 +15,17 @@ struct StrategyConfig {
     double take_profit_pct = 0.15;
     bool enable_risk_management = true;
     
+    // Position increase configuration
+    bool allow_position_increases = true;
+    double max_position_percentage = 0.3;  // Max 30% of portfolio in single position
+    double position_increase_size = 0.05;  // 5% of portfolio per increase
+    int max_position_increases = 3;        // Maximum number of increases per position
+    
+    // Portfolio rebalancing configuration
+    bool enable_rebalancing = false;
+    double rebalancing_threshold = 0.05;   // Rebalance when allocation drifts 5%
+    int rebalancing_frequency = 30;        // Rebalance every 30 days
+    
     void setParameter(const std::string& key, double value) {
         parameters[key] = value;
     }
@@ -74,6 +85,7 @@ public:
     virtual std::string getDescription() const = 0;
     
     double calculatePositionSize(double available_capital, double stock_price) const;
+    double calculatePositionSize(const Portfolio& portfolio, const std::string& symbol, double stock_price, double portfolio_value) const;
     bool shouldApplyRiskManagement(const Portfolio& portfolio, const std::string& symbol) const;
     
 protected:

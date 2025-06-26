@@ -2,24 +2,12 @@
 
 ### **Phase 1: Core Feature Enhancements**
 
-#### **1.1 Multi-Symbol Portfolio Support**
-- **Current**: Simulations limited to single symbol
-- **Goal**: Enable portfolio simulations with multiple stocks
-- **Implementation**:
-  - Extend C++ engine to handle multiple symbols simultaneously
-  - Implement portfolio allocation strategies (equal weight, market cap weighted)
-  - Update frontend UI for multi-symbol selection
-  - Utilize existing ThreadPoolExecutor infrastructure for parallel processing
-
 #### **1.2 Enhanced Trading Strategies**
-- **Current**: Basic MA crossover strategy
 - **Goal**: Implement additional proven strategies
 - **Strategies to Add**:
-  - RSI (Relative Strength Index) - framework already exists
   - Bollinger Bands
   - MACD (Moving Average Convergence Divergence)
   - Mean reversion strategies
-- **Implementation**: Extend existing strategy framework in C++ engine
 
 #### **1.3 Advanced Performance Metrics**
 - **Current**: Basic return and equity curve

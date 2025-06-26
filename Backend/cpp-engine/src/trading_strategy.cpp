@@ -15,6 +15,55 @@ double TradingStrategy::calculatePositionSize(double available_capital, double s
     return max_shares;
 }
 
+double TradingStrategy::calculatePositionSize(const Portfolio& portfolio, const std::string& symbol, double stock_price, double portfolio_value) const {
+    if (stock_price <= 0 || portfolio_value <= 0) {
+        return 0.0;
+    }
+    
+    // Check if position increases are enabled
+    if (!config_.allow_position_increases) {
+        // If position increases are disabled, only allow new positions
+        if (portfolio.hasPosition(symbol) && portfolio.getPosition(symbol).getShares() > 0) {
+            return 0.0;
+        }
+        return calculatePositionSize(portfolio.getCashBalance(), stock_price);
+    }
+    
+    // Calculate current position value as percentage of portfolio
+    double current_position_value = 0.0;
+    bool has_existing_position = portfolio.hasPosition(symbol) && portfolio.getPosition(symbol).getShares() > 0;
+    
+    if (has_existing_position) {
+        const Position& position = portfolio.getPosition(symbol);
+        current_position_value = position.getShares() * stock_price;
+    }
+    
+    double current_position_pct = current_position_value / portfolio_value;
+    
+    // Check if we've reached maximum position percentage
+    if (current_position_pct >= config_.max_position_percentage) {
+        return 0.0; // Cannot increase position further
+    }
+    
+    // For new positions, use the standard max_position_size
+    // For existing positions, use the smaller position_increase_size
+    double investment_pct = has_existing_position ? config_.position_increase_size : config_.max_position_size;
+    double target_investment = portfolio_value * investment_pct;
+    
+    // Ensure we don't exceed maximum position percentage
+    double max_additional_investment = (portfolio_value * config_.max_position_percentage) - current_position_value;
+    target_investment = std::min(target_investment, max_additional_investment);
+    
+    // Ensure we don't exceed available cash
+    target_investment = std::min(target_investment, portfolio.getCashBalance());
+    
+    if (target_investment <= 0) {
+        return 0.0;
+    }
+    
+    return std::floor(target_investment / stock_price);
+}
+
 bool TradingStrategy::shouldApplyRiskManagement(const Portfolio& portfolio, const std::string& symbol) const {
     if (!config_.enable_risk_management) {
         return false;
@@ -92,15 +141,10 @@ TradingSignal MovingAverageCrossoverStrategy::evaluateSignal(const std::vector<P
     double current_price = price_data.back().close;
     std::string current_date = price_data.back().date;
     
-    // Check for bullish crossover (buy signal) - only if we don't have a position
+    // Check for bullish crossover (buy signal) - allow position increases
     if (prev_short <= prev_long && curr_short > curr_long) {
-        // Only generate buy signal if we don't already have a position for this symbol
-        bool has_position = !symbol.empty() && portfolio.hasPosition(symbol) && portfolio.getPosition(symbol).getShares() > 0;
-        
-        if (!has_position) {
-            return TradingSignal(Signal::BUY, current_price, current_date, 
-                               "MA Crossover: Short MA crossed above Long MA");
-        }
+        return TradingSignal(Signal::BUY, current_price, current_date, 
+                           "MA Crossover: Short MA crossed above Long MA");
     }
     
     // Check for bearish crossover (sell signal) - only if we have a position

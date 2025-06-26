@@ -14,7 +14,7 @@ class SimulationStatus(str, Enum):
     FAILED = "failed"
 
 class SimulationConfig(BaseModel):
-    symbols: List[str] = Field(..., min_items=1, max_items=20, description="Stock symbols to simulate")
+    symbols: List[str] = Field(..., min_items=1, max_items=50, description="Stock symbols to simulate")
     start_date: date = Field(..., description="Start date for simulation")
     end_date: date = Field(..., description="End date for simulation")
     starting_capital: float = Field(10000.0, gt=0, le=1000000, description="Starting capital in USD")

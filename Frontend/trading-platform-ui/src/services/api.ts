@@ -237,6 +237,13 @@ class ApiService {
   async listSimulations(): Promise<Record<string, SimulationResults>> {
     return this.fetchWithErrorHandling<Record<string, SimulationResults>>('/simulations');
   }
+
+  // Get date range for a specific stock
+  async getStockDateRange(symbol: string): Promise<{ min_date: string; max_date: string }> {
+    return this.fetchWithErrorHandling<{ min_date: string; max_date: string }>(
+      `/stocks/${symbol}/date-range`
+    );
+  }
 }
 
 export const apiService = new ApiService();

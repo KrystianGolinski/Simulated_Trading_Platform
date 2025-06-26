@@ -19,6 +19,33 @@ async def get_stocks(db: DatabaseManager = Depends(get_database)) -> StandardRes
             [ApiError(code="STOCKS_FETCH_ERROR", message=str(e))]
         )
 
+@router.get("/stocks/{symbol}/date-range")
+async def get_stock_date_range(symbol: str, db: DatabaseManager = Depends(get_database)) -> StandardResponse[Dict[str, str]]:
+    # Get available date range for a specific stock
+    try:
+        result = await db.get_symbol_date_range(symbol)
+        if not result:
+            return create_error_response(
+                f"No data found for symbol {symbol}",
+                [ApiError(code="SYMBOL_NOT_FOUND", message=f"Symbol {symbol} not found in database", field="symbol")]
+            )
+        
+        date_range = {
+            "min_date": result['earliest_date'].strftime('%Y-%m-%d'),
+            "max_date": result['latest_date'].strftime('%Y-%m-%d')
+        }
+        
+        return create_success_response(
+            date_range,
+            f"Successfully retrieved date range for {symbol}",
+            metadata={"symbol": symbol}
+        )
+    except Exception as e:
+        return create_error_response(
+            f"Failed to retrieve date range for {symbol}",
+            [ApiError(code="STOCK_DATE_RANGE_ERROR", message=str(e), field="symbol")]
+        )
+
 @router.get("/stocks/{symbol}/data")
 async def get_stock_data(symbol: str, start_date: str, end_date: str, timeframe: str = "daily", db: DatabaseManager = Depends(get_database)) -> StandardResponse[List[Dict[str, Any]]]:
     # Get historical stock data

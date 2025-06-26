@@ -245,7 +245,7 @@ class ExecutionService:
         
         # Determine health status
         if not process_alive:
-            status = "crashed" if process else "unknown"
+            status = "failed" if process else "unknown"
         elif heartbeat_expired:
             status = "stalled"
         else:
@@ -260,12 +260,12 @@ class ExecutionService:
         }
     
     def get_unhealthy_simulations(self) -> List[str]:
-        # Get list of simulation IDs that are unhealthy (crashed or stalled)
+        # Get list of simulation IDs that are unhealthy (failed or stalled)
         unhealthy = []
         
         for sim_id in list(self.active_simulations.keys()):
             health = self.check_simulation_health(sim_id)
-            if health["status"] in ["crashed", "stalled"]:
+            if health["status"] in ["failed", "stalled"]:
                 unhealthy.append(sim_id)
         
         return unhealthy
@@ -283,7 +283,7 @@ class ExecutionService:
         elif health_info["status"] == "stalled":
             status = "stalled"
         else:
-            status = "crashed"
+            status = "failed"
         
         return {
             "status": status,

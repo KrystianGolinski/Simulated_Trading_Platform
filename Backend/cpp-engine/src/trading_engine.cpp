@@ -423,26 +423,29 @@ bool TradingEngine::executeSignal(const TradingSignal& signal, const std::string
     
     try {
         if (signal.signal == Signal::BUY) {
-            // Only buy if we don't already have a position
+            // Allow position increases - can buy regardless of existing position
             bool has_position = portfolio_.hasPosition(symbol);
             int current_shares = has_position ? portfolio_.getPosition(symbol).getShares() : 0;
             
             std::cerr << "[DEBUG] BUY signal - has_position=" << has_position 
                       << " current_shares=" << current_shares << std::endl;
             
-            if (!has_position || current_shares == 0) {
-                double cash_available = portfolio_.getCashBalance();
-                double position_size = strategy_->calculatePositionSize(cash_available, signal.price);
-                
-                std::cerr << "[DEBUG] BUY order: cash=" << cash_available 
-                          << " position_size=" << position_size 
-                          << " price=" << signal.price << std::endl;
-                
-                if (position_size > 0) {
-                    bool success = portfolio_.buyStock(symbol, static_cast<int>(position_size), signal.price);
-                    std::cerr << "[DEBUG] Buy order " << (success ? "SUCCESS" : "FAILED") << std::endl;
-                    return success;
-                }
+            // Calculate portfolio value for position sizing
+            std::map<std::string, double> current_prices;
+            current_prices[symbol] = signal.price;
+            double portfolio_value = portfolio_.getTotalValue(current_prices);
+            
+            double position_size = strategy_->calculatePositionSize(portfolio_, symbol, signal.price, portfolio_value);
+            
+            std::cerr << "[DEBUG] BUY order: cash=" << portfolio_.getCashBalance() 
+                      << " portfolio_value=" << portfolio_value
+                      << " position_size=" << position_size 
+                      << " price=" << signal.price << std::endl;
+            
+            if (position_size > 0) {
+                bool success = portfolio_.buyStock(symbol, static_cast<int>(position_size), signal.price);
+                std::cerr << "[DEBUG] Buy order " << (success ? "SUCCESS" : "FAILED") << std::endl;
+                return success;
             }
         } else if (signal.signal == Signal::SELL) {
             // Only sell if we have a position

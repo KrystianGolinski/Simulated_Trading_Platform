@@ -175,13 +175,14 @@ describe('Dashboard Component', () => {
     expect(screen.getByText('Stock Symbol')).toBeInTheDocument();
   });
 
-  it('has proper date constraints on date inputs', () => {
+  it('has proper date constraints on date inputs initially', () => {
     render(<Dashboard />);
     
     const inputs = screen.getAllByDisplayValue(/2024/);
     const startDateInput = inputs[0]; // First date input
     const endDateInput = inputs[1];   // Second date input
     
+    // Should have default constraints initially (before API call completes)
     expect(startDateInput).toHaveAttribute('min', '2015-06-17');
     expect(startDateInput).toHaveAttribute('max', '2025-06-13');
     expect(endDateInput).toHaveAttribute('min', '2015-06-17');
