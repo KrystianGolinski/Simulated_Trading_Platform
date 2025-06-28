@@ -198,11 +198,11 @@ class TestErrorHandler:
         assert len(handler.error_history) == 0
     
     def test_extract_cpp_error_details_exception(self):
-        # Test C++ error detail extraction with standard exception
+        # Test C++ error detail extraction with standard exception via CppErrorExtractor
         handler = ErrorHandler()
         stderr = "terminate called after throwing an instance of 'std::runtime_error'\nwhat(): Database connection failed"
         
-        details = handler._extract_cpp_error_details(stderr, "")
+        details = handler.cpp_error_extractor.extract_cpp_error_details(stderr, "")
         
         assert details["exception_type"] == "std::runtime_error"
         assert details["error_message"] == "Database connection failed"
@@ -212,7 +212,7 @@ class TestErrorHandler:
         handler = ErrorHandler()
         stderr = "std::bad_alloc: out of memory allocation failed"
         
-        details = handler._extract_cpp_error_details(stderr, "")
+        details = handler.cpp_error_extractor.extract_cpp_error_details(stderr, "")
         
         assert details["exception_type"] == "bad_alloc"
         assert any("memory" in suggestion.lower() for suggestion in details["suggestions"])
@@ -222,7 +222,7 @@ class TestErrorHandler:
         handler = ErrorHandler()
         stderr = "Segmentation fault (core dumped)"
         
-        details = handler._extract_cpp_error_details(stderr, "")
+        details = handler.cpp_error_extractor.extract_cpp_error_details(stderr, "")
         
         assert details["exception_type"] == "Segmentation fault"
         assert "null pointer" in details["suggestions"][0]
@@ -232,7 +232,7 @@ class TestErrorHandler:
         handler = ErrorHandler()
         stderr = "Error at trading_engine.cpp:145 in function calculateProfit"
         
-        details = handler._extract_cpp_error_details(stderr, "")
+        details = handler.cpp_error_extractor.extract_cpp_error_details(stderr, "")
         
         assert details["file_location"] == "trading_engine.cpp"
         assert details["line_number"] == "145"
@@ -242,7 +242,7 @@ class TestErrorHandler:
         handler = ErrorHandler()
         stderr = "JSON parsing failed: invalid format"
         
-        details = handler._extract_cpp_error_details(stderr, "")
+        details = handler.cpp_error_extractor.extract_cpp_error_details(stderr, "")
         
         assert any("JSON" in suggestion for suggestion in details["suggestions"])
     

@@ -17,7 +17,7 @@ function App() {
   useEffect(() => {
     if (simulation.isLoading && currentView !== 'progress') {
       setCurrentView('progress');
-    } else if (simulation.currentSimulation?.status === 'completed' && currentView !== 'results') {
+    } else if (simulation.currentSimulation?.status === 'completed' && (currentView === 'setup' || currentView === 'progress')) {
       setCurrentView('results');
     } else if (simulation.error && currentView === 'progress') {
       setCurrentView('setup');

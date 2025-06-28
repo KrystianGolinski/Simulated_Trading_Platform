@@ -4,12 +4,18 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
 from models import SimulationResults, SimulationStatus, PerformanceMetrics, TradeRecord, SimulationConfig
+from .performance_calculator import PerformanceCalculator
+from .trade_converter import TradeConverter
+from .equity_processor import EquityProcessor
 
 logger = logging.getLogger(__name__)
 
 class ResultProcessor:
     def __init__(self):
         self.results_storage: Dict[str, SimulationResults] = {}
+        self.performance_calculator = PerformanceCalculator()
+        self.trade_converter = TradeConverter()
+        self.equity_processor = EquityProcessor()
     
     def initialize_simulation_result(self, simulation_id: str, config: SimulationConfig) -> SimulationResults:
         result = SimulationResults(
@@ -53,44 +59,15 @@ class ResultProcessor:
             simulation_result.ending_value = result_data.get("ending_value")
             simulation_result.total_return_pct = result_data.get("total_return_pct")
             
-            # Process performance metrics (use performance_metrics if available, otherwise use top-level fields)
-            performance_data = result_data.get("performance_metrics", {})
-            if not performance_data:
-                # Fallback to top-level fields if performance_metrics not available
-                performance_data = result_data
-                
-            simulation_result.performance_metrics = PerformanceMetrics(
-                # Core metrics
-                total_return_pct=performance_data.get("total_return_pct", 0.0),
-                sharpe_ratio=performance_data.get("sharpe_ratio"),
-                max_drawdown_pct=performance_data.get("max_drawdown_pct", performance_data.get("max_drawdown", 0.0)),
-                win_rate=performance_data.get("win_rate", 0.0),
-                total_trades=performance_data.get("total_trades", performance_data.get("trades", 0)),
-                winning_trades=performance_data.get("winning_trades", 0),
-                losing_trades=performance_data.get("losing_trades", 0),
-                
-                # Additional metrics from C++ engine
-                final_balance=result_data.get("ending_value"),
-                starting_capital=result_data.get("starting_capital"),
-                max_drawdown=performance_data.get("max_drawdown"),  # Absolute value
-                
-                # Signals data
-                signals_generated=len(result_data.get("signals", [])),
-                
-                # Computed metrics (could be calculated here if needed)
-                profit_factor=None,  # Could calculate: winning_value / losing_value
-                average_win=None,
-                average_loss=None,
-                annualized_return=None,
-                volatility=None
-            )
+            # Process performance metrics using specialized calculator
+            simulation_result.performance_metrics = self.performance_calculator.calculate_performance_metrics(result_data)
             
-            # Process signals into proper trade pairs
+            # Process signals into proper trade pairs using specialized converter
             signals_data = result_data.get("signals", [])
-            simulation_result.trades = self._convert_signals_to_trades(signals_data, result_data)
+            simulation_result.trades = self.trade_converter.convert_signals_to_trades(signals_data, result_data)
             
-            # Process equity curve
-            simulation_result.equity_curve = result_data.get("equity_curve", [])
+            # Process equity curve using specialized processor
+            simulation_result.equity_curve = self.equity_processor.process_equity_curve(result_data)
             
             logger.info(f"Successfully processed results for simulation {simulation_id}")
             
@@ -129,81 +106,6 @@ class ResultProcessor:
         
         return len(to_remove)
     
-    def _convert_signals_to_trades(self, signals_data: List[Dict[str, Any]], result_data: Dict[str, Any]) -> List[TradeRecord]:
-        # Convert trading signals into proper trade pairs with profit/loss calculations
-        trades = []
-        open_positions = {}  # symbol -> {entry_signal, shares}
-        symbol = result_data.get("symbol", "UNKNOWN")
-        
-        for signal in signals_data:
-            if not isinstance(signal, dict):
-                continue
-                
-            signal_type = signal.get("signal", "").upper()
-            price = signal.get("price", 0.0)
-            date_str = signal.get("date", datetime.now().isoformat())
-            
-            if signal_type == "BUY":
-                # Open a new position
-                shares = self._calculate_position_size(price, result_data)
-                open_positions[symbol] = {
-                    "entry_date": date_str,
-                    "entry_price": price,
-                    "shares": shares
-                }
-                
-            elif signal_type == "SELL" and symbol in open_positions:
-                # Close the position and create a trade record
-                position = open_positions[symbol]
-                entry_price = position["entry_price"]
-                shares = position["shares"]
-                
-                # Calculate profit/loss
-                total_entry_value = entry_price * shares
-                total_exit_value = price * shares
-                profit_loss = total_exit_value - total_entry_value
-                profit_loss_pct = (profit_loss / total_entry_value) * 100 if total_entry_value > 0 else 0.0
-                
-                # Create trade record for the completed trade
-                trade = TradeRecord(
-                    date=f"{position['entry_date']} -> {date_str}",  # Show entry and exit dates
-                    symbol=symbol,
-                    action=f"BUY@{entry_price:.2f} -> SELL@{price:.2f} ({profit_loss_pct:+.2f}%)",
-                    shares=shares,
-                    price=entry_price,  # Entry price
-                    total_value=profit_loss  # Profit/loss as total value
-                )
-                trades.append(trade)
-                
-                # Remove the closed position
-                del open_positions[symbol]
-        
-        # Handle any remaining open positions as incomplete trades
-        for symbol, position in open_positions.items():
-            trade = TradeRecord(
-                date=f"{position['entry_date']} (OPEN)",
-                symbol=symbol,
-                action=f"BUY@{position['entry_price']:.2f} (POSITION OPEN)",
-                shares=position["shares"],
-                price=position["entry_price"],
-                total_value=0.0  # No profit/loss for open positions
-            )
-            trades.append(trade)
-        
-        return trades
-    
-    def _calculate_position_size(self, price: float, result_data: Dict[str, Any]) -> int:
-        # Calculate how many shares to buy based on available capital and strategy
-        starting_capital = result_data.get("starting_capital", 10000.0)
-        
-        # Simple strategy: use a fixed percentage of capital per trade
-        position_size_pct = 0.1  # 10% of capital per position
-        available_capital = starting_capital * position_size_pct
-        
-        if price > 0:
-            shares = int(available_capital / price)
-            return max(1, shares)  # At least 1 share
-        return 1
     
     def parse_json_result(self, json_text: str) -> Dict[str, Any]:
         # Parse and validate JSON result from C++ engine with comprehensive error handling
@@ -256,23 +158,23 @@ class ResultProcessor:
                         logger.error(f"Field '{field}' failed validation: {value}")
                         return False
             
-            # Validate performance_metrics structure
+            # Validate performance_metrics structure using specialized calculator
             if "performance_metrics" in result_data:
-                if not self._validate_performance_metrics(result_data["performance_metrics"]):
+                if not self.performance_calculator.validate_performance_metrics(result_data["performance_metrics"]):
                     return False
             
-            # Validate signals structure
+            # Validate signals structure using specialized converter
             if "signals" in result_data:
-                if not self._validate_signals(result_data["signals"]):
+                if not self.trade_converter.validate_signals(result_data["signals"]):
                     return False
             
-            # Validate equity_curve structure
+            # Validate equity_curve structure using specialized processor
             if "equity_curve" in result_data:
-                if not self._validate_equity_curve(result_data["equity_curve"]):
+                if not self.equity_processor.validate_equity_curve(result_data["equity_curve"]):
                     return False
             
-            # Cross-field validation
-            if not self._validate_cross_field_consistency(result_data):
+            # Cross-field validation using specialized calculator
+            if not self.performance_calculator.validate_cross_field_consistency(result_data):
                 return False
             
             return True
@@ -320,145 +222,3 @@ class ResultProcessor:
             if value is None and key in ["ending_value", "starting_capital"]:
                 raise ValueError(f"Critical field '{key}' is null")
     
-    def _validate_performance_metrics(self, performance_metrics: Any) -> bool:
-        # Validate performance_metrics structure and content
-        if not isinstance(performance_metrics, dict):
-            logger.error("performance_metrics must be a dictionary")
-            return False
-        
-        # Expected numeric fields with validation rules (flexible)
-        metric_validations = [
-            ("total_return_pct", float, None),  # Can be negative
-            ("sharpe_ratio", float, None),      # Can be negative  
-            ("max_drawdown_pct", float, lambda x: x >= 0),  # Drawdown as positive percentage
-            ("win_rate", float, lambda x: x >= 0),     # Win rate can be percentage or ratio
-            ("total_trades", int, lambda x: x >= 0),
-            ("winning_trades", int, lambda x: x >= 0),
-            ("losing_trades", int, lambda x: x >= 0),
-        ]
-        
-        for field, field_type, validator in metric_validations:
-            if field in performance_metrics:
-                value = performance_metrics[field]
-                if field_type == float and not isinstance(value, (int, float)):
-                    logger.error(f"Performance metric '{field}' must be numeric, got {type(value)}")
-                    return False
-                elif field_type == int and not isinstance(value, int):
-                    logger.error(f"Performance metric '{field}' must be integer, got {type(value)}")
-                    return False
-                
-                if validator and not validator(value):
-                    logger.error(f"Performance metric '{field}' failed validation: {value}")
-                    return False
-        
-        # Cross-field validation within performance metrics (flexible trade counting)
-        if "winning_trades" in performance_metrics and "losing_trades" in performance_metrics and "total_trades" in performance_metrics:
-            winning = performance_metrics["winning_trades"]
-            losing = performance_metrics["losing_trades"]
-            total = performance_metrics["total_trades"]
-            
-            # Allow for neutral trades, open positions, or different counting methodologies
-            if winning + losing > total:
-                logger.error(f"Trade count impossible: winning({winning}) + losing({losing}) > total({total})")
-                return False
-            elif winning + losing < total:
-                # This is acceptable - there might be neutral trades or open positions
-                logger.info(f"Trade count info: winning({winning}) + losing({losing}) < total({total}) - may include neutral/open trades")
-        
-        return True
-    
-    def _validate_signals(self, signals: Any) -> bool:
-        # Validate signals array structure and content
-        if not isinstance(signals, list):
-            logger.error("signals must be a list")
-            return False
-        
-        for i, signal in enumerate(signals):
-            if not isinstance(signal, dict):
-                logger.error(f"Signal {i} must be a dictionary")
-                return False
-            
-            # Required signal fields
-            required_signal_fields = ["signal", "price", "date"]
-            for field in required_signal_fields:
-                if field not in signal:
-                    logger.error(f"Signal {i} missing required field: {field}")
-                    return False
-            
-            # Validate signal values
-            signal_type = signal.get("signal", "").upper()
-            if signal_type not in ["BUY", "SELL"]:
-                logger.error(f"Signal {i} has invalid signal type: {signal_type}")
-                return False
-            
-            price = signal.get("price")
-            if not isinstance(price, (int, float)) or price <= 0:
-                logger.error(f"Signal {i} has invalid price: {price}")
-                return False
-            
-            # Validate date format (basic check)
-            date_str = signal.get("date")
-            if not isinstance(date_str, str) or len(date_str) < 8:
-                logger.error(f"Signal {i} has invalid date format: {date_str}")
-                return False
-        
-        return True
-    
-    def _validate_equity_curve(self, equity_curve: Any) -> bool:
-        # Validate equity_curve array structure and content
-        if not isinstance(equity_curve, list):
-            logger.error("equity_curve must be a list")
-            return False
-        
-        for i, point in enumerate(equity_curve):
-            if not isinstance(point, dict):
-                logger.error(f"Equity curve point {i} must be a dictionary")
-                return False
-            
-            # Required equity curve fields
-            required_fields = ["date", "value"]
-            for field in required_fields:
-                if field not in point:
-                    logger.error(f"Equity curve point {i} missing required field: {field}")
-                    return False
-            
-            # Validate values
-            value = point.get("value")
-            if not isinstance(value, (int, float)) or value < 0:
-                logger.error(f"Equity curve point {i} has invalid value: {value}")
-                return False
-            
-            date_str = point.get("date")
-            if not isinstance(date_str, str):
-                logger.error(f"Equity curve point {i} has invalid date format: {date_str}")
-                return False
-        
-        return True
-    
-    def _validate_cross_field_consistency(self, result_data: Dict[str, Any]) -> bool:
-        # Validate consistency between different fields in the result data
-        try:
-            # Validate starting vs ending capital consistency
-            starting_capital = result_data.get("starting_capital")
-            ending_value = result_data.get("ending_value")
-            total_return_pct = result_data.get("total_return_pct")
-            
-            if starting_capital and ending_value and total_return_pct is not None:
-                expected_return = ((ending_value - starting_capital) / starting_capital) * 100
-                if abs(expected_return - total_return_pct) > 0.01:  # Allow small floating point differences
-                    logger.warning(f"Return percentage inconsistency: expected {expected_return:.2f}%, got {total_return_pct:.2f}%")
-            
-            # Validate equity curve consistency
-            if "equity_curve" in result_data:
-                equity_curve = result_data["equity_curve"]
-                if equity_curve and len(equity_curve) > 0:
-                    final_equity_value = equity_curve[-1].get("value")
-                    if final_equity_value and ending_value:
-                        if abs(final_equity_value - ending_value) > 0.01:
-                            logger.warning(f"Equity curve final value ({final_equity_value}) doesn't match ending_value ({ending_value})")
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"Cross-field validation error: {e}")
-            return False

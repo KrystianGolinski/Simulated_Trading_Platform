@@ -1,71 +1,28 @@
 import logging
 import re
-from enum import Enum
 from typing import Dict, Any, Optional, List
 from datetime import datetime
+from .error_types import SimulationError, ErrorCode, ErrorSeverity
+from .error_categorizers import (
+    ErrorCategorizer, TimeoutErrorCategorizer, PermissionErrorCategorizer,
+    MemoryErrorCategorizer, DiskSpaceErrorCategorizer, FileNotFoundErrorCategorizer,
+    GenericErrorCategorizer, CppErrorExtractor
+)
 
 logger = logging.getLogger(__name__)
-
-class ErrorCode(Enum):
-    # Engine errors
-    ENGINE_NOT_CONFIGURED = "ENGINE_NOT_CONFIGURED"
-    ENGINE_FILE_NOT_FOUND = "ENGINE_FILE_NOT_FOUND"
-    ENGINE_NOT_EXECUTABLE = "ENGINE_NOT_EXECUTABLE"
-    
-    # Execution errors
-    PROCESS_EXECUTION_FAILED = "PROCESS_EXECUTION_FAILED"
-    PROCESS_TIMEOUT = "PROCESS_TIMEOUT"
-    INVALID_WORKING_DIRECTORY = "INVALID_WORKING_DIRECTORY"
-    
-    # Data errors
-    JSON_PARSE_ERROR = "JSON_PARSE_ERROR"
-    INVALID_RESULT_DATA = "INVALID_RESULT_DATA"
-    MISSING_REQUIRED_FIELDS = "MISSING_REQUIRED_FIELDS"
-    
-    # Simulation errors
-    SIMULATION_NOT_FOUND = "SIMULATION_NOT_FOUND"
-    SIMULATION_ALREADY_RUNNING = "SIMULATION_ALREADY_RUNNING"
-    INVALID_SIMULATION_CONFIG = "INVALID_SIMULATION_CONFIG"
-    
-    # System errors
-    MEMORY_ERROR = "MEMORY_ERROR"
-    DISK_SPACE_ERROR = "DISK_SPACE_ERROR"
-    PERMISSION_ERROR = "PERMISSION_ERROR"
-    
-    # Unknown error
-    UNKNOWN_ERROR = "UNKNOWN_ERROR"
-
-class ErrorSeverity(Enum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    CRITICAL = "critical"
-
-class SimulationError:
-    def __init__(self, error_code: ErrorCode, message: str, 
-                 severity: ErrorSeverity = ErrorSeverity.MEDIUM,
-                 context: Optional[Dict[str, Any]] = None,
-                 suggestions: Optional[List[str]] = None):
-        self.error_code = error_code
-        self.message = message
-        self.severity = severity
-        self.context = context or {}
-        self.suggestions = suggestions or []
-        self.timestamp = datetime.now()
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "error_code": self.error_code.value,
-            "message": self.message,
-            "severity": self.severity.value,
-            "context": self.context,
-            "suggestions": self.suggestions,
-            "timestamp": self.timestamp.isoformat()
-        }
 
 class ErrorHandler:
     def __init__(self):
         self.error_history: List[SimulationError] = []
+        self.cpp_error_extractor = CppErrorExtractor()
+        self.categorizers: List[ErrorCategorizer] = [
+            TimeoutErrorCategorizer(),
+            FileNotFoundErrorCategorizer(),
+            PermissionErrorCategorizer(),
+            DiskSpaceErrorCategorizer(),
+            MemoryErrorCategorizer(),
+            GenericErrorCategorizer()  # Must be last as it's the fallback
+        ]
     
     def create_engine_validation_error(self, validation_result: Dict[str, Any]) -> SimulationError:
         error_code_mapping = {
@@ -101,96 +58,23 @@ class ErrorHandler:
             "cpp_stdout": stdout.strip() if stdout.strip() else None,
             "cpp_stderr": stderr.strip() if stderr.strip() else None,
             # Extract C++ specific error patterns
-            "cpp_error_details": self._extract_cpp_error_details(stderr, stdout)
+            "cpp_error_details": self.cpp_error_extractor.extract_cpp_error_details(stderr, stdout)
         }
         
-        # Categorize based on return code and error content
-        if return_code == -9 or "killed" in stderr.lower():
-            error = SimulationError(
-                error_code=ErrorCode.PROCESS_TIMEOUT,
-                message="Simulation process was terminated (likely timeout or memory limit)",
-                severity=ErrorSeverity.HIGH,
-                context=context,
-                suggestions=[
-                    "Check if simulation parameters are too resource-intensive",
-                    "Consider reducing date range or complexity",
-                    "Monitor Docker container resource limits"
-                ]
-            )
-        elif return_code == 127:
-            error = SimulationError(
-                error_code=ErrorCode.ENGINE_FILE_NOT_FOUND,
-                message="C++ engine executable not found or not executable",
-                severity=ErrorSeverity.CRITICAL,
-                context=context,
-                suggestions=[
-                    "Verify C++ engine was compiled successfully",
-                    "Check Docker volume mounts",
-                    "Ensure executable permissions are set"
-                ]
-            )
-        elif "permission denied" in stderr.lower():
-            error = SimulationError(
-                error_code=ErrorCode.PERMISSION_ERROR,
-                message="Permission denied when executing C++ engine",
-                severity=ErrorSeverity.HIGH,
-                context=context,
-                suggestions=[
-                    "Check file permissions on C++ engine",
-                    "Verify Docker container permissions",
-                    "Ensure proper user/group configuration"
-                ]
-            )
-        elif "no space left" in stderr.lower():
-            error = SimulationError(
-                error_code=ErrorCode.DISK_SPACE_ERROR,
-                message="Insufficient disk space for simulation",
-                severity=ErrorSeverity.HIGH,
-                context=context,
-                suggestions=[
-                    "Free up disk space",
-                    "Check Docker volume space limits",
-                    "Clean up old simulation data"
-                ]
-            )
-        elif "out of memory" in stderr.lower() or "bad_alloc" in stderr.lower():
-            error = SimulationError(
-                error_code=ErrorCode.MEMORY_ERROR,
-                message="Simulation ran out of memory",
-                severity=ErrorSeverity.HIGH,
-                context=context,
-                suggestions=[
-                    "Reduce simulation complexity or date range",
-                    "Increase Docker container memory limits",
-                    "Optimize C++ engine memory usage"
-                ]
-            )
-        else:
-            # Generic process execution failure with detailed C++ error preservation
-            error_message = f"C++ engine failed with return code {return_code}"
-            
-            # Include detailed C++ error information in the message
-            cpp_details = context.get("cpp_error_details", {})
-            if cpp_details.get("exception_type"):
-                error_message += f" - {cpp_details['exception_type']}"
-            if cpp_details.get("error_message"):
-                error_message += f": {cpp_details['error_message']}"
-            elif stderr.strip():
-                error_message += f": {stderr.strip()[:200]}"
-            
-            error = SimulationError(
-                error_code=ErrorCode.PROCESS_EXECUTION_FAILED,
-                message=error_message,
-                severity=ErrorSeverity.MEDIUM,
-                context=context,
-                suggestions=[
-                    "Check simulation parameters for validity",
-                    "Review detailed C++ error output in error context",
-                    "Verify input data integrity",
-                    *cpp_details.get("suggestions", [])
-                ]
-            )
+        # Use strategy pattern to find appropriate categorizer
+        for categorizer in self.categorizers:
+            if categorizer.can_handle(return_code, stdout, stderr):
+                error = categorizer.categorize(return_code, stdout, stderr, context)
+                self._log_error(error)
+                return error
         
+        # This should never happen as GenericErrorCategorizer handles everything
+        error = SimulationError(
+            error_code=ErrorCode.UNKNOWN_ERROR,
+            message="Unknown error occurred",
+            severity=ErrorSeverity.MEDIUM,
+            context=context
+        )
         self._log_error(error)
         return error
     
@@ -284,83 +168,3 @@ class ErrorHandler:
         self.error_history.clear()
         logger.info("Error history cleared")
     
-    def _extract_cpp_error_details(self, stderr: str, stdout: str) -> Dict[str, Any]:
-        # Extract detailed C++ error information from stderr and stdout
-        
-        details = {
-            "exception_type": None,
-            "error_message": None,
-            "file_location": None,
-            "line_number": None,
-            "function_name": None,
-            "stack_trace": None,
-            "suggestions": []
-        }
-        
-        # Combine stderr and stdout for comprehensive error analysis
-        combined_output = f"{stderr}\n{stdout}".strip()
-        if not combined_output:
-            return details
-        
-        # Pattern matching for common C++ error types
-        cpp_error_patterns = [
-            # Standard C++ exceptions
-            (r"(std::\w+(?:::\w+)*)\s*[:\-]\s*(.+)", "exception_type", "error_message"),
-            (r"terminate called after throwing an instance of '([^']+)'\s*what\(\):\s*(.+)", "exception_type", "error_message"),
-            (r"Exception:\s*([^\n]+)", None, "error_message"),
-            
-            # File and line information
-            (r"([^\s]+\.(?:cpp|h|hpp)):(\d+)", "file_location", "line_number"),
-            (r"at\s+([^\s]+)\s*\(([^)]+)\)", "function_name", None),
-            
-            # Specific error messages
-            (r"(bad_alloc|out of memory)", "exception_type", None),
-            (r"(segmentation fault|segfault)", "exception_type", None),
-            (r"(assertion failed|assert)", "exception_type", None),
-            (r"(null pointer|nullptr)", "exception_type", None),
-        ]
-        
-        for pattern, key1, key2 in cpp_error_patterns:
-            match = re.search(pattern, combined_output, re.IGNORECASE | re.MULTILINE)
-            if match:
-                if key1 and match.group(1):
-                    details[key1] = match.group(1).strip()
-                if key2 and len(match.groups()) > 1 and match.group(2):
-                    details[key2] = match.group(2).strip()
-        
-        # Extract stack trace if present
-        stack_trace_match = re.search(r'(stack trace:|backtrace:)(.*?)(?=\n\n|\Z)', 
-                                    combined_output, re.IGNORECASE | re.DOTALL)
-        if stack_trace_match:
-            details["stack_trace"] = stack_trace_match.group(2).strip()
-        
-        # Generate context-specific suggestions
-        if details["exception_type"]:
-            exception_type = details["exception_type"].lower()
-            if "bad_alloc" in exception_type or "memory" in exception_type:
-                details["suggestions"].extend([
-                    "Reduce data size or simulation complexity",
-                    "Check for memory leaks in C++ code",
-                    "Increase available memory"
-                ])
-            elif "segmentation" in exception_type or "segfault" in exception_type:
-                details["suggestions"].extend([
-                    "Check for null pointer dereferences",
-                    "Verify array bounds",
-                    "Review memory management in C++ code"
-                ])
-            elif "assertion" in exception_type or "assert" in exception_type:
-                details["suggestions"].extend([
-                    "Check preconditions and input validation",
-                    "Review assertion conditions in C++ code"
-                ])
-        
-        # Look for JSON-related errors
-        if "json" in combined_output.lower():
-            details["suggestions"].append("Check JSON parsing/generation in C++ engine")
-        
-        # Look for database-related errors
-        if any(db_keyword in combined_output.lower() for db_keyword in ["sqlite", "database", "sql"]):
-            details["suggestions"].append("Check database connection and query execution")
-        
-        return details

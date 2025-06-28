@@ -3,6 +3,8 @@
 #include <numeric>
 #include <cmath>
 #include <stdexcept>
+#include <future>
+#include <thread>
 
 TechnicalIndicators::TechnicalIndicators(const std::vector<PriceData>& data) 
     : price_data_(data) {}
@@ -49,11 +51,19 @@ std::vector<double> TechnicalIndicators::calculateSMA(int period) const {
         return sma_values;
     }
     
-    for (size_t i = period - 1; i < price_data_.size(); ++i) {
-        double sum = 0.0;
-        for (int j = 0; j < period; ++j) {
-            sum += price_data_[i - j].close;
-        }
+    // Vectorized SMA calculation
+    sma_values.reserve(price_data_.size() - period + 1);
+    
+    // Calculate initial sum
+    double sum = 0.0;
+    for (int j = 0; j < period; ++j) {
+        sum += price_data_[j].close;
+    }
+    sma_values.push_back(sum / period);
+    
+    // Rolling calculation for efficiency
+    for (size_t i = period; i < price_data_.size(); ++i) {
+        sum = sum - price_data_[i - period].close + price_data_[i].close;
         sma_values.push_back(sum / period);
     }
     
@@ -273,4 +283,36 @@ void TechnicalIndicators::cacheIndicator(const std::string& key, const std::vect
 
 const std::vector<double>& TechnicalIndicators::getCachedIndicator(const std::string& key) const {
     return indicator_cache_.at(key);
+}
+
+TechnicalIndicators::IndicatorSet TechnicalIndicators::calculateIndicatorSetParallel(int sma_short_period, 
+                                                                                    int sma_long_period, 
+                                                                                    int rsi_period, 
+                                                                                    int ema_period) const {
+    IndicatorSet result;
+    
+    // Use std::async for parallel computation of independent indicators
+    auto sma_short_future = std::async(std::launch::async, [this, sma_short_period]() {
+        return calculateSMA(sma_short_period);
+    });
+    
+    auto sma_long_future = std::async(std::launch::async, [this, sma_long_period]() {
+        return calculateSMA(sma_long_period);
+    });
+    
+    auto rsi_future = std::async(std::launch::async, [this, rsi_period]() {
+        return calculateRSI(rsi_period);
+    });
+    
+    auto ema_future = std::async(std::launch::async, [this, ema_period]() {
+        return calculateEMA(ema_period);
+    });
+    
+    // Collect results
+    result.sma_short = sma_short_future.get();
+    result.sma_long = sma_long_future.get();
+    result.rsi = rsi_future.get();
+    result.ema = ema_future.get();
+    
+    return result;
 }

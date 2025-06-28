@@ -1,22 +1,18 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { StockChart } from './StockChart';
 import { useStockData, useStocks } from '../hooks/useStockData';
 import { useDebounce } from '../hooks/useDebounce';
-import { apiService } from '../services/api';
+import { DateRangeSelector, LoadingWrapper } from './common';
 
 type ChartType = 'line' | 'candlestick' | 'ohlc';
 
 export const Dashboard: React.FC = () => {
   const [selectedSymbol, setSelectedSymbol] = useState<string>('AAPL');
-  const [startDate, setStartDate] = useState<string>('2024-01-01');
-  const [endDate, setEndDate] = useState<string>('2024-12-31');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
   const [timeframe, setTimeframe] = useState<'daily'>('daily');
   const [chartType, setChartType] = useState<ChartType>('line');
   const [showVolume, setShowVolume] = useState<boolean>(false);
-  const [dateRange, setDateRange] = useState<{ min_date: string; max_date: string }>({
-    min_date: '2015-06-17',
-    max_date: '2025-06-13'
-  });
 
   const debouncedSymbol = useDebounce(selectedSymbol, 500);
   const debouncedStartDate = useDebounce(startDate, 800);
@@ -36,21 +32,6 @@ export const Dashboard: React.FC = () => {
     setSelectedSymbol(symbol);
   }, []);
 
-  useEffect(() => {
-    const updateDateRangeForSymbol = async () => {
-      try {
-        const range = await apiService.getStockDateRange(selectedSymbol);
-        setDateRange(range);
-      } catch (error) {
-        console.error(`Error fetching date range for ${selectedSymbol}:`, error);
-        setDateRange({ min_date: '2015-06-17', max_date: '2025-06-13' });
-      }
-    };
-
-    if (selectedSymbol) {
-      updateDateRangeForSymbol();
-    }
-  }, [selectedSymbol]);
 
   const handleStartDateChange = useCallback((date: string) => {
     setStartDate(date);
@@ -89,100 +70,39 @@ export const Dashboard: React.FC = () => {
           <div style={{ backgroundColor: 'white', borderRadius: '8px', padding: '16px', boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
               {/* Stock Selection */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', minWidth: '130px' }}>
-                  Stock Symbol
-                </label>
-                <select
-                  value={selectedSymbol}
-                  onChange={(e) => handleSymbolChange(e.target.value)}
-                  disabled={stocksLoading}
-                  style={{
-                    padding: '6px 10px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '4px',
-                    fontSize: '13px',
-                    outline: 'none',
-                    width: '140px'
-                  }}
-                >
-                  {stockOptions}
-                </select>
-              </div>
+              <LoadingWrapper isLoading={stocksLoading} loadingText="Loading symbols..." minHeight="40px">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', minWidth: '130px' }}>
+                    Stock Symbol
+                  </label>
+                  <select
+                    value={selectedSymbol}
+                    onChange={(e) => handleSymbolChange(e.target.value)}
+                    disabled={stocksLoading}
+                    style={{
+                      padding: '6px 10px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '4px',
+                      fontSize: '13px',
+                      outline: 'none',
+                      width: '140px'
+                    }}
+                  >
+                    {stockOptions}
+                  </select>
+                </div>
+              </LoadingWrapper>
 
-              {/* Start Date */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', minWidth: '130px' }}>
-                  Start Date
-                </label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => handleStartDateChange(e.target.value)}
-                  min={dateRange.min_date}
-                  max={dateRange.max_date}
-                  style={{
-                    padding: '6px 10px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '4px',
-                    fontSize: '13px',
-                    outline: 'none',
-                    width: '140px'
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => handleStartDateChange(dateRange.min_date)}
-                  style={{
-                    padding: '4px 8px',
-                    fontSize: '12px',
-                    backgroundColor: '#6b7280',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Earliest
-                </button>
-              </div>
-
-              {/* End Date */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', minWidth: '130px' }}>
-                  End Date
-                </label>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => handleEndDateChange(e.target.value)}
-                  min={dateRange.min_date}
-                  max={dateRange.max_date}
-                  style={{
-                    padding: '6px 10px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '4px',
-                    fontSize: '13px',
-                    outline: 'none',
-                    width: '140px'
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => handleEndDateChange(dateRange.max_date)}
-                  style={{
-                    padding: '4px 8px',
-                    fontSize: '12px',
-                    backgroundColor: '#6b7280',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Latest
-                </button>
-              </div>
+              {/* Date Range */}
+              <DateRangeSelector
+                startDate={startDate}
+                endDate={endDate}
+                onStartDateChange={handleStartDateChange}
+                onEndDateChange={handleEndDateChange}
+                variant="compact"
+                symbol={selectedSymbol}
+                autoSetDatesOnSymbolChange={true}
+              />
 
               {/* Timeframe */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

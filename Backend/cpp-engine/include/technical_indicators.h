@@ -58,6 +58,19 @@ public:
     std::vector<double> calculateRSI(int period = 14) const;
     std::vector<double> calculateBollingerBands(int period = 20, double std_dev = 2.0) const;
     
+    // Parallel calculation methods for multiple indicators
+    struct IndicatorSet {
+        std::vector<double> sma_short;
+        std::vector<double> sma_long;
+        std::vector<double> rsi;
+        std::vector<double> ema;
+    };
+    
+    IndicatorSet calculateIndicatorSetParallel(int sma_short_period = 20, 
+                                              int sma_long_period = 50, 
+                                              int rsi_period = 14, 
+                                              int ema_period = 20) const;
+    
     std::vector<TradingSignal> detectMACrossover(int short_period, int long_period) const;
     std::vector<TradingSignal> detectRSISignals(double oversold = 30.0, double overbought = 70.0) const;
     

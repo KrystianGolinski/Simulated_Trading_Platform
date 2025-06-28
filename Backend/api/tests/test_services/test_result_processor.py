@@ -215,7 +215,7 @@ class TestResultProcessor:
         assert "recent-sim" in processor.results_storage
     
     def test_convert_signals_to_trades(self, sample_simulation_config):
-        # Test conversion of signals to trade records
+        # Test conversion of signals to trade records via TradeConverter
         processor = ResultProcessor()
         
         signals_data = [
@@ -230,7 +230,7 @@ class TestResultProcessor:
             "starting_capital": 10000.0
         }
         
-        trades = processor._convert_signals_to_trades(signals_data, result_data)
+        trades = processor.trade_converter.convert_signals_to_trades(signals_data, result_data)
         
         assert len(trades) == 2
         
@@ -249,22 +249,22 @@ class TestResultProcessor:
         assert open_trade.total_value == 0.0  # No profit/loss for open positions
     
     def test_calculate_position_size(self):
-        # Test position size calculation
+        # Test position size calculation via TradeConverter
         processor = ResultProcessor()
         
         result_data = {"starting_capital": 10000.0}
         
         # Test normal case
-        position_size = processor._calculate_position_size(100.0, result_data)
+        position_size = processor.trade_converter._calculate_position_size(100.0, result_data)
         expected_shares = int((10000.0 * 0.1) / 100.0)  # 10% of capital / price
         assert position_size == max(1, expected_shares)
         
         # Test edge case with very high price
-        position_size = processor._calculate_position_size(10000.0, result_data)
+        position_size = processor.trade_converter._calculate_position_size(10000.0, result_data)
         assert position_size == 1  # At least 1 share
         
         # Test edge case with zero price
-        position_size = processor._calculate_position_size(0.0, result_data)
+        position_size = processor.trade_converter._calculate_position_size(0.0, result_data)
         assert position_size == 1  # At least 1 share
     
     def test_parse_json_result_valid(self, sample_cpp_output):
@@ -454,7 +454,7 @@ class TestResultProcessor:
             "total_return_pct": 10.0  # (11000 - 10000) / 10000 * 100 = 10%
         }
         
-        assert processor._validate_cross_field_consistency(consistent_data) is True
+        assert processor.performance_calculator.validate_cross_field_consistency(consistent_data) is True
         
         # Test inconsistent data
         inconsistent_data = {
@@ -463,8 +463,8 @@ class TestResultProcessor:
             "total_return_pct": 20.0  # Should be 10%, not 20%
         }
         
-        with patch('services.result_processor.logger') as mock_logger:
-            result = processor._validate_cross_field_consistency(inconsistent_data)
+        with patch('services.performance_calculator.logger') as mock_logger:
+            result = processor.performance_calculator.validate_cross_field_consistency(inconsistent_data)
             assert result is True  # Should still pass but log warning
             mock_logger.warning.assert_called()
     

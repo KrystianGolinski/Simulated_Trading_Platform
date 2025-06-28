@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { SimulationConfig, SimulationResults, SimulationStatusResponse } from '../services/api';
-import { simulationService, SimulationState } from '../services/simulationService';
+import { simulationService, SimulationState } from '../services/simulation';
 
 export interface UseSimulationReturn {
   startSimulation: (config: SimulationConfig) => Promise<void>;

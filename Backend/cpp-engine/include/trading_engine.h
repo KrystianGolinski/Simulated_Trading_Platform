@@ -76,6 +76,16 @@ public:
     nlohmann::json getBacktestResultsAsJson(const BacktestResult& result) const;
     
 private:
+    // Decomposed backtest methods
+    bool validateBacktestConfig(const BacktestConfig& config) const;
+    void initializeBacktest(const BacktestConfig& config, BacktestResult& result);
+    std::vector<PriceData> prepareMarketData(const BacktestConfig& config);
+    void runSimulationLoop(const std::vector<PriceData>& price_data, const BacktestConfig& config, BacktestResult& result);
+    void finalizeBacktestResults(BacktestResult& result);
+    
+    // Progress reporting
+    void reportProgress(size_t current_day, size_t total_days, const PriceData& data_point, const std::string& symbol);
+
     bool executeSignal(const TradingSignal& signal, const std::string& symbol);
     std::vector<PriceData> convertToTechnicalData(const std::vector<std::map<std::string, std::string>>& db_data) const;
     double calculateSharpeRatio(const std::vector<double>& returns, double risk_free_rate = 0.02) const;

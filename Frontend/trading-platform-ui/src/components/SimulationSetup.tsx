@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useStocks } from '../hooks/useStockData';
 import { SimulationConfig, ValidationError, apiService } from '../services/api';
-import { Card, FormInput, Spinner, Alert, Button } from './common';
+import { Card, FormInput, Spinner, Alert, Button, DateRangeSelector, ErrorAlert } from './common';
 
 interface SimulationSetupProps {
   onStartSimulation: (config: SimulationConfig) => Promise<void>;
@@ -24,8 +24,8 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
 }) => {
   const [config, setConfig] = useState<SimulationConfig>({
     symbols: [],
-    start_date: '2023-01-01',
-    end_date: '2023-12-31',
+    start_date: '',
+    end_date: '',
     starting_capital: 10000,
     strategy: 'ma_crossover',
     short_ma: 20,
@@ -41,40 +41,9 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
     isValidating: false
   });
 
-  const [dateRange, setDateRange] = useState<{ min_date: string; max_date: string }>({
-    min_date: '2015-06-17',
-    max_date: '2025-06-13'
-  });
 
   const { stocks, loading: stocksLoading } = useStocks();
 
-  const updateDateRangeForSelectedStocks = async (selectedSymbols: string[]) => {
-    if (selectedSymbols.length === 0) {
-      setDateRange({ min_date: '2015-06-17', max_date: '2025-06-13' });
-      return;
-    }
-
-    try {
-      const dateRanges = await Promise.all(
-        selectedSymbols.map(symbol => apiService.getStockDateRange(symbol))
-      );
-      
-      const minDate = dateRanges.reduce((earliest, range) => 
-        range.min_date < earliest ? range.min_date : earliest, 
-        dateRanges[0].min_date
-      );
-      
-      const maxDate = dateRanges.reduce((latest, range) => 
-        range.max_date > latest ? range.max_date : latest, 
-        dateRanges[0].max_date
-      );
-
-      setDateRange({ min_date: minDate, max_date: maxDate });
-    } catch (error) {
-      console.error('Error fetching date ranges:', error);
-      setDateRange({ min_date: '2015-06-17', max_date: '2025-06-13' });
-    }
-  };
 
   const validateConfiguration = async () => {
     setValidation(prev => ({ ...prev, isValidating: true }));
@@ -162,83 +131,66 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
         )}
 
         {/* General Errors */}
-        {error && (
-          <Alert
-            type="error"
-            title="Error Starting Simulation"
-            onDismiss={onClearError}
-            className="mb-6"
-          >
-            {error}
-          </Alert>
-        )}
+        <ErrorAlert
+          error={error || null}
+          title="Error Starting Simulation"
+          onDismiss={onClearError}
+          className="mb-6"
+        />
 
         <form onSubmit={handleSubmit} className="compact-spacing">
           {/* Starting Capital */}
           <div style={{ marginBottom: '1.5rem' }}>
             <h2 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>Portfolio Settings</h2>
             <Card>
-              <div style={{ display: 'flex', justifyContent: 'center' }}>
-                <FormInput
-                  label="Starting Capital ($)"
-                  type="number"
-                  min="1000"
-                  max="1000000"
-                  step="100"
-                  value={config.starting_capital}
-                  onChange={(e) => setConfig(prev => ({ ...prev, starting_capital: Number(e.target.value) }))}
-                  required
-                />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', padding: '0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: '#374151', width: '140px', textAlign: 'left' }}>
+                    Starting Capital ($)
+                  </label>
+                  <input
+                    type="number"
+                    min="1000"
+                    max="1000000"
+                    step="100"
+                    value={config.starting_capital}
+                    onChange={(e) => setConfig(prev => ({ ...prev, starting_capital: Number(e.target.value) }))}
+                    required
+                    style={{
+                      padding: '8px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      width: '200px',
+                      color: '#374151',
+                      backgroundColor: '#ffffff',
+                      textAlign: 'left'
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => setConfig(prev => ({ ...prev, starting_capital: 1000000 }))}
+                    variant="secondary"
+                    style={{ fontSize: '0.75rem', padding: '4px 8px', width: '60px', textAlign: 'center' }}
+                  >
+                    Max
+                  </Button>
+                </div>
               </div>
             </Card>
           </div>
 
           {/* Date Range */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>Simulation Period</h2>
-            <Card>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <FormInput
-                    label="Start Date"
-                    type="date"
-                    value={config.start_date}
-                    onChange={(e) => setConfig(prev => ({ ...prev, start_date: e.target.value }))}
-                    min={dateRange.min_date}
-                    max={dateRange.max_date}
-                    required
-                  />
-                  <Button
-                    type="button"
-                    onClick={() => setConfig(prev => ({ ...prev, start_date: dateRange.min_date }))}
-                    variant="secondary"
-                    style={{ fontSize: '0.75rem', padding: '4px 8px' }}
-                  >
-                    Earliest
-                  </Button>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <FormInput
-                    label="End Date"
-                    type="date"
-                    value={config.end_date}
-                    onChange={(e) => setConfig(prev => ({ ...prev, end_date: e.target.value }))}
-                    min={dateRange.min_date}
-                    max={dateRange.max_date}
-                    required
-                  />
-                  <Button
-                    type="button"
-                    onClick={() => setConfig(prev => ({ ...prev, end_date: dateRange.max_date }))}
-                    variant="secondary"
-                    style={{ fontSize: '0.75rem', padding: '4px 8px' }}
-                  >
-                    Latest
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          </div>
+          <DateRangeSelector
+            startDate={config.start_date}
+            endDate={config.end_date}
+            onStartDateChange={(date) => setConfig(prev => ({ ...prev, start_date: date }))}
+            onEndDateChange={(date) => setConfig(prev => ({ ...prev, end_date: date }))}
+            title="Simulation Period"
+            variant="card"
+            symbol={config.symbols.length > 0 ? config.symbols[0] : undefined}
+            autoSetDatesOnSymbolChange={true}
+          />
 
           {/* Stock Selection */}
           <div style={{ marginBottom: '1.5rem' }}>
@@ -259,7 +211,6 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
                         onChange={(e) => {
                           const selectedValues = Array.from(e.target.selectedOptions, option => option.value);
                           setConfig(prev => ({ ...prev, symbols: selectedValues }));
-                          updateDateRangeForSelectedStocks(selectedValues);
                         }}
                         style={{
                           width: 'auto',
@@ -282,7 +233,6 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
                           type="button"
                           onClick={() => {
                             setConfig(prev => ({ ...prev, symbols: [...stocks] }));
-                            updateDateRangeForSelectedStocks([...stocks]);
                           }}
                           style={{
                             padding: '4px 8px',
@@ -300,7 +250,6 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
                           type="button"
                           onClick={() => {
                             setConfig(prev => ({ ...prev, symbols: [] }));
-                            updateDateRangeForSelectedStocks([]);
                           }}
                           style={{
                             padding: '4px 8px',

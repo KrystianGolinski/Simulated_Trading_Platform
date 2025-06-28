@@ -20,6 +20,10 @@ set(CORE_SOURCES
     src/database_connection.cpp
     src/technical_indicators.cpp
     src/trading_strategy.cpp
+    src/argument_parser.cpp
+    src/command_dispatcher.cpp
+    src/data_conversion.cpp
+    src/json_helpers.cpp
 )
 
 set(CORE_HEADERS
@@ -31,6 +35,10 @@ set(CORE_HEADERS
     include/database_connection.h
     include/technical_indicators.h
     include/trading_strategy.h
+    include/argument_parser.h
+    include/command_dispatcher.h
+    include/data_conversion.h
+    include/json_helpers.h
 )
 
 # Main executable
