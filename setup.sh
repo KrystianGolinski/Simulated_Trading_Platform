@@ -419,7 +419,7 @@ run_confirmation() {
     echo ""
     print_status "Trading Platform Setup Complete!"
     print_status "Services Available:"
-    print_status "Frontend:    http://localhost:3000"
+    print_status "Frontend: http://localhost:3000"
 }
 
 # Main execution flow

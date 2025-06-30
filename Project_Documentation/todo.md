@@ -8,20 +8,10 @@
   - Security Testing - Input validation and authentication
   - Performance Testing - Load and scalability validation
 
-
-## Backend API Services
-
-### `Backend/api/services/performance_calculator.py`
-
-*   **TODO**: Several metrics in `calculate_performance_metrics` are set to `None` (`profit_factor`, `average_win`, `average_loss`, `annualized_return`, `volatility`). These could be implemented for more comprehensive performance analysis.
-
 ## C++ Engine Analysis
 
 ### C++ Engine Headers (`Backend/cpp-engine/include/`)
-
-*   **`argument_parser.h`**: The `SimulationConfig` struct has hardcoded members for different strategies (e.g., `short_ma`, `rsi_period`), which is not scalable. Consider using a `std::map<std::string, double>` for strategy parameters.
 *   **`database_service.h`**: This class appears to be a thin wrapper around `MarketData`. Evaluate if this abstraction is necessary.
-*   **`error_utils.h`**: The `fromException` and `fromExceptionVoid` functions contain duplicated code and could be refactored.
 *   **`technical_indicators.h`**: The `calculateBollingerBands` function returns a flat vector, which is not intuitive. It should return a struct or a vector of structs.
 *   **`trading_engine.h`**: The `BacktestConfig` and `SimulationConfig` structs are very similar and should be merged. The `runBacktestMultiSymbol` and `optimizeMemoryUsage` methods are incomplete.
 
@@ -38,8 +28,7 @@
 
 ### C++ Engine Root Files (`Backend/cpp-engine/`)
 
-*   **`CMakeLists.txt`**: The library linking logic for `nlohmann_json` and `libpq` is duplicated for every executable and could be simplified by using a function or macro.
-*   **`Dockerfile`**: Only the `test_basic` executable is run. It would be more robust to run all compiled tests to ensure the build is valid. The `HEALTHCHECK` command could be improved by executing a simple command like `--status` instead of just checking for the file's existence.
+*   **`Dockerfile`**: It would be more robust to run all compiled tests to ensure the build is valid. The `HEALTHCHECK` command could be improved by executing a simple command like `--status` instead of just checking for the file's existence.
 
 ### Docker (`Docker/`)
 
@@ -137,8 +126,6 @@
   - **Generic Error Handling**: The `fetchWithErrorHandling` method uses a custom error structure that includes `errorDetails` and `errors`. While this is flexible, the `Error` object's `message` property is often a generic "HTTP error!" or "Failed to fetch data".
   - **Recommendation**: Enhance the error handling to propagate more specific error messages from the backend API responses to improve debugging and user feedback.
 
-  - **Loose Pagination Type**: The `pagination` property returned by `getStocks` and `getStockData` is typed as `any`, which reduces type safety.
-  - **Recommendation**: Define a proper interface for the `pagination` object to improve type safety and clarity.
 
   - **Inconsistent `cancelSimulation` Parameter**: The `cancelSimulation` method in `api.ts` expects a `simulationId` parameter, but the `simulationService` (which calls this method) relies on an internally managed `currentSimulationId`. This is a valid design choice, but it creates a tight coupling between the service and the API layer.
   - **Recommendation**: Document this dependency clearly or consider if `cancelSimulation` in `api.ts` should be refactored to not require the `simulationId` if it's always managed internally by `simulationService`.

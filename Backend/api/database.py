@@ -1,6 +1,6 @@
 import os
 import asyncpg
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 import logging
 from datetime import datetime, date
 import json
@@ -89,14 +89,15 @@ class DatabaseManager:
             result = await conn.execute(query, *args)
             return result
 
-    async def get_available_stocks(self, page: int = 1, page_size: int = 100) -> Dict[str, Any]:
-        # Get list of available stock symbols with pagination and caching
+    async def get_available_stocks(self, page: int = 1, page_size: int = 100) -> Tuple[List[str], int]:
+        # Get list of available stock symbols with pagination and caching - returns (data, total_count)
         cache_key = f'available_stocks_{page}_{page_size}'
         
         # Check cache first
         if cache_key in self._stocks_list_cache:
             logger.debug(f"Cache hit for available stocks page {page}")
-            return self._stocks_list_cache[cache_key]
+            cached_result = self._stocks_list_cache[cache_key]
+            return cached_result['data'], cached_result['total_count']
         
         # Calculate offset
         offset = (page - 1) * page_size
@@ -116,27 +117,13 @@ class DatabaseManager:
         results = await self.execute_query(query, page_size, offset)
         stocks = [row['symbol'] for row in results]
         
-        # Calculate pagination metadata
-        total_pages = (total_count + page_size - 1) // page_size
-        has_next = page < total_pages
-        has_previous = page > 1
-        
-        result = {
-            'data': stocks,
-            'pagination': {
-                'page': page,
-                'page_size': page_size,
-                'total_count': total_count,
-                'total_pages': total_pages,
-                'has_next': has_next,
-                'has_previous': has_previous
-            }
-        }
-        
         # Cache the results
-        self._stocks_list_cache[cache_key] = result
+        cache_data = {'data': stocks, 'total_count': total_count}
+        self._stocks_list_cache[cache_key] = cache_data
+        total_pages = (total_count + page_size - 1) // page_size
         logger.debug(f"Fetched and cached {len(stocks)} available stocks (page {page}/{total_pages})")
-        return result
+        
+        return stocks, total_count
     
 
     async def get_stock_data_batch(self, symbols: List[str], start_date: date, end_date: date, timeframe: str = 'daily') -> Dict[str, List[Dict[str, Any]]]:
@@ -183,14 +170,15 @@ class DatabaseManager:
             return {symbol.upper(): [] for symbol in symbols}
 
     async def get_stock_data(self, symbol: str, start_date: date, end_date: date, timeframe: str = 'daily', 
-                           page: int = 1, page_size: int = 1000) -> Dict[str, Any]:
-        # Get historical stock data with pagination and manual caching
+                           page: int = 1, page_size: int = 1000) -> Tuple[List[Dict[str, Any]], int, Dict[str, str]]:
+        # Get historical stock data with pagination and caching - returns (data, total_count, date_range)
         cache_key = f"{symbol}_{start_date}_{end_date}_{timeframe}_{page}_{page_size}"
         
         # Check cache first
         if cache_key in self._stock_data_cache:
             logger.debug(f"Cache hit for stock data: {symbol} {start_date} to {end_date} page {page}")
-            return self._stock_data_cache[cache_key]
+            cached_result = self._stock_data_cache[cache_key]
+            return cached_result['data'], cached_result['total_count'], cached_result['date_range']
         
         if timeframe == 'daily':
             table = 'stock_prices_daily'
@@ -224,32 +212,22 @@ class DatabaseManager:
         
         data = await self.execute_query(query, symbol, start_date, end_date, page_size, offset)
         
-        # Calculate pagination metadata
-        total_pages = (total_count + page_size - 1) // page_size
-        has_next = page < total_pages
-        has_previous = page > 1
-        
-        result = {
-            'data': data,
-            'pagination': {
-                'page': page,
-                'page_size': page_size,
-                'total_count': total_count,
-                'total_pages': total_pages,
-                'has_next': has_next,
-                'has_previous': has_previous
-            },
-            'symbol': symbol,
-            'date_range': {
-                'start_date': start_date.isoformat(),
-                'end_date': end_date.isoformat()
-            }
+        date_range = {
+            'start_date': start_date.isoformat(),
+            'end_date': end_date.isoformat()
         }
         
         # Cache the results
-        self._stock_data_cache[cache_key] = result
+        cache_data = {
+            'data': data,
+            'total_count': total_count,
+            'date_range': date_range
+        }
+        self._stock_data_cache[cache_key] = cache_data
+        total_pages = (total_count + page_size - 1) // page_size
         logger.debug(f"Fetched and cached stock data: {symbol} {start_date} to {end_date} page {page}/{total_pages} ({len(data)} records)")
-        return result
+        
+        return data, total_count, date_range
     
 
     async def create_trading_session(self, user_id: str, strategy_name: str,

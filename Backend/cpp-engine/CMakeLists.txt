@@ -52,22 +52,21 @@ if(NOT nlohmann_json_FOUND)
     pkg_check_modules(NLOHMANN_JSON REQUIRED nlohmann_json)
 endif()
 
-# Link libraries to main executable
-if(nlohmann_json_FOUND)
-    target_link_libraries(trading_engine ${LIBPQ_LIBRARIES} nlohmann_json::nlohmann_json)
-else()
-    target_link_libraries(trading_engine ${LIBPQ_LIBRARIES})
-    target_include_directories(trading_engine PRIVATE ${NLOHMANN_JSON_INCLUDE_DIRS})
-endif()
-target_include_directories(trading_engine PRIVATE ${LIBPQ_INCLUDE_DIRS})
-target_compile_options(trading_engine PRIVATE ${LIBPQ_CFLAGS_OTHER})
+# Function to link common libraries to targets (eliminates duplication)
+function(link_common_libraries target_name)
+    # Link PostgreSQL libraries
+    target_link_libraries(${target_name} ${LIBPQ_LIBRARIES})
+    target_include_directories(${target_name} PRIVATE ${LIBPQ_INCLUDE_DIRS})
+    target_compile_options(${target_name} PRIVATE ${LIBPQ_CFLAGS_OTHER})
+    
+    # Link JSON library
+    if(nlohmann_json_FOUND)
+        target_link_libraries(${target_name} nlohmann_json::nlohmann_json)
+    else()
+        target_include_directories(${target_name} PRIVATE ${NLOHMANN_JSON_INCLUDE_DIRS})
+    endif()
+endfunction()
 
-# Link libraries to comprehensive test executable
-if(nlohmann_json_FOUND)
-    target_link_libraries(test_comprehensive ${LIBPQ_LIBRARIES} nlohmann_json::nlohmann_json)
-else()
-    target_link_libraries(test_comprehensive ${LIBPQ_LIBRARIES})
-    target_include_directories(test_comprehensive PRIVATE ${NLOHMANN_JSON_INCLUDE_DIRS})
-endif()
-target_include_directories(test_comprehensive PRIVATE ${LIBPQ_INCLUDE_DIRS})
-target_compile_options(test_comprehensive PRIVATE ${LIBPQ_CFLAGS_OTHER})
+# Link libraries to all executables
+link_common_libraries(trading_engine)
+link_common_libraries(test_comprehensive)

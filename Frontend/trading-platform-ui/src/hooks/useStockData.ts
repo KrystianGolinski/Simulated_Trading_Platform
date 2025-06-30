@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { apiService, StockData } from '../services/api';
+import { PaginationInfo } from '../types/pagination';
 
 export const useStockData = (
   symbol: string,
@@ -10,6 +11,7 @@ export const useStockData = (
   pageSize: number = 1000
 ) => {
   const [data, setData] = useState<StockData[]>([]);
+  const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,10 +28,10 @@ export const useStockData = (
           startDate, 
           endDate, 
           timeframe,
-          page,
-          pageSize
+          { page, page_size: pageSize }
         );
         setData(response.data);
+        setPagination(response.pagination);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch data');
       } finally {
@@ -40,20 +42,22 @@ export const useStockData = (
     fetchData();
   }, [symbol, startDate, endDate, timeframe, page, pageSize]);
 
-  return { data, loading, error };
+  return { data, pagination, loading, error };
 };
 
 // Hook for available stocks with pagination
 export const useStocks = (page: number = 1, pageSize: number = 1000) => {
   const [stocks, setStocks] = useState<string[]>([]);
+  const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchStocks = async () => {
       try {
-        const response = await apiService.getStocks(page, pageSize);
+        const response = await apiService.getStocks({ page, page_size: pageSize });
         setStocks(response.data);
+        setPagination(response.pagination);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch stocks');
       } finally {
@@ -64,5 +68,5 @@ export const useStocks = (page: number = 1, pageSize: number = 1000) => {
     fetchStocks();
   }, [page, pageSize]);
 
-  return { stocks, loading, error };
+  return { stocks, pagination, loading, error };
 };

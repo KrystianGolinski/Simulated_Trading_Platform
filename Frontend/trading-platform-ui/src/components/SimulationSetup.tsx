@@ -41,7 +41,7 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
   });
 
 
-  const { stocks, loading: stocksLoading } = useStocks();
+  const { stocks, loading: stocksLoading, error: stocksError } = useStocks();
 
 
   const validateConfiguration = async () => {
@@ -221,26 +221,37 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
                           fontSize: '13px'
                         }}
                       >
-                        {stocks.map(symbol => (
-                          <option key={symbol} value={symbol}>
-                            {symbol}
-                          </option>
-                        ))}
+                        {stocksLoading ? (
+                          <option value="">Loading stocks...</option>
+                        ) : stocksError ? (
+                          <option value="">Error loading stocks</option>
+                        ) : stocks && stocks.length > 0 ? (
+                          stocks.map(symbol => (
+                            <option key={symbol} value={symbol}>
+                              {symbol}
+                            </option>
+                          ))
+                        ) : (
+                          <option value="">No stocks available</option>
+                        )}
                       </select>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <button
                           type="button"
+                          disabled={stocksLoading || !stocks || stocks.length === 0}
                           onClick={() => {
-                            setConfig(prev => ({ ...prev, symbols: [...stocks] }));
+                            if (stocks && stocks.length > 0) {
+                              setConfig(prev => ({ ...prev, symbols: [...stocks] }));
+                            }
                           }}
                           style={{
                             padding: '4px 8px',
                             fontSize: '12px',
-                            backgroundColor: '#3b82f6',
+                            backgroundColor: stocksLoading || !stocks || stocks.length === 0 ? '#6b7280' : '#3b82f6',
                             color: 'white',
                             border: 'none',
                             borderRadius: '4px',
-                            cursor: 'pointer'
+                            cursor: stocksLoading || !stocks || stocks.length === 0 ? 'not-allowed' : 'pointer'
                           }}
                         >
                           Add all
@@ -291,7 +302,7 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
                       strategy: newStrategy,
                       strategy_parameters: newStrategy === 'ma_crossover' 
                         ? { short_ma: 20, long_ma: 50 }
-                        : { rsi_period: 14, rsi_oversold: 30, rsi_overbought: 70 }
+                        : { rsi_period: 14, rsi_oversold: 30.0, rsi_overbought: 70.0 }
                     }));
                   }}
                   style={{
@@ -367,10 +378,11 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
                       type="number"
                       min="10"
                       max="40"
+                      step="0.1"
                       value={config.strategy_parameters.rsi_oversold || 30}
                       onChange={(e) => setConfig(prev => ({ 
                         ...prev, 
-                        strategy_parameters: { ...prev.strategy_parameters, rsi_oversold: Number(e.target.value) }
+                        strategy_parameters: { ...prev.strategy_parameters, rsi_oversold: parseFloat(e.target.value) || 0.0 }
                       }))}
                       required
                     />
@@ -379,10 +391,11 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
                       type="number"
                       min="60"
                       max="90"
+                      step="0.1"
                       value={config.strategy_parameters.rsi_overbought || 70}
                       onChange={(e) => setConfig(prev => ({ 
                         ...prev, 
-                        strategy_parameters: { ...prev.strategy_parameters, rsi_overbought: Number(e.target.value) }
+                        strategy_parameters: { ...prev.strategy_parameters, rsi_overbought: parseFloat(e.target.value) || 0.0 }
                       }))}
                       required
                     />

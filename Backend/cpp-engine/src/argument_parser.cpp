@@ -58,24 +58,24 @@ void ArgumentParser::parseKeyValueFormat(const std::string& arg, SimulationConfi
     } else if (arg.find("--capital=") == 0) {
         config.capital = std::stod(arg.substr(10));
         Logger::debug("Set capital = ", config.capital);
-    } else if (arg.find("--short-ma=") == 0) {
-        config.short_ma = std::stoi(arg.substr(11));
-        Logger::debug("Set short_ma = ", config.short_ma);
-    } else if (arg.find("--long-ma=") == 0) {
-        config.long_ma = std::stoi(arg.substr(10));
-        Logger::debug("Set long_ma = ", config.long_ma);
     } else if (arg.find("--strategy=") == 0) {
         config.strategy = arg.substr(11);
         Logger::debug("Set strategy = '", config.strategy, "'");
+    } else if (arg.find("--short-ma=") == 0) {
+        config.setParameter("short_ma", std::stod(arg.substr(11)));
+        Logger::debug("Set short_ma = ", config.getDoubleParameter("short_ma"));
+    } else if (arg.find("--long-ma=") == 0) {
+        config.setParameter("long_ma", std::stod(arg.substr(10)));
+        Logger::debug("Set long_ma = ", config.getDoubleParameter("long_ma"));
     } else if (arg.find("--rsi-period=") == 0) {
-        config.rsi_period = std::stoi(arg.substr(13));
-        Logger::debug("Set rsi_period = ", config.rsi_period);
+        config.setParameter("rsi_period", std::stod(arg.substr(13)));
+        Logger::debug("Set rsi_period = ", config.getDoubleParameter("rsi_period"));
     } else if (arg.find("--rsi-oversold=") == 0) {
-        config.rsi_oversold = std::stod(arg.substr(15));
-        Logger::debug("Set rsi_oversold = ", config.rsi_oversold);
+        config.setParameter("rsi_oversold", std::stod(arg.substr(15)));
+        Logger::debug("Set rsi_oversold = ", config.getDoubleParameter("rsi_oversold"));
     } else if (arg.find("--rsi-overbought=") == 0) {
-        config.rsi_overbought = std::stod(arg.substr(17));
-        Logger::debug("Set rsi_overbought = ", config.rsi_overbought);
+        config.setParameter("rsi_overbought", std::stod(arg.substr(17)));
+        Logger::debug("Set rsi_overbought = ", config.getDoubleParameter("rsi_overbought"));
     }
 }
 
@@ -92,24 +92,24 @@ void ArgumentParser::parseKeyValuePairFormat(const std::string& key, const std::
     } else if (key == "--capital") {
         config.capital = std::stod(value);
         Logger::debug("Set capital = ", config.capital);
-    } else if (key == "--short-ma") {
-        config.short_ma = std::stoi(value);
-        Logger::debug("Set short_ma = ", config.short_ma);
-    } else if (key == "--long-ma") {
-        config.long_ma = std::stoi(value);
-        Logger::debug("Set long_ma = ", config.long_ma);
     } else if (key == "--strategy") {
         config.strategy = value;
         Logger::debug("Set strategy = '", config.strategy, "'");
+    } else if (key == "--short-ma") {
+        config.setParameter("short_ma", std::stod(value));
+        Logger::debug("Set short_ma = ", config.getDoubleParameter("short_ma"));
+    } else if (key == "--long-ma") {
+        config.setParameter("long_ma", std::stod(value));
+        Logger::debug("Set long_ma = ", config.getDoubleParameter("long_ma"));
     } else if (key == "--rsi-period") {
-        config.rsi_period = std::stoi(value);
-        Logger::debug("Set rsi_period = ", config.rsi_period);
+        config.setParameter("rsi_period", std::stod(value));
+        Logger::debug("Set rsi_period = ", config.getDoubleParameter("rsi_period"));
     } else if (key == "--rsi-oversold") {
-        config.rsi_oversold = std::stod(value);
-        Logger::debug("Set rsi_oversold = ", config.rsi_oversold);
+        config.setParameter("rsi_oversold", std::stod(value));
+        Logger::debug("Set rsi_oversold = ", config.getDoubleParameter("rsi_oversold"));
     } else if (key == "--rsi-overbought") {
-        config.rsi_overbought = std::stod(value);
-        Logger::debug("Set rsi_overbought = ", config.rsi_overbought);
+        config.setParameter("rsi_overbought", std::stod(value));
+        Logger::debug("Set rsi_overbought = ", config.getDoubleParameter("rsi_overbought"));
     }
 }
 
@@ -140,12 +140,14 @@ void ArgumentParser::debugPrintConfig(const SimulationConfig& config) {
     Logger::debug("  start_date = '", config.start_date, "'");
     Logger::debug("  end_date = '", config.end_date, "'");
     Logger::debug("  capital = ", config.capital);
-    Logger::debug("  short_ma = ", config.short_ma);
-    Logger::debug("  long_ma = ", config.long_ma);
     Logger::debug("  strategy = '", config.strategy, "'");
-    Logger::debug("  rsi_period = ", config.rsi_period);
-    Logger::debug("  rsi_oversold = ", config.rsi_oversold);
-    Logger::debug("  rsi_overbought = ", config.rsi_overbought);
+    
+    // Print all strategy parameters dynamically
+    Logger::debug("  strategy_parameters = {");
+    for (const auto& param : config.strategy_parameters) {
+        Logger::debug("    ", param.first, " = ", param.second);
+    }
+    Logger::debug("  }");
 }
 
 std::string ArgumentParser::trimWhitespace(const std::string& str) {

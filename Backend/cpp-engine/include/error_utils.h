@@ -9,61 +9,43 @@
 // Namespace for error handling utilities
 namespace ErrorUtils {
 
-    // Convert exception to Result<T>
-    template<typename T>
-    Result<T> fromException(const std::exception& e) {
+    // Helper function to convert exception to ErrorInfo
+    inline ErrorInfo exceptionToErrorInfo(const std::exception& e) {
         // Try to cast to TradingException first for structured error info
         if (const auto* trading_ex = dynamic_cast<const TradingException*>(&e)) {
-            return Result<T>(trading_ex->toErrorInfo());
+            return trading_ex->toErrorInfo();
         }
         
         // Handle standard exceptions
         if (const auto* invalid_arg = dynamic_cast<const std::invalid_argument*>(&e)) {
-            return Result<T>(ErrorCode::VALIDATION_INVALID_INPUT, invalid_arg->what());
+            return ErrorInfo(ErrorCode::VALIDATION_INVALID_INPUT, invalid_arg->what());
         }
         
         if (const auto* out_of_range = dynamic_cast<const std::out_of_range*>(&e)) {
-            return Result<T>(ErrorCode::VALIDATION_OUT_OF_RANGE, out_of_range->what());
+            return ErrorInfo(ErrorCode::VALIDATION_OUT_OF_RANGE, out_of_range->what());
         }
         
         if (const auto* runtime_error = dynamic_cast<const std::runtime_error*>(&e)) {
-            return Result<T>(ErrorCode::SYSTEM_UNEXPECTED_ERROR, runtime_error->what());
+            return ErrorInfo(ErrorCode::SYSTEM_UNEXPECTED_ERROR, runtime_error->what());
         }
         
         if (const auto* bad_alloc = dynamic_cast<const std::bad_alloc*>(&e)) {
-            return Result<T>(ErrorCode::SYSTEM_MEMORY_ALLOCATION_FAILED, "Memory allocation failed");
+            return ErrorInfo(ErrorCode::SYSTEM_MEMORY_ALLOCATION_FAILED, "Memory allocation failed");
         }
         
         // Generic exception fallback
-        return Result<T>(ErrorCode::SYSTEM_UNEXPECTED_ERROR, e.what());
+        return ErrorInfo(ErrorCode::SYSTEM_UNEXPECTED_ERROR, e.what());
+    }
+
+    // Convert exception to Result<T>
+    template<typename T>
+    Result<T> fromException(const std::exception& e) {
+        return Result<T>(exceptionToErrorInfo(e));
     }
     
     // Convert exception to Result<void>
     inline Result<void> fromExceptionVoid(const std::exception& e) {
-        // Try to cast to TradingException first for structured error info
-        if (const auto* trading_ex = dynamic_cast<const TradingException*>(&e)) {
-            return Result<void>(trading_ex->toErrorInfo());
-        }
-        
-        // Handle standard exceptions
-        if (const auto* invalid_arg = dynamic_cast<const std::invalid_argument*>(&e)) {
-            return Result<void>(ErrorCode::VALIDATION_INVALID_INPUT, invalid_arg->what());
-        }
-        
-        if (const auto* out_of_range = dynamic_cast<const std::out_of_range*>(&e)) {
-            return Result<void>(ErrorCode::VALIDATION_OUT_OF_RANGE, out_of_range->what());
-        }
-        
-        if (const auto* runtime_error = dynamic_cast<const std::runtime_error*>(&e)) {
-            return Result<void>(ErrorCode::SYSTEM_UNEXPECTED_ERROR, runtime_error->what());
-        }
-        
-        if (const auto* bad_alloc = dynamic_cast<const std::bad_alloc*>(&e)) {
-            return Result<void>(ErrorCode::SYSTEM_MEMORY_ALLOCATION_FAILED, "Memory allocation failed");
-        }
-        
-        // Generic exception fallback
-        return Result<void>(ErrorCode::SYSTEM_UNEXPECTED_ERROR, e.what());
+        return Result<void>(exceptionToErrorInfo(e));
     }
     
     // Execute function and convert any exceptions to Result<T>

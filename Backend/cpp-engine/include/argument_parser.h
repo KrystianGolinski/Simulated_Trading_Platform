@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 
 struct SimulationConfig {
     std::vector<std::string> symbols;
@@ -9,15 +10,32 @@ struct SimulationConfig {
     std::string end_date;
     double capital;
     std::string strategy;
-    int short_ma;
-    int long_ma;
-    int rsi_period; 
-    double rsi_oversold;
-    double rsi_overbought;
+    std::map<std::string, double> strategy_parameters;
     
-    SimulationConfig() 
-        : capital(10000.0), strategy("ma_crossover"), short_ma(20), long_ma(50),
-          rsi_period(14), rsi_oversold(30.0), rsi_overbought(70.0) {}
+    SimulationConfig() : capital(10000.0), strategy("ma_crossover") {
+        // Set default parameters for ma_crossover strategy
+        strategy_parameters["short_ma"] = 20.0;
+        strategy_parameters["long_ma"] = 50.0;
+        // Set default parameters for rsi strategy
+        strategy_parameters["rsi_period"] = 14.0;
+        strategy_parameters["rsi_oversold"] = 30.0;
+        strategy_parameters["rsi_overbought"] = 70.0;
+    }
+    
+    // Helper methods to retrieve strategy parameters with type safety
+    int getIntParameter(const std::string& key, int default_value = 0) const {
+        auto it = strategy_parameters.find(key);
+        return (it != strategy_parameters.end()) ? static_cast<int>(it->second) : default_value;
+    }
+    
+    double getDoubleParameter(const std::string& key, double default_value = 0.0) const {
+        auto it = strategy_parameters.find(key);
+        return (it != strategy_parameters.end()) ? it->second : default_value;
+    }
+    
+    void setParameter(const std::string& key, double value) {
+        strategy_parameters[key] = value;
+    }
 };
 
 class ArgumentParser {

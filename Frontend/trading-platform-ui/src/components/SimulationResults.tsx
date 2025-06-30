@@ -228,6 +228,66 @@ export const SimulationResults: React.FC<SimulationResultsProps> = ({
                   <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Win Rate:</span>
                   <span style={{ fontWeight: '600' }}>{winRate}%</span>
                 </div>
+                {performanceMetrics?.profit_factor && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Profit Factor:</span>
+                    <span style={{ fontWeight: '600', color: performanceMetrics.profit_factor >= 1 ? '#059669' : '#dc2626' }}>
+                      {performanceMetrics.profit_factor.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                {performanceMetrics?.average_win && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Average Win:</span>
+                    <span style={{ fontWeight: '600', color: '#059669' }}>
+                      ${performanceMetrics.average_win.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                {performanceMetrics?.average_loss && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Average Loss:</span>
+                    <span style={{ fontWeight: '600', color: '#dc2626' }}>
+                      ${performanceMetrics.average_loss.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                {performanceMetrics?.annualized_return && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Annualised Return:</span>
+                    <span style={{ 
+                      fontWeight: '600', 
+                      color: performanceMetrics.annualized_return >= 0 ? '#059669' : '#dc2626' 
+                    }}>
+                      {performanceMetrics.annualized_return >= 0 ? '+' : ''}{performanceMetrics.annualized_return.toFixed(2)}%
+                    </span>
+                  </div>
+                )}
+                {performanceMetrics?.volatility && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Volatility:</span>
+                    <span style={{ fontWeight: '600' }}>{performanceMetrics.volatility.toFixed(2)}%</span>
+                  </div>
+                )}
+                {performanceMetrics?.sharpe_ratio && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Sharpe Ratio:</span>
+                    <span style={{ 
+                      fontWeight: '600',
+                      color: performanceMetrics.sharpe_ratio >= 1 ? '#059669' : performanceMetrics.sharpe_ratio >= 0 ? '#d97706' : '#dc2626'
+                    }}>
+                      {performanceMetrics.sharpe_ratio.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                {performanceMetrics?.max_drawdown_pct && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Max Drawdown:</span>
+                    <span style={{ fontWeight: '600', color: '#dc2626' }}>
+                      {performanceMetrics.max_drawdown_pct.toFixed(2)}%
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

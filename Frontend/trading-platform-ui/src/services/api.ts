@@ -1,4 +1,6 @@
 // API configuration and service layer
+import { PaginatedResponse, PaginationRequest, PaginationUtils } from '../types/pagination';
+
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 export interface StockData {
@@ -60,6 +62,15 @@ export interface PerformanceMetrics {
   total_trades: number;
   winning_trades: number;
   losing_trades: number;
+  final_balance?: number;
+  starting_capital?: number;
+  max_drawdown?: number;
+  profit_factor?: number;
+  average_win?: number;
+  average_loss?: number;
+  annualized_return?: number;
+  volatility?: number;
+  signals_generated?: number;
 }
 
 export interface ValidationError {
@@ -125,9 +136,9 @@ class ApiService {
         throw error;
       }
       
-      // For success responses, extract the data field
+      // Return the full response structure for the new infrastructure
       if (responseData.status === 'success' || responseData.status === 'warning') {
-        return responseData.data as T;
+        return responseData as unknown as T;
       }
       
       // Fallback for any non-standard responses
@@ -140,24 +151,29 @@ class ApiService {
 
   // Get system health and database statistics
   async getHealth(): Promise<HealthData> {
-    const response = await this.fetchWithErrorHandling<any>('/health');
+    const response = await this.fetchWithErrorHandling<StandardResponse<any>>('/health');
     // Transform the standardized health response to the expected format
+    const data = response.data;
     return {
-      status: response.service ? 'healthy' : 'unhealthy',
-      database_connected: response.database?.status === 'healthy',
-      stocks_count: response.stocks_count || 0,
-      daily_records_count: response.daily_records_count || 0,
-      minute_records_count: response.minute_records_count || 0
+      status: data.service ? 'healthy' : 'unhealthy',
+      database_connected: data.database?.status === 'healthy',
+      stocks_count: data.stocks_count || 0,
+      daily_records_count: data.daily_records_count || 0,
+      minute_records_count: data.minute_records_count || 0
     };
   }
 
   // Get list of available stock symbols with pagination
-  async getStocks(page: number = 1, pageSize: number = 100): Promise<{ data: string[], pagination: any }> {
+  async getStocks(paginationRequest: PaginationRequest = {}): Promise<PaginatedResponse<string>> {
+    const validation = PaginationUtils.validatePaginationRequest(paginationRequest);
+    const { page, page_size } = validation.sanitized;
+    
     const params = new URLSearchParams({
       page: page.toString(),
-      page_size: pageSize.toString()
+      page_size: page_size.toString()
     });
-    return this.fetchWithErrorHandling<{ data: string[], pagination: any }>(`/stocks?${params}`);
+    
+    return this.fetchWithErrorHandling<PaginatedResponse<string>>(`/stocks?${params}`);
   }
 
   // Get historical stock data with pagination
@@ -166,15 +182,17 @@ class ApiService {
     startDate: string,
     endDate: string,
     timeframe: 'daily' = 'daily',
-    page: number = 1,
-    pageSize: number = 1000
-  ): Promise<{ data: StockData[], pagination: any, symbol: string, date_range: any }> {
+    paginationRequest: PaginationRequest = {}
+  ): Promise<PaginatedResponse<StockData> & { symbol: string; date_range: any }> {
+    const validation = PaginationUtils.validatePaginationRequest(paginationRequest);
+    const { page, page_size } = validation.sanitized;
+    
     const params = new URLSearchParams({
       start_date: startDate,
       end_date: endDate,
       timeframe: timeframe,
       page: page.toString(),
-      page_size: pageSize.toString()
+      page_size: page_size.toString()
     });
     
     const response = await this.fetchWithErrorHandling<{
@@ -197,64 +215,73 @@ class ApiService {
     }));
 
     return {
-      ...response,
-      data: processedData
+      data: processedData,
+      pagination: response.pagination,
+      symbol: response.symbol,
+      date_range: response.date_range
     };
   }
 
   // Validate simulation configuration
   async validateSimulation(config: SimulationConfig): Promise<ValidationResult> {
-    return this.fetchWithErrorHandling<ValidationResult>('/simulation/validate', {
+    const response = await this.fetchWithErrorHandling<StandardResponse<ValidationResult>>('/simulation/validate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(config),
     });
+    return response.data!;
   }
 
   // Start a new simulation
   async startSimulation(config: SimulationConfig): Promise<SimulationResponse> {
-    return this.fetchWithErrorHandling<SimulationResponse>('/simulation/start', {
+    const response = await this.fetchWithErrorHandling<StandardResponse<SimulationResponse>>('/simulation/start', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(config),
     });
+    return response.data!;
   }
 
   // Get simulation status and progress
   async getSimulationStatus(simulationId: string): Promise<SimulationStatusResponse> {
-    return this.fetchWithErrorHandling<SimulationStatusResponse>(
+    const response = await this.fetchWithErrorHandling<StandardResponse<SimulationStatusResponse>>(
       `/simulation/${simulationId}/status`
     );
+    return response.data!;
   }
 
   // Get simulation results
   async getSimulationResults(simulationId: string): Promise<SimulationResults> {
-    return this.fetchWithErrorHandling<SimulationResults>(
+    const response = await this.fetchWithErrorHandling<StandardResponse<SimulationResults>>(
       `/simulation/${simulationId}/results`
     );
+    return response.data!;
   }
 
   // Cancel a running simulation
   async cancelSimulation(simulationId: string): Promise<{ message: string }> {
-    return this.fetchWithErrorHandling<{ message: string }>(
+    const response = await this.fetchWithErrorHandling<StandardResponse<{ message: string }>>(
       `/simulation/${simulationId}/cancel`
     );
+    return response.data!;
   }
 
   // List all simulations
   async listSimulations(): Promise<Record<string, SimulationResults>> {
-    return this.fetchWithErrorHandling<Record<string, SimulationResults>>('/simulations');
+    const response = await this.fetchWithErrorHandling<StandardResponse<Record<string, SimulationResults>>>('/simulations');
+    return response.data!;
   }
 
   // Get date range for a specific stock
   async getStockDateRange(symbol: string): Promise<{ min_date: string; max_date: string }> {
-    return this.fetchWithErrorHandling<{ min_date: string; max_date: string }>(
+    const response = await this.fetchWithErrorHandling<StandardResponse<{ min_date: string; max_date: string }>>(
       `/stocks/${symbol}/date-range`
     );
+    return response.data!;
   }
 }
 

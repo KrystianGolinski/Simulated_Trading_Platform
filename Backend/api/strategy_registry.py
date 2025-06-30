@@ -151,7 +151,11 @@ class StrategyRegistry:
                 value = parameters[param.name]
                 
                 # Type validation
-                if not isinstance(value, param.param_type):
+                if param.param_type is float:
+                    if not isinstance(value, (int, float)):
+                        errors.append(f"Parameter {param.name} must be a number (float or integer)")
+                        continue
+                elif not isinstance(value, param.param_type):
                     errors.append(f"Parameter {param.name} must be of type {param.param_type.__name__}")
                     continue
                 

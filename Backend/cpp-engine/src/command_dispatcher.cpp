@@ -70,20 +70,31 @@ int CommandDispatcher::executeSimulation(const SimulationConfig& config) {
     std::cerr << "[DEBUG]   capital = " << config.capital << std::endl;
     std::cerr << "[DEBUG]   strategy = '" << config.strategy << "'" << std::endl;
     
+    // Print all strategy parameters dynamically
+    std::cerr << "[DEBUG]   strategy_parameters = {" << std::endl;
+    for (const auto& param : config.strategy_parameters) {
+        std::cerr << "[DEBUG]     " << param.first << " = " << param.second << std::endl;
+    }
+    std::cerr << "[DEBUG]   }" << std::endl;
+    
     TradingEngine engine(config.capital);
     
     if (config.strategy == "ma_crossover") {
-        std::cerr << "[DEBUG]   short_ma = " << config.short_ma << std::endl;
-        std::cerr << "[DEBUG]   long_ma = " << config.long_ma << std::endl;
-        engine.setMovingAverageStrategy(config.short_ma, config.long_ma);
+        int short_ma = config.getIntParameter("short_ma", 20);
+        int long_ma = config.getIntParameter("long_ma", 50);
+        std::cerr << "[DEBUG]   Using MA crossover: short=" << short_ma << ", long=" << long_ma << std::endl;
+        engine.setMovingAverageStrategy(short_ma, long_ma);
     } else if (config.strategy == "rsi") {
-        std::cerr << "[DEBUG]   rsi_period = " << config.rsi_period << std::endl;
-        std::cerr << "[DEBUG]   rsi_oversold = " << config.rsi_oversold << std::endl;
-        std::cerr << "[DEBUG]   rsi_overbought = " << config.rsi_overbought << std::endl;
-        engine.setRSIStrategy(config.rsi_period, config.rsi_oversold, config.rsi_overbought);
+        int rsi_period = config.getIntParameter("rsi_period", 14);
+        double rsi_oversold = config.getDoubleParameter("rsi_oversold", 30.0);
+        double rsi_overbought = config.getDoubleParameter("rsi_overbought", 70.0);
+        std::cerr << "[DEBUG]   Using RSI: period=" << rsi_period << ", oversold=" << rsi_oversold << ", overbought=" << rsi_overbought << std::endl;
+        engine.setRSIStrategy(rsi_period, rsi_oversold, rsi_overbought);
     } else {
         std::cerr << "[DEBUG] Unknown strategy '" << config.strategy << "', defaulting to MA crossover" << std::endl;
-        engine.setMovingAverageStrategy(config.short_ma, config.long_ma);
+        int short_ma = config.getIntParameter("short_ma", 20);
+        int long_ma = config.getIntParameter("long_ma", 50);
+        engine.setMovingAverageStrategy(short_ma, long_ma);
     }
     
     try {
@@ -247,14 +258,21 @@ int CommandDispatcher::runBacktest(const SimulationConfig& config) {
         TradingEngine engine(config.capital);
         
         if (config.strategy == "ma_crossover") {
-            std::cout << "MA Crossover Parameters: Short=" << config.short_ma << ", Long=" << config.long_ma << std::endl;
-            engine.setMovingAverageStrategy(config.short_ma, config.long_ma);
+            int short_ma = config.getIntParameter("short_ma", 20);
+            int long_ma = config.getIntParameter("long_ma", 50);
+            std::cout << "MA Crossover Parameters: Short=" << short_ma << ", Long=" << long_ma << std::endl;
+            engine.setMovingAverageStrategy(short_ma, long_ma);
         } else if (config.strategy == "rsi") {
-            std::cout << "RSI Parameters: Period=" << config.rsi_period << ", Oversold=" << config.rsi_oversold << ", Overbought=" << config.rsi_overbought << std::endl;
-            engine.setRSIStrategy(config.rsi_period, config.rsi_oversold, config.rsi_overbought);
+            int rsi_period = config.getIntParameter("rsi_period", 14);
+            double rsi_oversold = config.getDoubleParameter("rsi_oversold", 30.0);
+            double rsi_overbought = config.getDoubleParameter("rsi_overbought", 70.0);
+            std::cout << "RSI Parameters: Period=" << rsi_period << ", Oversold=" << rsi_oversold << ", Overbought=" << rsi_overbought << std::endl;
+            engine.setRSIStrategy(rsi_period, rsi_oversold, rsi_overbought);
         } else {
             std::cout << "Unknown strategy, defaulting to MA Crossover" << std::endl;
-            engine.setMovingAverageStrategy(config.short_ma, config.long_ma);
+            int short_ma = config.getIntParameter("short_ma", 20);
+            int long_ma = config.getIntParameter("long_ma", 50);
+            engine.setMovingAverageStrategy(short_ma, long_ma);
         }
         
         BacktestResult result;
@@ -267,12 +285,12 @@ int CommandDispatcher::runBacktest(const SimulationConfig& config) {
             backtest_config.strategy_name = config.strategy;
             
             if (config.strategy == "ma_crossover") {
-                backtest_config.strategy_config.setParameter("short_period", config.short_ma);
-                backtest_config.strategy_config.setParameter("long_period", config.long_ma);
+                backtest_config.strategy_config.setParameter("short_period", config.getDoubleParameter("short_ma", 20.0));
+                backtest_config.strategy_config.setParameter("long_period", config.getDoubleParameter("long_ma", 50.0));
             } else if (config.strategy == "rsi") {
-                backtest_config.strategy_config.setParameter("rsi_period", config.rsi_period);
-                backtest_config.strategy_config.setParameter("oversold_threshold", config.rsi_oversold);
-                backtest_config.strategy_config.setParameter("overbought_threshold", config.rsi_overbought);
+                backtest_config.strategy_config.setParameter("rsi_period", config.getDoubleParameter("rsi_period", 14.0));
+                backtest_config.strategy_config.setParameter("oversold_threshold", config.getDoubleParameter("rsi_oversold", 30.0));
+                backtest_config.strategy_config.setParameter("overbought_threshold", config.getDoubleParameter("rsi_overbought", 70.0));
             }
             backtest_config.strategy_config.max_position_size = 0.1;
             backtest_config.strategy_config.enable_risk_management = true;
@@ -280,14 +298,14 @@ int CommandDispatcher::runBacktest(const SimulationConfig& config) {
             auto backtest_result = engine.runBacktest(backtest_config);
             if (backtest_result.isError()) {
                 std::cout << "[ERROR] Backtest failed: " << backtest_result.getErrorMessage() << std::endl;
-                return;
+                return 1;
             }
             result = backtest_result.getValue();
         } else {
             auto multi_backtest_result = engine.runBacktestMultiSymbol(config.symbols, config.start_date, config.end_date, config.capital);
             if (multi_backtest_result.isError()) {
                 std::cout << "[ERROR] Multi-symbol backtest failed: " << multi_backtest_result.getErrorMessage() << std::endl;
-                return;
+                return 1;
             }
             result = multi_backtest_result.getValue();
         }
@@ -295,7 +313,7 @@ int CommandDispatcher::runBacktest(const SimulationConfig& config) {
         auto json_result = engine.getBacktestResultsAsJson(result);
         if (json_result.isError()) {
             std::cout << "[ERROR] Failed to generate backtest results: " << json_result.getErrorMessage() << std::endl;
-            return;
+            return 1;
         }
         std::cout << json_result.getValue().dump(2) << std::endl;
         
