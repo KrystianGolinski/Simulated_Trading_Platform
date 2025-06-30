@@ -1,5 +1,4 @@
-import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Dashboard } from '../Dashboard';
 
@@ -46,11 +45,14 @@ describe('Dashboard Component', () => {
     // Reset mocks before each test
     mockUseStocks.mockReturnValue({
       stocks: ['AAPL', 'GOOGL', 'MSFT'],
-      loading: false
+      pagination: null,
+      loading: false,
+      error: null
     });
 
     mockUseStockData.mockReturnValue({
       data: mockStockData,
+      pagination: null,
       loading: false,
       error: null
     });
@@ -151,6 +153,7 @@ describe('Dashboard Component', () => {
   it('handles loading state from useStockData', () => {
     mockUseStockData.mockReturnValue({
       data: [],
+      pagination: null,
       loading: true,
       error: null
     });
@@ -165,6 +168,7 @@ describe('Dashboard Component', () => {
     const errorMessage = 'Failed to fetch stock data';
     mockUseStockData.mockReturnValue({
       data: [],
+      pagination: null,
       loading: false,
       error: errorMessage
     });

@@ -59,7 +59,7 @@ class SimulationEngine:
             
             # Execute simulation using execution service
             execution_result = await self.execution_service.execute_simulation(
-                simulation_id, config, optimization_info
+                simulation_id, config
             )
             
             # Process results based on execution outcome

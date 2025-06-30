@@ -1,5 +1,4 @@
-#ifndef PORTFOLIO_H
-#define PORTFOLIO_H
+#pragma once
 
 #include "position.h"
 #include <map>
@@ -31,7 +30,6 @@ public:
     
     // Cash management
     double getCashBalance() const;
-    double getCash() const { return getCashBalance(); }
     double getInitialCapital() const;
     void addCash(double amount);
     bool canAfford(double cost) const;
@@ -59,5 +57,3 @@ public:
     std::string toString() const;
     std::string toDetailedString(const std::map<std::string, double>& current_prices) const;
 };
-
-#endif // PORTFOLIO_H

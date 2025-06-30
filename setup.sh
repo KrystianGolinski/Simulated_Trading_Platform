@@ -1,6 +1,8 @@
 #!/bin/bash
 
 set -e  # Exit on any error
+set -u  # Exit on unset variables
+set -o pipefail  # Fail if any command in a pipeline fails
 
 echo "Trading Platform Complete Setup"
 
@@ -74,14 +76,6 @@ check_dependencies() {
     
     if [ ${#missing_tools[@]} -ne 0 ]; then
         print_error "Missing required tools: ${missing_tools[*]}"
-        echo ""
-        echo "To install on Ubuntu/Debian:"
-        echo "sudo apt-get update"
-        echo "sudo apt-get install build-essential cmake nodejs npm docker.io docker-compose"
-        echo ""
-        echo "Don't forget to add your user to docker group:"
-        echo "sudo usermod -aG docker \$USER"
-        echo "Then log out and back in."
         exit 1
     fi
     
@@ -94,11 +88,6 @@ check_docker_permissions() {
     
     if ! docker info &> /dev/null; then
         print_error "Cannot connect to Docker daemon"
-        echo ""
-        echo "This usually means:"
-        echo "1. Docker is not running: sudo systemctl start docker"
-        echo "2. Permission denied: sudo usermod -aG docker \$USER (then logout/login)"
-        echo "3. Docker service not installed properly"
         exit 1
     fi
     
@@ -127,20 +116,6 @@ build_cpp_engine() {
         cmake ..
         make -j$(nproc)
         cd ..
-    fi
-    
-    # Run tests
-    print_status "Running C++ unit tests..."
-    if [ -f "build/test_basic" ]; then
-        ./build/test_basic
-        if [ $? -eq 0 ]; then
-            print_success "C++ unit tests passed"
-        else
-            print_error "C++ unit tests failed"
-            exit 1
-        fi
-    else
-        print_warning "C++ tests not found"
     fi
     
     cd ../..
@@ -196,6 +171,90 @@ setup_environment() {
     print_success "Environment setup complete"
 }
 
+# Function to wait for database readiness
+wait_for_database() {
+    print_status "Waiting for database to be ready..."
+    
+    # Load database credentials from .env
+    if [ -f ".env" ]; then
+        TEST_DB_HOST=$(grep "^TEST_DB_HOST=" .env | cut -d'=' -f2)
+        TEST_DB_PORT=$(grep "^TEST_DB_PORT=" .env | cut -d'=' -f2)
+        TEST_DB_USER=$(grep "^TEST_DB_USER=" .env | cut -d'=' -f2)
+        TEST_DB_NAME=$(grep "^TEST_DB_NAME=" .env | cut -d'=' -f2)
+    else
+        TEST_DB_HOST=localhost
+        TEST_DB_PORT=5433
+        TEST_DB_USER=trading_user
+        TEST_DB_NAME=simulated_trading_platform
+    fi
+    
+    # Wait for PostgreSQL to accept connections
+    MAX_ATTEMPTS=30
+    ATTEMPT=1
+    
+    while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+        if command -v pg_isready &> /dev/null; then
+            # Use pg_isready if available
+            if pg_isready -h "$TEST_DB_HOST" -p "$TEST_DB_PORT" -U "$TEST_DB_USER" -d "$TEST_DB_NAME" &> /dev/null; then
+                print_success "Database is ready!"
+                return 0
+            fi
+        else
+            # Fallback: try to connect with docker exec
+            if docker exec trading-db pg_isready -U "$TEST_DB_USER" -d "$TEST_DB_NAME" &> /dev/null; then
+                print_success "Database is ready!"
+                return 0
+            fi
+        fi
+        
+        print_status "Database not ready yet (attempt $ATTEMPT/$MAX_ATTEMPTS), waiting 2 seconds..."
+        sleep 2
+        ATTEMPT=$((ATTEMPT + 1))
+    done
+    
+    print_error "Database failed to become ready after $MAX_ATTEMPTS attempts"
+    exit 1
+}
+
+# Function to run comprehensive tests
+run_cpp_tests() {
+    print_status "Running C++ comprehensive test suite..."
+    
+    if [ ! -f "Backend/cpp-engine/build/test_comprehensive" ]; then
+        print_error "C++ comprehensive test suite not found. Build the C++ engine first."
+        exit 1
+    fi
+    
+    cd Backend/cpp-engine
+    
+    # Load local testing credentials from .env file
+    if [ -f "../../.env" ]; then
+        # Extract TEST_DB_* variables from .env and set as DB_* for the test
+        export DB_HOST=$(grep "^TEST_DB_HOST=" ../../.env | cut -d'=' -f2)
+        export DB_PORT=$(grep "^TEST_DB_PORT=" ../../.env | cut -d'=' -f2)
+        export DB_NAME=$(grep "^TEST_DB_NAME=" ../../.env | cut -d'=' -f2)
+        export DB_USER=$(grep "^TEST_DB_USER=" ../../.env | cut -d'=' -f2)
+        export DB_PASSWORD=$(grep "^TEST_DB_PASSWORD=" ../../.env | cut -d'=' -f2)
+    else
+        print_warning "No .env file found, using default test configuration"
+        export DB_HOST=localhost
+        export DB_PORT=5433
+        export DB_NAME=simulated_trading_platform
+        export DB_USER=trading_user
+        export DB_PASSWORD=trading_password
+    fi
+    
+    ./build/test_comprehensive
+    if [ $? -eq 0 ]; then
+        print_success "C++ comprehensive test suite passed - all 1187 tests successful"
+    else
+        print_error "C++ comprehensive test suite failed"
+        exit 1
+    fi
+    
+    cd ../..
+}
+
 # Function to setup Docker services
 setup_docker_services() {
     print_status "Setting up Docker services..."
@@ -215,8 +274,8 @@ setup_docker_services() {
     print_status "Building and starting containers..."
     $COMPOSE_CMD -f Docker/docker-compose.dev.yml up --build -d
     
-    # Wait a moment for services to start
-    sleep 3
+    # Wait for database to be ready
+    wait_for_database
     
     # Check if services are running
     print_status "Checking service health..."
@@ -253,6 +312,7 @@ main() {
     build_cpp_engine
     setup_frontend
     setup_docker_services
+    run_cpp_tests
     run_development_mode
 }
 

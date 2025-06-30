@@ -1,13 +1,15 @@
-#ifndef MARKET_DATA_H
-#define MARKET_DATA_H
+#pragma once
 
 #include <string>
 #include <map>
 #include <vector>
 #include <memory>
+#include <mutex>
 #include <nlohmann/json.hpp>
 #include "database_connection.h"
 #include "technical_indicators.h"
+#include "result.h"
+#include "trading_exceptions.h"
 
 /**
  * MarketData class handles historical price data access from PostgreSQL/TimescaleDB.
@@ -17,12 +19,13 @@ class MarketData {
 private:
     std::unique_ptr<DatabaseConnection> db_connection_;
     mutable std::map<std::string, double> price_cache_;
+    mutable std::mutex cache_mutex_;
     bool cache_enabled_;
     
     // Helper methods
-    bool ensureConnection() const;
+    Result<void> ensureConnection() const;
     void cachePrice(const std::string& symbol, double price) const;
-    double getCachedPrice(const std::string& symbol) const;
+    Result<double> getCachedPrice(const std::string& symbol) const;
     
 public:
     // Constructors
@@ -46,53 +49,52 @@ public:
     bool isConnected() const;
     
     // Basic price access
-    double getPrice(const std::string& symbol) const;
-    double getLatestPrice(const std::string& symbol) const;
-    std::map<std::string, double> getCurrentPrices() const;
-    std::map<std::string, double> getCurrentPrices(const std::vector<std::string>& symbols) const;
+    Result<double> getLatestPrice(const std::string& symbol) const;
+    Result<std::map<std::string, double>> getCurrentPrices() const;
+    Result<std::map<std::string, double>> getCurrentPrices(const std::vector<std::string>& symbols) const;
     
     // Historical data access (returns database format for conversion to PriceData)
-    std::vector<std::map<std::string, std::string>> getHistoricalPrices(
+    Result<std::vector<std::map<std::string, std::string>>> getHistoricalPrices(
         const std::string& symbol,
         const std::string& start_date,
         const std::string& end_date
     ) const;
     
-    std::map<std::string, std::vector<std::map<std::string, std::string>>> getHistoricalPrices(
+    Result<std::map<std::string, std::vector<std::map<std::string, std::string>>>> getHistoricalPrices(
         const std::vector<std::string>& symbols,
         const std::string& start_date,
         const std::string& end_date
     ) const;
     
     // Date range utilities
-    std::vector<std::map<std::string, std::string>> getPricesForDateRange(
+    Result<std::vector<std::map<std::string, std::string>>> getPricesForDateRange(
         const std::string& symbol,
         const std::string& start_date,
         const std::string& end_date
     ) const;
     
-    std::map<std::string, std::string> getPriceForDate(const std::string& symbol, const std::string& date) const;
+    Result<std::map<std::string, std::string>> getPriceForDate(const std::string& symbol, const std::string& date) const;
     
     // Symbol validation and discovery
-    bool symbolExists(const std::string& symbol) const;
-    std::vector<std::string> getAvailableSymbols() const;
+    Result<bool> symbolExists(const std::string& symbol) const;
+    Result<std::vector<std::string>> getAvailableSymbols() const;
     
     // Data validation and statistics
-    int getDataPointCount(const std::string& symbol, 
-                         const std::string& start_date, 
-                         const std::string& end_date) const;
+    Result<int> getDataPointCount(const std::string& symbol, 
+                                const std::string& start_date, 
+                                const std::string& end_date) const;
     
-    std::pair<std::string, std::string> getDateRange(const std::string& symbol) const;
+    Result<std::pair<std::string, std::string>> getDateRange(const std::string& symbol) const;
     
     // Utility methods
     void clearCache();
-    nlohmann::json getDataSummary(const std::string& symbol,
-                                 const std::string& start_date,
-                                 const std::string& end_date) const;
+    Result<nlohmann::json> getDataSummary(const std::string& symbol,
+                                         const std::string& start_date,
+                                         const std::string& end_date) const;
     
     // Test methods
-    bool testDatabaseConnection() const;
-    nlohmann::json getDatabaseInfo() const;
+    Result<void> testDatabaseConnection() const;
+    Result<nlohmann::json> getDatabaseInfo() const;
     
     // Static helper methods
     static std::string getCurrentDate();
@@ -100,4 +102,3 @@ public:
     static std::string formatDate(const std::string& date);
 };
 
-#endif // MARKET_DATA_H

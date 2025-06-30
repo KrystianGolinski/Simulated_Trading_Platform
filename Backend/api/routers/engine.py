@@ -6,19 +6,22 @@ from typing import Dict, Any
 
 from simulation_engine import simulation_engine
 from response_models import StandardResponse, create_success_response, create_error_response, ApiError
+from base_router import BaseRouter
 
 router = APIRouter(tags=["engine"])
+
+class EngineRouter(BaseRouter):
+    # C++ engine testing router with standardized patterns
+    pass
+
+engine_router = EngineRouter()
 
 @router.get("/engine/test")
 async def test_engine() -> StandardResponse[Dict[str, Any]]:
     # Test engine directly and return raw output
-
     engine_path = Path("/app/cpp-engine/build/trading_engine")
     if not engine_path.exists():
-        return create_error_response(
-            "Engine not found",
-            [ApiError(code="ENGINE_NOT_FOUND", message=f"Engine path does not exist: {engine_path}")]
-        )
+        return engine_router.create_not_found_response("Engine", str(engine_path), "engine_path")
     
     try:
         # Run test simulation to capture output

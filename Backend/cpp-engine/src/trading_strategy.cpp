@@ -1,4 +1,5 @@
 #include "trading_strategy.h"
+#include "logger.h"
 #include <algorithm>
 #include <cmath>
 
@@ -121,8 +122,21 @@ TradingSignal MovingAverageCrossoverStrategy::evaluateSignal(const std::vector<P
     }
     
     // Calculate moving averages for the last few data points
-    auto short_ma = indicators_->calculateSMA(short_period_);
-    auto long_ma = indicators_->calculateSMA(long_period_);
+    auto short_ma_result = indicators_->calculateSMA(short_period_);
+    auto long_ma_result = indicators_->calculateSMA(long_period_);
+    
+    if (short_ma_result.isError()) {
+        Logger::warning("Short MA calculation failed: ", short_ma_result.getErrorMessage());
+        return TradingSignal();
+    }
+    
+    if (long_ma_result.isError()) {
+        Logger::warning("Long MA calculation failed: ", long_ma_result.getErrorMessage());
+        return TradingSignal();
+    }
+    
+    const auto& short_ma = short_ma_result.getValue();
+    const auto& long_ma = long_ma_result.getValue();
     
     if (short_ma.size() < 2 || long_ma.size() < 2) {
         return TradingSignal();
@@ -244,7 +258,14 @@ TradingSignal RSIStrategy::evaluateSignal(const std::vector<PriceData>& price_da
         return TradingSignal();
     }
     
-    auto signals = indicators_->detectRSISignals(oversold_threshold_, overbought_threshold_);
+    auto signals_result = indicators_->detectRSISignals(oversold_threshold_, overbought_threshold_);
+    
+    if (signals_result.isError()) {
+        Logger::warning("RSI signal detection failed: ", signals_result.getErrorMessage());
+        return TradingSignal();
+    }
+    
+    const auto& signals = signals_result.getValue();
     
     if (signals.empty()) {
         return TradingSignal();

@@ -1,5 +1,4 @@
-#ifndef POSITION_H
-#define POSITION_H
+#pragma once
 
 #include <string>
 
@@ -43,5 +42,3 @@ public:
     bool isEmpty() const;
     std::string toString() const;
 };
-
-#endif // POSITION_H

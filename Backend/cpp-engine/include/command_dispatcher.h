@@ -1,5 +1,4 @@
-#ifndef COMMAND_DISPATCHER_H
-#define COMMAND_DISPATCHER_H
+#pragma once
 
 #include "argument_parser.h"
 #include <string>
@@ -25,5 +24,3 @@ private:
     
     ArgumentParser arg_parser;
 };
-
-#endif

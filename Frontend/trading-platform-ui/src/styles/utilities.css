@@ -36,22 +36,6 @@
   @apply bg-white rounded-lg shadow;
 }
 
-/* Numbered Card Utilities (for backward compatibility) */
-.card-3 {
-  @apply bg-white rounded-lg shadow p-2;
-}
-
-.card-4 {
-  @apply bg-white rounded-lg shadow p-3;
-}
-
-.card-6 {
-  @apply bg-white rounded-lg shadow p-3 md:p-4;
-}
-
-.card-8 {
-  @apply bg-white rounded-lg shadow p-4 md:p-6;
-}
 
 /* Grid Utilities - Reduced gaps for better viewport fit */
 .grid-responsive-2 {
@@ -139,19 +123,13 @@
 }
 
 /* Color/Status Utilities */
+.text-success,
 .text-profit {
   @apply text-green-600;
 }
 
+.text-danger,
 .text-loss {
-  @apply text-red-600;
-}
-
-.text-success {
-  @apply text-green-600;
-}
-
-.text-danger {
   @apply text-red-600;
 }
 

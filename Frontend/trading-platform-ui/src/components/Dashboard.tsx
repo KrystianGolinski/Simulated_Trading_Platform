@@ -18,7 +18,6 @@ export const Dashboard: React.FC = () => {
   const debouncedStartDate = useDebounce(startDate, 800);
   const debouncedEndDate = useDebounce(endDate, 800);
   const debouncedTimeframe = useDebounce(timeframe, 300);
-  const debouncedChartType = useDebounce(chartType, 200);
 
   const { stocks, loading: stocksLoading } = useStocks();
   const { data, loading, error } = useStockData(
@@ -177,7 +176,7 @@ export const Dashboard: React.FC = () => {
               symbol={selectedSymbol}
               loading={loading}
               error={error}
-              chartType={debouncedChartType}
+              chartType={chartType}
               showVolume={showVolume}
             />
           </div>

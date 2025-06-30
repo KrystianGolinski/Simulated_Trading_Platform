@@ -10,8 +10,8 @@ import type {
 } from '../api';
 import { server } from '../../__mocks__/server';
 
-beforeAll(() => server.close());
-afterAll(() => server.listen());
+beforeAll(() => server.listen());
+afterAll(() => server.close());
 
 // Mock fetch globally
 global.fetch = jest.fn();
@@ -223,8 +223,10 @@ describe('ApiService', () => {
         end_date: '2023-12-31',
         starting_capital: 10000,
         strategy: 'ma_crossover',
-        short_ma: 20,
-        long_ma: 50
+        strategy_parameters: {
+          short_ma: 20,
+          long_ma: 50
+        }
       };
 
       const validationResult: ValidationResult = {
@@ -256,7 +258,11 @@ describe('ApiService', () => {
         start_date: '2023-01-01',
         end_date: '2023-12-31',
         starting_capital: 500,
-        strategy: 'ma_crossover'
+        strategy: 'ma_crossover',
+        strategy_parameters: {
+          short_ma: 20,
+          long_ma: 50
+        }
       };
 
       const validationResult: ValidationResult = {
@@ -286,8 +292,10 @@ describe('ApiService', () => {
         end_date: '2023-12-31',
         starting_capital: 10000,
         strategy: 'ma_crossover',
-        short_ma: 20,
-        long_ma: 50
+        strategy_parameters: {
+          short_ma: 20,
+          long_ma: 50
+        }
       };
 
       const response: SimulationResponse = {
@@ -350,8 +358,10 @@ describe('ApiService', () => {
           end_date: '2023-12-31',
           starting_capital: 10000,
           strategy: 'ma_crossover',
-          short_ma: 20,
-          long_ma: 50
+          strategy_parameters: {
+            short_ma: 20,
+            long_ma: 50
+          }
         },
         starting_capital: 10000,
         ending_value: 12500,
@@ -414,7 +424,11 @@ describe('ApiService', () => {
             start_date: '2023-01-01',
             end_date: '2023-12-31',
             starting_capital: 10000,
-            strategy: 'ma_crossover'
+            strategy: 'ma_crossover',
+            strategy_parameters: {
+              short_ma: 20,
+              long_ma: 50
+            }
           },
           created_at: '2023-01-01T00:00:00Z'
         },
@@ -426,7 +440,12 @@ describe('ApiService', () => {
             start_date: '2023-01-01',
             end_date: '2023-12-31',
             starting_capital: 5000,
-            strategy: 'rsi'
+            strategy: 'rsi',
+            strategy_parameters: {
+              rsi_period: 14,
+              rsi_oversold: 30,
+              rsi_overbought: 70
+            }
           },
           created_at: '2023-01-02T00:00:00Z',
           error_message: 'Insufficient data'
@@ -445,19 +464,6 @@ describe('ApiService', () => {
   });
 
   describe('API Base URL configuration', () => {
-    it.skip('uses environment variable for API URL', async () => {
-      // Environment variables are read at module load time, static URL 
-      process.env.REACT_APP_API_URL = 'https://api.example.com';
-      
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ status: 'ok' }),
-      } as Response);
-
-      await apiService.getHealth();
-      expect(mockFetch).toHaveBeenCalledWith('https://api.example.com/health', undefined);
-    });
-
     it('falls back to localhost when no environment variable', async () => {
       delete process.env.REACT_APP_API_URL;
       

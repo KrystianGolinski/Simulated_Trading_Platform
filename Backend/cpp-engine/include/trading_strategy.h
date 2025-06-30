@@ -51,10 +51,11 @@ struct BacktestResult {
     std::vector<double> equity_curve;
     std::string start_date;
     std::string end_date;
+    std::string error_message;  // For error reporting
     
     BacktestResult() : starting_capital(0), ending_value(0), total_return_pct(0),
                       total_trades(0), winning_trades(0), losing_trades(0),
-                      win_rate(0), max_drawdown(0), sharpe_ratio(0) {}
+                      win_rate(0), max_drawdown(0), sharpe_ratio(0), error_message("") {}
 };
 
 class TradingStrategy {

@@ -24,12 +24,8 @@ export interface SimulationConfig {
   start_date: string;
   end_date: string;
   starting_capital: number;
-  strategy: 'ma_crossover' | 'rsi';
-  short_ma?: number;
-  long_ma?: number;
-  rsi_period?: number;
-  rsi_oversold?: number;
-  rsi_overbought?: number;
+  strategy: string;
+  strategy_parameters: Record<string, any>;
 }
 
 export interface SimulationResponse {
@@ -150,35 +146,46 @@ class ApiService {
       status: response.service ? 'healthy' : 'unhealthy',
       database_connected: response.database?.status === 'healthy',
       stocks_count: response.stocks_count || 0,
-      daily_records_count: 0,
-      minute_records_count: 0
+      daily_records_count: response.daily_records_count || 0,
+      minute_records_count: response.minute_records_count || 0
     };
   }
 
-  // Get list of available stock symbols
-  async getStocks(): Promise<string[]> {
-    return this.fetchWithErrorHandling<string[]>('/stocks');
+  // Get list of available stock symbols with pagination
+  async getStocks(page: number = 1, pageSize: number = 100): Promise<{ data: string[], pagination: any }> {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      page_size: pageSize.toString()
+    });
+    return this.fetchWithErrorHandling<{ data: string[], pagination: any }>(`/stocks?${params}`);
   }
 
-  // Get historical stock data
+  // Get historical stock data with pagination
   async getStockData(
     symbol: string,
     startDate: string,
     endDate: string,
-    timeframe: 'daily'
-  ): Promise<StockData[]> {
+    timeframe: 'daily' = 'daily',
+    page: number = 1,
+    pageSize: number = 1000
+  ): Promise<{ data: StockData[], pagination: any, symbol: string, date_range: any }> {
     const params = new URLSearchParams({
       start_date: startDate,
       end_date: endDate,
-      timeframe: timeframe
+      timeframe: timeframe,
+      page: page.toString(),
+      page_size: pageSize.toString()
     });
     
-    const rawData = await this.fetchWithErrorHandling<any[]>(
-      `/stocks/${symbol}/data?${params}`
-    );
+    const response = await this.fetchWithErrorHandling<{
+      data: any[],
+      pagination: any,
+      symbol: string,
+      date_range: any
+    }>(`/stocks/${symbol}/data?${params}`);
 
     // Ensure numeric conversion for price/volume data
-    return rawData.map(item => ({
+    const processedData = response.data.map(item => ({
       time: item.time,
       symbol: item.symbol,
       open: parseFloat(item.open) || 0,
@@ -188,6 +195,11 @@ class ApiService {
       volume: parseInt(item.volume) || 0,
       vwap: item.vwap ? parseFloat(item.vwap) : undefined
     }));
+
+    return {
+      ...response,
+      data: processedData
+    };
   }
 
   // Validate simulation configuration

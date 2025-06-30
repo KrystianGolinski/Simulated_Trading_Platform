@@ -1,7 +1,7 @@
 import logging
 import re
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any
 from .error_types import SimulationError, ErrorCode, ErrorSeverity
 
 logger = logging.getLogger(__name__)

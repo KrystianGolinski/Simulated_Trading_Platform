@@ -5,7 +5,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from datetime import date
 from database import DatabaseManager
-from models import SimulationConfig, ValidationError, ValidationResult, StrategyType
+from models import SimulationConfig, ValidationError, ValidationResult
 from services.error_handler import ErrorHandler, ErrorCode, ErrorSeverity
 
 logger = logging.getLogger(__name__)
@@ -231,47 +231,56 @@ class SimulationValidator:
         return errors
     
     def _validate_strategy_parameters(self, config: SimulationConfig) -> List[ValidationError]:
-        # Validate strategy-specific parameters
+        # Validate strategy-specific parameters using dynamic strategy registry
         errors = []
         
-        if config.strategy == StrategyType.MA_CROSSOVER:
-            # Validate MA periods
-            if config.short_ma and config.short_ma < 5:
-                errors.append(ValidationError(
-                    field="short_ma",
-                    message="Short moving average period should be at least 5",
-                    error_code="SHORT_MA_TOO_LOW"
-                ))
+        try:
+            # Import here to avoid circular imports
+            from strategy_registry import get_strategy_registry
             
-            if config.long_ma and config.long_ma > 200:
-                errors.append(ValidationError(
-                    field="long_ma",
-                    message="Long moving average period should not exceed 200",
-                    error_code="LONG_MA_TOO_HIGH"
-                ))
-        
-        elif config.strategy == StrategyType.RSI:
-            # Validate RSI parameters
-            if config.rsi_period and config.rsi_period < 5:
-                errors.append(ValidationError(
-                    field="rsi_period",
-                    message="RSI period should be at least 5",
-                    error_code="RSI_PERIOD_TOO_LOW"
-                ))
+            registry = get_strategy_registry()
             
-            if config.rsi_oversold and config.rsi_oversold < 10:
+            # Validate that strategy exists
+            available_strategies = registry.get_available_strategies()
+            if config.strategy not in available_strategies:
                 errors.append(ValidationError(
-                    field="rsi_oversold",
-                    message="RSI oversold threshold should be at least 10",
-                    error_code="RSI_OVERSOLD_TOO_LOW"
+                    field="strategy",
+                    message=f"Unknown strategy '{config.strategy}'. Available strategies: {list(available_strategies.keys())}",
+                    error_code="UNKNOWN_STRATEGY"
                 ))
+                return errors
             
-            if config.rsi_overbought and config.rsi_overbought > 90:
+            # Use strategy registry for dynamic validation
+            validation_errors = registry.validate_strategy_config(config.strategy, config.strategy_parameters)
+            
+            # Convert strategy registry errors to ValidationError objects
+            for error_msg in validation_errors:
+                # Extract field name if possible (assumes format "Field name: error message")
+                field_name = "strategy_parameters"
+                if ":" in error_msg:
+                    potential_field = error_msg.split(":")[0].strip()
+                    if potential_field.replace("_", "").replace(" ", "").isalnum():
+                        field_name = potential_field.lower().replace(" ", "_")
+                
                 errors.append(ValidationError(
-                    field="rsi_overbought",
-                    message="RSI overbought threshold should not exceed 90",
-                    error_code="RSI_OVERBOUGHT_TOO_HIGH"
+                    field=field_name,
+                    message=error_msg,
+                    error_code="STRATEGY_PARAMETER_INVALID"
                 ))
+                
+        except ImportError:
+            # Fallback to basic validation if strategy registry not available
+            errors.append(ValidationError(
+                field="strategy",
+                message="Strategy validation system not available",
+                error_code="STRATEGY_SYSTEM_UNAVAILABLE"
+            ))
+        except Exception as e:
+            errors.append(ValidationError(
+                field="strategy",
+                message=f"Strategy validation failed: {str(e)}",
+                error_code="STRATEGY_VALIDATION_ERROR"
+            ))
         
         return errors
     
@@ -292,13 +301,16 @@ class SimulationValidator:
                 f"Very long date range ({date_range_days} days). Consider shorter periods for faster execution."
             )
         
-        # Strategy-specific warnings
-        if config.strategy == StrategyType.MA_CROSSOVER:
-            if config.short_ma and config.long_ma:
-                ratio = config.long_ma / config.short_ma
+        # Strategy-specific warnings using dynamic strategy system
+        if config.strategy == "ma_crossover":
+            # Get MA crossover parameters from strategy_parameters
+            short_ma = config.strategy_parameters.get("short_ma")
+            long_ma = config.strategy_parameters.get("long_ma")
+            if short_ma and long_ma:
+                ratio = long_ma / short_ma
                 if ratio < 1.5:
                     warnings.append(
-                        f"MA periods are close ({config.short_ma}, {config.long_ma}). "
+                        f"MA periods are close ({short_ma}, {long_ma}). "
                         f"Consider using more separated periods for clearer signals."
                     )
         

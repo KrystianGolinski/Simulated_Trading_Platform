@@ -2,13 +2,12 @@ import asyncio
 import json
 import logging
 import os
-import tempfile
 import uuid
 from datetime import datetime
 from typing import Dict, Any, List
 from pathlib import Path
 
-from models import SimulationConfig, SimulationStatus
+from models import SimulationConfig
 from performance_optimizer import performance_optimizer
 
 logger = logging.getLogger(__name__)
@@ -57,37 +56,34 @@ class ExecutionService:
         return {'is_valid': True}
     
     def create_config_file(self, config: SimulationConfig) -> str:
-        # Create a temporary JSON config file for the C++ engine
-        config_data = {
-            "symbol": config.symbols[0] if config.symbols else "AAPL",
-            "start_date": config.start_date.isoformat(),
-            "end_date": config.end_date.isoformat(),
-            "starting_capital": config.starting_capital,
-            "strategy": config.strategy.value if hasattr(config.strategy, 'value') else str(config.strategy),
-            "cleanup": True
-        }
-        
-        # Add strategy-specific parameters
-        if config.strategy == "ma_crossover":
-            config_data.update({
-                "short_ma": config.short_ma or 20,
-                "long_ma": config.long_ma or 50
-            })
-        elif config.strategy == "rsi":
-            config_data.update({
-                "rsi_period": config.rsi_period or 14,
-                "rsi_oversold": config.rsi_oversold or 30.0,
-                "rsi_overbought": config.rsi_overbought or 70.0
-            })
-        
-        # Create temporary file
-        config_file = f"/tmp/sim_config_{uuid.uuid4().hex[:8]}.json"
-        
+        # Create a temporary JSON config file for the C++ engine using dynamic strategy system
         try:
+            # Import here to avoid circular dependencies
+            from strategy_factory import get_strategy_factory
+            
+            # Base configuration
+            config_data = {
+                "symbol": config.symbols[0] if config.symbols else "AAPL",
+                "start_date": config.start_date.isoformat(),
+                "end_date": config.end_date.isoformat(),
+                "starting_capital": config.starting_capital,
+                "cleanup": True
+            }
+            
+            # Use dynamic strategy factory to create C++ compatible configuration
+            factory = get_strategy_factory()
+            strategy_config = factory.create_strategy_config(config.strategy, config.strategy_parameters)
+            
+            # Merge strategy configuration with base configuration
+            config_data.update(strategy_config)
+            
+            # Create temporary file
+            config_file = f"/tmp/sim_config_{uuid.uuid4().hex[:8]}.json"
+            
             with open(config_file, 'w') as f:
                 json.dump(config_data, f, indent=2)
             
-            logger.debug(f"Created config file: {config_file}")
+            logger.debug(f"Created config file: {config_file} with strategy: {config.strategy}")
             return config_file
             
         except Exception as e:
@@ -107,8 +103,7 @@ class ExecutionService:
         
         return cmd, config_file
     
-    async def execute_simulation(self, simulation_id: str, config: SimulationConfig, 
-                               optimization_info: Dict[str, Any] = None) -> Dict[str, Any]:
+    async def execute_simulation(self, simulation_id: str, config: SimulationConfig) -> Dict[str, Any]:
         config_file = None
         try:
             # Build command using JSON config file
@@ -124,12 +119,22 @@ class ExecutionService:
             
             logger.debug(f"Starting simulation {simulation_id}: {' '.join(cmd)} (build_time: {build_time:.2f}ms)")
             
-            # Run subprocess with validated working directory
+            # Prepare environment variables for C++ engine
+            env = os.environ.copy()  # Copy current environment
+            # Ensure database environment variables are available to C++ engine
+            db_env_vars = ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD']
+            for var in db_env_vars:
+                if var in os.environ:
+                    env[var] = os.environ[var]
+                    logger.debug(f"Passing {var} to C++ engine")
+            
+            # Run subprocess with validated working directory and environment
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd=working_dir
+                cwd=working_dir,
+                env=env
             )
             
             # Store process for status tracking with heartbeat

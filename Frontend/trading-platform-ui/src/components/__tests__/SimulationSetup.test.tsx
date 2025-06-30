@@ -1,5 +1,4 @@
-import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SimulationSetup } from '../SimulationSetup';
 import { apiService } from '../../services/api';
@@ -35,7 +34,9 @@ describe('SimulationSetup Component', () => {
   beforeEach(() => {
     mockUseStocks.mockReturnValue({
       stocks: ['AAPL', 'GOOGL', 'MSFT', 'TSLA'],
-      loading: false
+      pagination: null,
+      loading: false,
+      error: null
     });
 
     mockApiService.validateSimulation.mockResolvedValue({
@@ -149,11 +150,10 @@ describe('SimulationSetup Component', () => {
         end_date: '2023-12-31',
         starting_capital: 10000,
         strategy: 'ma_crossover',
-        short_ma: 20,
-        long_ma: 50,
-        rsi_period: 14,
-        rsi_oversold: 30,
-        rsi_overbought: 70
+        strategy_parameters: {
+          short_ma: 20,
+          long_ma: 50
+        }
       });
     });
   });
@@ -276,7 +276,9 @@ describe('SimulationSetup Component', () => {
   it('shows loading state for stocks', () => {
     mockUseStocks.mockReturnValue({
       stocks: [],
-      loading: true
+      pagination: null,
+      loading: true,
+      error: null
     });
     
     render(<SimulationSetup {...defaultProps} />);

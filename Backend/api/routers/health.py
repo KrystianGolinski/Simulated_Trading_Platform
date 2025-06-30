@@ -7,8 +7,15 @@ from pathlib import Path
 from database import DatabaseManager, get_database
 from validation import SimulationValidator
 from response_models import StandardResponse, create_success_response, create_error_response, ApiError
+from base_router import BaseRouter
 
 router = APIRouter(tags=["health"])
+
+class HealthRouter(BaseRouter):
+    # Health monitoring router with standardized patterns
+    pass
+
+health_router = HealthRouter()
 
 async def check_cpp_engine_health() -> Dict[str, Any]:
     # Check if C++ engine is available and functional
@@ -85,7 +92,7 @@ def get_system_health() -> Dict[str, Any]:
 @router.get("/")
 async def root() -> StandardResponse[Dict[str, str]]:
     # Root endpoint
-    return create_success_response(
+    return health_router.create_success_with_metadata(
         {"service": "Trading Platform API", "version": "1.0.0"},
         "Trading Platform API is running"
     )
@@ -195,36 +202,6 @@ async def health_check(db: DatabaseManager = Depends(get_database)) -> StandardR
             "Health check failed",
             [ApiError(code="HEALTH_CHECK_ERROR", message=str(e))]
         )
-@router.get("/health/ready")
-async def readiness_check(db: DatabaseManager = Depends(get_database)) -> StandardResponse[Dict[str, Any]]:
-    # Kubernetes-style readiness probe - checks if service is ready to accept traffic
-    try:
-        # Quick database connection check
-        db_health = await db.health_check()
-        
-        if db_health["status"] == "healthy":
-            return create_success_response(
-                {"ready": True, "database": "connected"},
-                "Service ready to accept traffic"
-            )
-        else:
-            return create_error_response(
-                "Service not ready",
-                [ApiError(code="NOT_READY", message="Database connection failed")]
-            )
-    except Exception as e:
-        return create_error_response(
-            "Readiness check failed",
-            [ApiError(code="READINESS_ERROR", message=str(e))]
-        )
-
-@router.get("/health/live")
-async def liveness_check() -> StandardResponse[Dict[str, Any]]:
-    # Kubernetes-style liveness probe - checks if service is alive
-    return create_success_response(
-        {"alive": True, "timestamp": time.time()},
-        "Service is alive"
-    )
 
 @router.get("/health/dashboard")
 async def health_dashboard(db: DatabaseManager = Depends(get_database)) -> StandardResponse[Dict[str, Any]]:

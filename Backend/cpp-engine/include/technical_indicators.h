@@ -1,8 +1,11 @@
 #pragma once
 
+#include "result.h"
+#include "trading_exceptions.h"
 #include <vector>
 #include <string>
 #include <map>
+#include <mutex>
 
 struct PriceData {
     double open;
@@ -38,7 +41,8 @@ struct TradingSignal {
 class TechnicalIndicators {
 private:
     std::vector<PriceData> price_data_;
-    std::map<std::string, std::vector<double>> indicator_cache_;
+    mutable std::map<std::string, std::vector<double>> indicator_cache_;
+    mutable std::mutex cache_mutex_;
     
 public:
     TechnicalIndicators() = default;
@@ -53,10 +57,10 @@ public:
     void setPriceData(const std::vector<PriceData>& data);
     void addPriceData(const PriceData& data);
     
-    std::vector<double> calculateSMA(int period) const;
-    std::vector<double> calculateEMA(int period) const;
-    std::vector<double> calculateRSI(int period = 14) const;
-    std::vector<double> calculateBollingerBands(int period = 20, double std_dev = 2.0) const;
+    Result<std::vector<double>> calculateSMA(int period) const;
+    Result<std::vector<double>> calculateEMA(int period) const;
+    Result<std::vector<double>> calculateRSI(int period = 14) const;
+    Result<std::vector<double>> calculateBollingerBands(int period = 20, double std_dev = 2.0) const;
     
     // Parallel calculation methods for multiple indicators
     struct IndicatorSet {
@@ -66,13 +70,13 @@ public:
         std::vector<double> ema;
     };
     
-    IndicatorSet calculateIndicatorSetParallel(int sma_short_period = 20, 
-                                              int sma_long_period = 50, 
-                                              int rsi_period = 14, 
-                                              int ema_period = 20) const;
+    Result<IndicatorSet> calculateIndicatorSetParallel(int sma_short_period = 20, 
+                                                       int sma_long_period = 50, 
+                                                       int rsi_period = 14, 
+                                                       int ema_period = 20) const;
     
-    std::vector<TradingSignal> detectMACrossover(int short_period, int long_period) const;
-    std::vector<TradingSignal> detectRSISignals(double oversold = 30.0, double overbought = 70.0) const;
+    Result<std::vector<TradingSignal>> detectMACrossover(int short_period, int long_period) const;
+    Result<std::vector<TradingSignal>> detectRSISignals(double oversold = 30.0, double overbought = 70.0) const;
     
     bool hasEnoughData(int required_period) const;
     int getDataSize() const;
@@ -81,9 +85,9 @@ public:
     void clearCache();
     
 private:
-    void validatePeriod(int period) const;
+    Result<void> validatePeriod(int period) const;
     std::string getCacheKey(const std::string& indicator, int period) const;
     bool isCached(const std::string& key) const;
-    void cacheIndicator(const std::string& key, const std::vector<double>& values);
+    void cacheIndicator(const std::string& key, const std::vector<double>& values) const;
     const std::vector<double>& getCachedIndicator(const std::string& key) const;
 };

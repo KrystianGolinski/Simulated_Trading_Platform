@@ -6,8 +6,7 @@ from models import TradeRecord
 logger = logging.getLogger(__name__)
 
 class TradeConverter:
-    def __init__(self):
-        pass
+    # No initialization needed for stateless conversion operations
     
     def convert_signals_to_trades(self, signals_data: List[Dict[str, Any]], result_data: Dict[str, Any]) -> List[TradeRecord]:
         # Convert trading signals into proper trade pairs with profit/loss calculations
@@ -77,7 +76,8 @@ class TradeConverter:
         starting_capital = result_data.get("starting_capital", 10000.0)
         
         # Simple strategy: use a fixed percentage of capital per trade
-        position_size_pct = 0.1  # 10% of capital per position
+        POSITION_SIZE_PCT = 0.1  # Default position size percentage - could be made configurable
+        position_size_pct = POSITION_SIZE_PCT
         available_capital = starting_capital * position_size_pct
         
         if price > 0:

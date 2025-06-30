@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 import asyncio
 from functools import lru_cache
 import hashlib
+from cachetools import TTLCache
 
 # Load environment variables from root .env file
 load_dotenv(dotenv_path='../../.env')
@@ -22,12 +23,10 @@ class DatabaseManager:
             "DATABASE_URL", 
             f"postgresql://{os.getenv('DB_USER', 'trading_user')}:{os.getenv('DB_PASSWORD', 'trading_password')}@postgres:5432/simulated_trading_platform"
         )
-        # Add caching for frequently accessed data
-        self._cache: Dict[str, Any] = {}
-        self._cache_timestamps: Dict[str, datetime] = {}
-        self._cache_ttl = 300  # 5 minutes TTL
-        self._available_stocks_cache: Optional[List[str]] = None
-        self._available_stocks_cache_time: Optional[datetime] = None
+        # Initialize cachetools caches
+        self._stock_data_cache = TTLCache(maxsize=1024, ttl=300)  # 5 minutes TTL, max 1024 entries
+        self._stocks_list_cache = TTLCache(maxsize=1, ttl=300)    # Cache for available stocks list
+        self._validation_cache = TTLCache(maxsize=256, ttl=600)   # 10 minutes for validation results
     
     async def connect(self):
         # Initialize database connection pool
@@ -52,35 +51,12 @@ class DatabaseManager:
             await self.pool.close()
             logger.info("Database connection pool closed")
     
-    def _get_cache_key(self, *args) -> str:
-        # Generate cache key from arguments using md5
-        key_str = "|".join(str(arg) for arg in args)
-        return hashlib.md5(key_str.encode()).hexdigest()
-    
-    def _is_cache_valid(self, cache_key: str) -> bool:
-        # Check if cache entry is still valid
-        if cache_key not in self._cache_timestamps:
-            return False
-        age = (datetime.now() - self._cache_timestamps[cache_key]).total_seconds()
-        return age < self._cache_ttl
-    
-    def _set_cache(self, cache_key: str, value: Any) -> None:
-        # Set cache value with timestamp
-        self._cache[cache_key] = value
-        self._cache_timestamps[cache_key] = datetime.now()
-    
-    def _get_cache(self, cache_key: str) -> Optional[Any]:
-        # Get cache value if valid
-        if self._is_cache_valid(cache_key):
-            return self._cache.get(cache_key)
-        return None
     
     async def clear_cache(self) -> None:
         # Clear all cached data
-        self._cache.clear()
-        self._cache_timestamps.clear()
-        self._available_stocks_cache = None
-        self._available_stocks_cache_time = None
+        self._stock_data_cache.clear()
+        self._stocks_list_cache.clear()
+        self._validation_cache.clear()
         logger.info("Database cache cleared")
 
     async def execute_query(self, query: str, *args) -> List[Dict[str, Any]]:
@@ -101,29 +77,55 @@ class DatabaseManager:
             result = await conn.execute(query, *args)
             return result
 
-    async def get_available_stocks(self) -> List[str]:
-        # Get list of available stock symbols with caching
+    async def get_available_stocks(self, page: int = 1, page_size: int = 100) -> Dict[str, Any]:
+        # Get list of available stock symbols with pagination and caching
+        cache_key = f'available_stocks_{page}_{page_size}'
         
         # Check cache first
-        if (self._available_stocks_cache and self._available_stocks_cache_time and 
-            (datetime.now() - self._available_stocks_cache_time).total_seconds() < self._cache_ttl):
-            return self._available_stocks_cache
+        if cache_key in self._stocks_list_cache:
+            logger.debug(f"Cache hit for available stocks page {page}")
+            return self._stocks_list_cache[cache_key]
         
-        # Query database
+        # Calculate offset
+        offset = (page - 1) * page_size
+        
+        # Get total count
+        count_query = "SELECT COUNT(DISTINCT symbol) as total FROM stock_prices_daily"
+        count_result = await self.execute_query(count_query)
+        total_count = count_result[0]['total'] if count_result else 0
+        
+        # Get paginated results
         query = """
             SELECT DISTINCT symbol 
             FROM stock_prices_daily 
             ORDER BY symbol
+            LIMIT $1 OFFSET $2
         """
-        results = await self.execute_query(query)
+        results = await self.execute_query(query, page_size, offset)
         stocks = [row['symbol'] for row in results]
         
-        # Cache the results
-        self._available_stocks_cache = stocks
-        self._available_stocks_cache_time = datetime.now()
-        logger.debug(f"Cached {len(stocks)} available stocks")
+        # Calculate pagination metadata
+        total_pages = (total_count + page_size - 1) // page_size
+        has_next = page < total_pages
+        has_previous = page > 1
         
-        return stocks
+        result = {
+            'data': stocks,
+            'pagination': {
+                'page': page,
+                'page_size': page_size,
+                'total_count': total_count,
+                'total_pages': total_pages,
+                'has_next': has_next,
+                'has_previous': has_previous
+            }
+        }
+        
+        # Cache the results
+        self._stocks_list_cache[cache_key] = result
+        logger.debug(f"Fetched and cached {len(stocks)} available stocks (page {page}/{total_pages})")
+        return result
+    
 
     async def get_stock_data_batch(self, symbols: List[str], start_date: date, end_date: date, timeframe: str = 'daily') -> Dict[str, List[Dict[str, Any]]]:
         # Get historical stock data for multiple symbols efficiently
@@ -139,11 +141,11 @@ class DatabaseManager:
             table_name = 'stock_prices_intraday'  # Future enhancement
         
         query = f"""
-            SELECT symbol, date, open_price, high_price, low_price, close_price, volume 
+            SELECT symbol, time, open, high, low, close, volume 
             FROM {table_name}
             WHERE symbol IN ({placeholders})
-            AND date BETWEEN ${len(symbols)+1} AND ${len(symbols)+2}
-            ORDER BY symbol, date
+            AND time BETWEEN ${len(symbols)+1} AND ${len(symbols)+2}
+            ORDER BY symbol, time
         """
         
         try:
@@ -168,22 +170,36 @@ class DatabaseManager:
             logger.error(f"Error fetching batch stock data for {symbols}: {e}")
             return {symbol.upper(): [] for symbol in symbols}
 
-    async def get_stock_data(self, symbol: str, start_date: date, end_date: date, timeframe: str = 'daily') -> List[Dict[str, Any]]:
-        # Get historical stock data with caching
+    async def get_stock_data(self, symbol: str, start_date: date, end_date: date, timeframe: str = 'daily', 
+                           page: int = 1, page_size: int = 1000) -> Dict[str, Any]:
+        # Get historical stock data with pagination and manual caching
+        cache_key = f"{symbol}_{start_date}_{end_date}_{timeframe}_{page}_{page_size}"
         
         # Check cache first
-        cache_key = self._get_cache_key("stock_data", symbol, start_date, end_date, timeframe)
-        cached_data = self._get_cache(cache_key)
-        if cached_data is not None:
-            logger.debug(f"Cache hit for stock data: {symbol} {start_date} to {end_date}")
-            return cached_data
+        if cache_key in self._stock_data_cache:
+            logger.debug(f"Cache hit for stock data: {symbol} {start_date} to {end_date} page {page}")
+            return self._stock_data_cache[cache_key]
         
         if timeframe == 'daily':
             table = 'stock_prices_daily'
         else:
             raise ValueError(f"Unsupported timeframe: {timeframe}")
         
-        # Optimized query with index hints
+        # Calculate offset
+        offset = (page - 1) * page_size
+        
+        # Get total count for this symbol and date range
+        count_query = f"""
+            SELECT COUNT(*) as total
+            FROM {table}
+            WHERE symbol = $1 
+            AND time >= $2 
+            AND time <= $3
+        """
+        count_result = await self.execute_query(count_query, symbol, start_date, end_date)
+        total_count = count_result[0]['total'] if count_result else 0
+        
+        # Get paginated results
         query = f"""
             SELECT time, symbol, open, high, low, close, volume
             FROM {table}
@@ -191,15 +207,38 @@ class DatabaseManager:
             AND time >= $2 
             AND time <= $3
             ORDER BY time ASC
+            LIMIT $4 OFFSET $5
         """
         
-        data = await self.execute_query(query, symbol, start_date, end_date)
+        data = await self.execute_query(query, symbol, start_date, end_date, page_size, offset)
+        
+        # Calculate pagination metadata
+        total_pages = (total_count + page_size - 1) // page_size
+        has_next = page < total_pages
+        has_previous = page > 1
+        
+        result = {
+            'data': data,
+            'pagination': {
+                'page': page,
+                'page_size': page_size,
+                'total_count': total_count,
+                'total_pages': total_pages,
+                'has_next': has_next,
+                'has_previous': has_previous
+            },
+            'symbol': symbol,
+            'date_range': {
+                'start_date': start_date.isoformat(),
+                'end_date': end_date.isoformat()
+            }
+        }
         
         # Cache the results
-        self._set_cache(cache_key, data)
-        logger.debug(f"Cached stock data: {symbol} {start_date} to {end_date} ({len(data)} records)")
-        
-        return data
+        self._stock_data_cache[cache_key] = result
+        logger.debug(f"Fetched and cached stock data: {symbol} {start_date} to {end_date} page {page}/{total_pages} ({len(data)} records)")
+        return result
+    
 
     async def create_trading_session(self, user_id: str, strategy_name: str,
                                    initial_capital: float, start_date: date,
@@ -246,17 +285,50 @@ class DatabaseManager:
             )
             return trade_id
 
-    async def get_session_trades(self, session_id: int) -> List[Dict[str, Any]]:
-        # Get all trades for a session
+    async def get_session_trades(self, session_id: int, page: int = 1, page_size: int = 100) -> Dict[str, Any]:
+        # Get trades for a session with pagination
         
+        # Calculate offset
+        offset = (page - 1) * page_size
+        
+        # Get total count
+        count_query = """
+            SELECT COUNT(*) as total
+            FROM trades_log 
+            WHERE session_id = $1
+        """
+        count_result = await self.execute_query(count_query, session_id)
+        total_count = count_result[0]['total'] if count_result else 0
+        
+        # Get paginated results
         query = """
             SELECT symbol, action, quantity, price, commission, trade_time
             FROM trades_log 
             WHERE session_id = $1
             ORDER BY trade_time ASC
+            LIMIT $2 OFFSET $3
         """
         
-        return await self.execute_query(query, session_id)
+        trades = await self.execute_query(query, session_id, page_size, offset)
+        
+        # Calculate pagination metadata
+        total_pages = (total_count + page_size - 1) // page_size
+        has_next = page < total_pages
+        has_previous = page > 1
+        
+        return {
+            'data': trades,
+            'pagination': {
+                'page': page,
+                'page_size': page_size,
+                'total_count': total_count,
+                'total_pages': total_pages,
+                'has_next': has_next,
+                'has_previous': has_previous
+            },
+            'session_id': session_id
+        }
+    
 
     async def get_session_results(self, session_id: int) -> Optional[Dict[str, Any]]:
         # Get session results
@@ -274,14 +346,21 @@ class DatabaseManager:
         
         session = results[0]
         
-        # Get trades for this session
-        trades = await self.get_session_trades(session_id)
-        session['trades'] = trades
+        # Get trades for this session (first page only for session results)
+        trades_result = await self.get_session_trades(session_id, page=1, page_size=1000)
+        session['trades'] = trades_result
         
         return session
 
     async def validate_symbol_exists(self, symbol: str) -> bool:
-        # Check if a stock symbol exists in the database
+        # Check if a stock symbol exists in the database with manual caching
+        cache_key = f"symbol_exists_{symbol.upper()}"
+        
+        # Check cache first
+        if cache_key in self._validation_cache:
+            logger.debug(f"Cache hit for symbol validation: {symbol}")
+            return self._validation_cache[cache_key]
+        
         query = """
             SELECT COUNT(*) as count
             FROM stock_prices_daily 
@@ -289,7 +368,12 @@ class DatabaseManager:
         """
         try:
             results = await self.execute_query(query, symbol.upper())
-            return results[0]['count'] > 0 if results else False
+            exists = results[0]['count'] > 0 if results else False
+            
+            # Cache the result
+            self._validation_cache[cache_key] = exists
+            logger.debug(f"Validated and cached symbol existence: {symbol} = {exists}")
+            return exists
         except Exception as e:
             logger.error(f"Error checking symbol {symbol}: {e}")
             return False
@@ -339,7 +423,14 @@ class DatabaseManager:
             }
     
     async def get_symbol_date_range(self, symbol: str) -> Optional[Dict[str, Any]]:
-        # Get the available date range for a symbol
+        # Get the available date range for a symbol with manual caching
+        cache_key = f"date_range_{symbol.upper()}"
+        
+        # Check cache first
+        if cache_key in self._validation_cache:
+            logger.debug(f"Cache hit for date range: {symbol}")
+            return self._validation_cache[cache_key]
+        
         query = """
             SELECT 
                 MIN(time) as earliest_date,
@@ -350,7 +441,12 @@ class DatabaseManager:
         """
         try:
             results = await self.execute_query(query, symbol.upper())
-            return results[0] if results and results[0]['total_records'] > 0 else None
+            result = results[0] if results and results[0]['total_records'] > 0 else None
+            
+            # Cache the result
+            self._validation_cache[cache_key] = result
+            logger.debug(f"Fetched and cached date range for {symbol}")
+            return result
         except Exception as e:
             logger.error(f"Error getting date range for {symbol}: {e}")
             return None
@@ -392,9 +488,11 @@ class DatabaseManager:
             
             # Get cache stats
             cache_stats = {
-                "cache_entries": len(self._cache),
-                "cache_hit_potential": len([k for k in self._cache.keys() if self._is_cache_valid(k)]),
-                "available_stocks_cached": self._available_stocks_cache is not None,
+                "stock_data_cache_size": len(self._stock_data_cache),
+                "stock_data_cache_maxsize": self._stock_data_cache.maxsize,
+                "stocks_list_cache_size": len(self._stocks_list_cache),
+                "validation_cache_size": len(self._validation_cache),
+                "validation_cache_maxsize": self._validation_cache.maxsize,
             }
             
             return {

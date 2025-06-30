@@ -1,5 +1,4 @@
-#ifndef DATABASE_CONNECTION_H
-#define DATABASE_CONNECTION_H
+#pragma once
 
 #include <string>
 #include <vector>
@@ -7,6 +6,8 @@
 #include <map>
 #include <libpq-fe.h>
 #include <nlohmann/json.hpp>
+#include "result.h"
+#include "trading_exceptions.h"
 
 /**
  * Database connection class for PostgreSQL/TimescaleDB integration.
@@ -27,7 +28,7 @@ private:
     
     // Helper methods
     void buildConnectionString();
-    bool executeQuery(const std::string& query, PGresult*& result);
+    Result<PGresult*> executeQueryInternal(const std::string& query);
     void handleError(const std::string& operation);
     
 public:
@@ -47,10 +48,10 @@ public:
     DatabaseConnection& operator=(const DatabaseConnection&) = delete;
     
     // Connection management
-    bool connect();
-    bool disconnect();
+    Result<void> connect();
+    Result<void> disconnect();
     bool isConnected() const;
-    bool testConnection();
+    Result<void> testConnection();
     
     // Configuration
     void setConnectionParams(const std::string& host, const std::string& port,
@@ -58,27 +59,32 @@ public:
                            const std::string& password);
     
     // Query execution
-    bool executeQuery(const std::string& query);
-    std::vector<std::map<std::string, std::string>> selectQuery(const std::string& query);
+    Result<void> executeQuery(const std::string& query);
+    Result<std::vector<std::map<std::string, std::string>>> selectQuery(const std::string& query);
+    
+    // Prepared statement methods for secure queries
+    Result<std::vector<std::map<std::string, std::string>>> executePreparedQuery(
+        const std::string& query, 
+        const std::vector<std::string>& params
+    );
     
     // Stock data specific queries
-    std::vector<std::map<std::string, std::string>> getStockPrices(
+    Result<std::vector<std::map<std::string, std::string>>> getStockPrices(
         const std::string& symbol, 
         const std::string& start_date, 
         const std::string& end_date
     );
     
-    std::vector<std::string> getAvailableSymbols();
+    Result<std::vector<std::string>> getAvailableSymbols();
     
-    bool checkSymbolExists(const std::string& symbol);
+    Result<bool> checkSymbolExists(const std::string& symbol);
     
     // Utility methods
     std::string getLastError() const;
     nlohmann::json getConnectionInfo() const;
     
     // Static methods for environment-based connection
-    static DatabaseConnection createFromEnvironment();
-    static DatabaseConnection createDefault();
+    static Result<DatabaseConnection> createFromEnvironment();
 };
 
 /*
@@ -118,4 +124,3 @@ public:
     }
 };
 
-#endif // DATABASE_CONNECTION_H

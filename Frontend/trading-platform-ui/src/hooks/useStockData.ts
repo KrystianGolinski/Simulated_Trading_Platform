@@ -5,7 +5,9 @@ export const useStockData = (
   symbol: string,
   startDate: string,
   endDate: string,
-  timeframe: 'daily' = 'daily'
+  timeframe: 'daily' = 'daily',
+  page: number = 1,
+  pageSize: number = 1000
 ) => {
   const [data, setData] = useState<StockData[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -19,13 +21,15 @@ export const useStockData = (
       setError(null);
       
       try {
-        const stockData = await apiService.getStockData(
+        const response = await apiService.getStockData(
           symbol, 
           startDate, 
           endDate, 
-          timeframe
+          timeframe,
+          page,
+          pageSize
         );
-        setData(stockData);
+        setData(response.data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch data');
       } finally {
@@ -34,13 +38,13 @@ export const useStockData = (
     };
 
     fetchData();
-  }, [symbol, startDate, endDate, timeframe]);
+  }, [symbol, startDate, endDate, timeframe, page, pageSize]);
 
   return { data, loading, error };
 };
 
-// Hook for available stocks
-export const useStocks = () => {
+// Hook for available stocks with pagination
+export const useStocks = (page: number = 1, pageSize: number = 1000) => {
   const [stocks, setStocks] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,8 +52,8 @@ export const useStocks = () => {
   useEffect(() => {
     const fetchStocks = async () => {
       try {
-        const stockList = await apiService.getStocks();
-        setStocks(stockList);
+        const response = await apiService.getStocks(page, pageSize);
+        setStocks(response.data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch stocks');
       } finally {
@@ -58,7 +62,7 @@ export const useStocks = () => {
     };
 
     fetchStocks();
-  }, []);
+  }, [page, pageSize]);
 
   return { stocks, loading, error };
 };

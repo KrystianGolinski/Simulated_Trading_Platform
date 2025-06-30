@@ -72,8 +72,10 @@ const mockSimulationResults: SimulationResults = {
     end_date: '2023-12-31',
     starting_capital: 10000,
     strategy: 'ma_crossover',
-    short_ma: 20,
-    long_ma: 50
+    strategy_parameters: {
+      short_ma: 20,
+      long_ma: 50
+    }
   },
   starting_capital: 10000,
   ending_value: 11550,

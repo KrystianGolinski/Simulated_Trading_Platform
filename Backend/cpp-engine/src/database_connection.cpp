@@ -1,4 +1,5 @@
 #include "database_connection.h"
+#include "error_utils.h"
 #include <iostream>
 #include <sstream>
 #include <cstdlib>
@@ -7,8 +8,20 @@
 // Constructors and destructor
 DatabaseConnection::DatabaseConnection() 
     : connection_(nullptr), connected_(false),
-      host_("postgres"), port_("5432"), database_("simulated_trading_platform"),
-      username_("trading_user"), password_("trading_password") {
+      host_(getenv("DB_HOST") ? getenv("DB_HOST") : "localhost"),
+      port_(getenv("DB_PORT") ? getenv("DB_PORT") : "5433"),
+      database_(getenv("DB_NAME") ? getenv("DB_NAME") : "simulated_trading_platform"),
+      username_(getenv("DB_USER") ? getenv("DB_USER") : "trading_user"),
+      password_(getenv("DB_PASSWORD") ? getenv("DB_PASSWORD") : "trading_password") {
+    
+    // Log connection configuration (without password for security)
+    std::cerr << "[CONFIG] Database connection: " << username_ << "@" << host_ << ":" << port_ << "/" << database_ << std::endl;
+    if (getenv("DB_HOST")) {
+        std::cerr << "[CONFIG] Using environment variables for database configuration" << std::endl;
+    } else {
+        std::cerr << "[CONFIG] Using default database configuration" << std::endl;
+    }
+    
     buildConnectionString();
 }
 
@@ -70,62 +83,52 @@ void DatabaseConnection::buildConnectionString() {
     connection_string_ = ss.str();
 }
 
-void DatabaseConnection::handleError(const std::string& operation) {
-    if (connection_) {
-        std::cerr << "Database error during " << operation << ": " 
-                  << PQerrorMessage(connection_) << std::endl;
-    } else {
-        std::cerr << "Database error during " << operation << ": No connection" << std::endl;
-    }
-}
 
 // Connection management
-bool DatabaseConnection::connect() {
+Result<void> DatabaseConnection::connect() {
     if (connected_) {
-        return true;
+        return Result<void>();
     }
     
     connection_ = PQconnectdb(connection_string_.c_str());
     
     if (PQstatus(connection_) != CONNECTION_OK) {
-        handleError("connection");
+        std::string error_msg = "Database connection failed: " + std::string(PQerrorMessage(connection_));
         disconnect();
-        return false;
+        return Result<void>(ErrorCode::DATABASE_CONNECTION_FAILED, error_msg);
     }
     
     connected_ = true;
-    return true;
+    return Result<void>();
 }
 
-bool DatabaseConnection::disconnect() {
+Result<void> DatabaseConnection::disconnect() {
     if (connection_) {
         PQfinish(connection_);
         connection_ = nullptr;
     }
     connected_ = false;
-    return true;
+    return Result<void>();
 }
 
 bool DatabaseConnection::isConnected() const {
     return connected_ && connection_ && PQstatus(connection_) == CONNECTION_OK;
 }
 
-bool DatabaseConnection::testConnection() {
-    if (!connect()) {
-        return false;
+Result<void> DatabaseConnection::testConnection() {
+    auto conn_result = connect();
+    if (conn_result.isError()) {
+        return conn_result;
     }
     
     // Execute a simple test query
-    PGresult* result = PQexec(connection_, "SELECT version();");
-    
-    if (PQresultStatus(result) != PGRES_TUPLES_OK) {
-        handleError("test query");
-        PQclear(result);
-        return false;
+    auto query_result = executeQueryInternal("SELECT version();");
+    if (query_result.isError()) {
+        return Result<void>(query_result.getError());
     }
     
-    PQclear(result);
-    return true;
+    PQclear(query_result.getValue());
+    return Result<void>();
 }
 
 // Configuration
@@ -133,7 +136,11 @@ void DatabaseConnection::setConnectionParams(const std::string& host, const std:
                                             const std::string& database, const std::string& username,
                                             const std::string& password) {
     if (connected_) {
-        disconnect();
+        auto disc_result = disconnect();
+        // Log disconnect error but don't fail the assignment
+        if (disc_result.isError()) {
+            std::cerr << "Database disconnect error during move assignment: " << disc_result.getError().message << std::endl;
+        }
     }
     
     host_ = host;
@@ -145,49 +152,119 @@ void DatabaseConnection::setConnectionParams(const std::string& host, const std:
     buildConnectionString();
 }
 
-// Query execution
-bool DatabaseConnection::executeQuery(const std::string& query, PGresult*& result) {
-    if (!isConnected() && !connect()) {
-        return false;
+// Query execution helper - returns PGresult* wrapped in Result<T>
+Result<PGresult*> DatabaseConnection::executeQueryInternal(const std::string& query) {
+    // Ensure connection
+    if (!isConnected()) {
+        auto conn_result = connect();
+        if (conn_result.isError()) {
+            return Result<PGresult*>(conn_result.getError());
+        }
     }
     
-    result = PQexec(connection_, query.c_str());
+    PGresult* result = PQexec(connection_, query.c_str());
     
     if (!result) {
-        handleError("query execution");
-        return false;
+        return Result<PGresult*>(ErrorCode::DATABASE_QUERY_FAILED, 
+                                "Query execution failed: no result returned");
     }
     
     ExecStatusType status = PQresultStatus(result);
     if (status != PGRES_COMMAND_OK && status != PGRES_TUPLES_OK) {
-        handleError("query execution");
+        std::string error_msg = "Query execution failed: " + std::string(PQerrorMessage(connection_));
         PQclear(result);
-        result = nullptr;
-        return false;
+        return Result<PGresult*>(ErrorCode::DATABASE_QUERY_FAILED, error_msg);
     }
     
-    return true;
+    return Result<PGresult*>(result);
 }
 
-bool DatabaseConnection::executeQuery(const std::string& query) {
-    PGresult* result;
-    bool success = executeQuery(query, result);
-    if (result) {
-        PQclear(result);
+Result<void> DatabaseConnection::executeQuery(const std::string& query) {
+    auto result = executeQueryInternal(query);
+    if (result.isError()) {
+        return Result<void>(result.getError());
     }
-    return success;
+    
+    PQclear(result.getValue());
+    return Result<void>();
 }
 
-std::vector<std::map<std::string, std::string>> DatabaseConnection::selectQuery(const std::string& query) {
+Result<std::vector<std::map<std::string, std::string>>> DatabaseConnection::selectQuery(const std::string& query) {
+    auto result = executeQueryInternal(query);
+    if (result.isError()) {
+        return Result<std::vector<std::map<std::string, std::string>>>(result.getError());
+    }
+    
+    PGResultWrapper wrapper(result.getValue());
+    PGresult* pg_result = result.getValue();
+    
     std::vector<std::map<std::string, std::string>> results;
+    int num_rows = PQntuples(pg_result);
+    int num_cols = PQnfields(pg_result);
     
-    PGresult* result;
-    if (!executeQuery(query, result)) {
-        return results;
+    for (int row = 0; row < num_rows; ++row) {
+        std::map<std::string, std::string> row_data;
+        
+        for (int col = 0; col < num_cols; ++col) {
+            std::string field_name = PQfname(pg_result, col);
+            std::string field_value = PQgetisnull(pg_result, row, col) ? 
+                                    "" : PQgetvalue(pg_result, row, col);
+            row_data[field_name] = field_value;
+        }
+        
+        results.push_back(std::move(row_data));
+    }
+    
+    return Result<std::vector<std::map<std::string, std::string>>>(std::move(results));
+}
+
+Result<std::vector<std::map<std::string, std::string>>> DatabaseConnection::executePreparedQuery(
+    const std::string& query, 
+    const std::vector<std::string>& params) {
+    
+    // Ensure connection
+    if (!isConnected()) {
+        auto conn_result = connect();
+        if (conn_result.isError()) {
+            return Result<std::vector<std::map<std::string, std::string>>>(conn_result.getError());
+        }
+    }
+    
+    // Convert parameters to C-style arrays for PostgreSQL
+    std::vector<const char*> param_values;
+    param_values.reserve(params.size());
+    
+    for (const auto& param : params) {
+        param_values.push_back(param.c_str());
+    }
+    
+    // Execute parameterized query
+    PGresult* result = PQexecParams(
+        connection_,
+        query.c_str(),
+        static_cast<int>(params.size()),
+        nullptr,  // param types (NULL = infer)
+        param_values.data(),
+        nullptr,  // param lengths (NULL = text format)
+        nullptr,  // param formats (NULL = text format)
+        0         // result format (0 = text)
+    );
+    
+    if (!result) {
+        return Result<std::vector<std::map<std::string, std::string>>>(
+            ErrorCode::DATABASE_QUERY_FAILED, "Prepared query execution failed: no result returned");
     }
     
     PGResultWrapper wrapper(result);
     
+    ExecStatusType status = PQresultStatus(result);
+    if (status != PGRES_TUPLES_OK) {
+        std::string error_msg = "Prepared query execution failed: " + std::string(PQerrorMessage(connection_));
+        return Result<std::vector<std::map<std::string, std::string>>>(ErrorCode::DATABASE_QUERY_FAILED, error_msg);
+    }
+    
+    // Process results same as selectQuery
+    std::vector<std::map<std::string, std::string>> results;
     int num_rows = PQntuples(result);
     int num_cols = PQnfields(result);
     
@@ -204,56 +281,70 @@ std::vector<std::map<std::string, std::string>> DatabaseConnection::selectQuery(
         results.push_back(std::move(row_data));
     }
     
-    return results;
+    return Result<std::vector<std::map<std::string, std::string>>>(std::move(results));
 }
 
 // Stock data specific queries
-std::vector<std::map<std::string, std::string>> DatabaseConnection::getStockPrices(
+Result<std::vector<std::map<std::string, std::string>>> DatabaseConnection::getStockPrices(
     const std::string& symbol, 
     const std::string& start_date, 
     const std::string& end_date) {
     
-    std::stringstream query;
-    query << "SELECT to_char(time, 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') as time, symbol, open, high, low, close, volume "
-          << "FROM stock_prices_daily "
-          << "WHERE symbol = '" << symbol << "' "
-          << "AND time >= '" << start_date << "' "
-          << "AND time <= '" << end_date << "' "
-          << "ORDER BY time ASC;";
+    std::string query = "SELECT to_char(time, 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') as time, symbol, open, high, low, close, volume "
+                       "FROM stock_prices_daily "
+                       "WHERE symbol = $1 "
+                       "AND time >= $2 "
+                       "AND time <= $3 "
+                       "ORDER BY time ASC;";
     
-    return selectQuery(query.str());
+    std::vector<std::string> params = {symbol, start_date, end_date};
+    return executePreparedQuery(query, params);
 }
 
-std::vector<std::string> DatabaseConnection::getAvailableSymbols() {
-    std::vector<std::string> symbols;
-    
+Result<std::vector<std::string>> DatabaseConnection::getAvailableSymbols() {
     std::string query = "SELECT DISTINCT symbol FROM stock_prices_daily ORDER BY symbol;";
     auto results = selectQuery(query);
     
-    for (const auto& row : results) {
+    if (results.isError()) {
+        return Result<std::vector<std::string>>(results.getError());
+    }
+    
+    std::vector<std::string> symbols;
+    for (const auto& row : results.getValue()) {
         auto it = row.find("symbol");
         if (it != row.end()) {
             symbols.push_back(it->second);
         }
     }
     
-    return symbols;
+    return Result<std::vector<std::string>>(std::move(symbols));
 }
 
-bool DatabaseConnection::checkSymbolExists(const std::string& symbol) {
-    std::stringstream query;
-    query << "SELECT COUNT(*) as count FROM stock_prices_daily WHERE symbol = '" << symbol << "';";
+Result<bool> DatabaseConnection::checkSymbolExists(const std::string& symbol) {
+    std::string query = "SELECT COUNT(*) as count FROM stock_prices_daily WHERE symbol = $1;";
     
-    auto results = selectQuery(query.str());
+    std::vector<std::string> params = {symbol};
+    auto results = executePreparedQuery(query, params);
     
-    if (!results.empty()) {
-        auto it = results[0].find("count");
-        if (it != results[0].end()) {
-            return std::stoi(it->second) > 0;
+    if (results.isError()) {
+        return Result<bool>(results.getError());
+    }
+    
+    const auto& result_data = results.getValue();
+    if (!result_data.empty()) {
+        auto it = result_data[0].find("count");
+        if (it != result_data[0].end()) {
+            try {
+                bool exists = std::stoi(it->second) > 0;
+                return Result<bool>(exists);
+            } catch (const std::exception& e) {
+                return Result<bool>(ErrorCode::DATA_PARSING_FAILED, 
+                                  "Failed to parse count result: " + std::string(e.what()));
+            }
         }
     }
     
-    return false;
+    return Result<bool>(ErrorCode::DATA_SYMBOL_NOT_FOUND, "No count result returned for symbol: " + symbol);
 }
 
 // Utility methods
@@ -281,24 +372,27 @@ nlohmann::json DatabaseConnection::getConnectionInfo() const {
 }
 
 // Static methods - Simplified for Docker environment
-DatabaseConnection DatabaseConnection::createFromEnvironment() {
-    // Always assume Docker environment with known container names and credentials
-    const char* host = std::getenv("DB_HOST");
-    const char* port = std::getenv("DB_PORT");
-    const char* database = std::getenv("DB_NAME");
-    const char* username = std::getenv("DB_USER");
-    const char* password = std::getenv("DB_PASSWORD");
-    
-    return DatabaseConnection(
-        host ? host : "postgres",           // Docker service name
-        port ? port : "5432",              // Standard PostgreSQL port inside container
-        database ? database : "simulated_trading_platform",
-        username ? username : "trading_user",
-        password ? password : "trading_password"
-    );
+Result<DatabaseConnection> DatabaseConnection::createFromEnvironment() {
+    try {
+        // Always assume Docker environment with known container names and credentials
+        const char* host = std::getenv("DB_HOST");
+        const char* port = std::getenv("DB_PORT");
+        const char* database = std::getenv("DB_NAME");
+        const char* username = std::getenv("DB_USER");
+        const char* password = std::getenv("DB_PASSWORD");
+        
+        DatabaseConnection conn(
+            host ? host : "postgres",           // Docker service name
+            port ? port : "5432",              // Standard PostgreSQL port inside container
+            database ? database : "simulated_trading_platform",
+            username ? username : "trading_user",
+            password ? password : "trading_password"
+        );
+        
+        return Result<DatabaseConnection>(std::move(conn));
+    } catch (const std::exception& e) {
+        return Result<DatabaseConnection>(ErrorCode::SYSTEM_CONFIGURATION_ERROR, 
+                                        "Failed to create database connection from environment: " + std::string(e.what()));
+    }
 }
 
-DatabaseConnection DatabaseConnection::createDefault() {
-    // Always use Docker environment defaults
-    return createFromEnvironment();
-}

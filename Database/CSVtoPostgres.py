@@ -5,7 +5,6 @@ from psycopg2.extras import execute_values
 import os
 import json
 import logging
-from datetime import datetime
 from typing import Dict, List
 
 logging.basicConfig(level=logging.INFO)

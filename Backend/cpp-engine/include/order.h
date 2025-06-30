@@ -1,5 +1,4 @@
-#ifndef ORDER_H
-#define ORDER_H
+#pragma once
 
 #include <string>
 
@@ -70,5 +69,3 @@ public:
     // Validation
     bool isValid() const;
 };
-
-#endif // ORDER_H

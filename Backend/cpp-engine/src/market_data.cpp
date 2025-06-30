@@ -1,4 +1,5 @@
 #include "market_data.h"
+#include "error_utils.h"
 #include <iostream>
 #include <sstream>
 #include <iomanip>
@@ -9,8 +10,17 @@
 
 // MarketData implementation
 MarketData::MarketData() 
-    : db_connection_(std::make_unique<DatabaseConnection>(DatabaseConnection::createFromEnvironment())),
-      cache_enabled_(true) {
+    : cache_enabled_(true) {
+    // Create database connection using Result pattern
+    auto conn_result = DatabaseConnection::createFromEnvironment();
+    if (conn_result.isSuccess()) {
+        db_connection_ = std::make_unique<DatabaseConnection>(std::move(conn_result.getValue()));
+    } else {
+        // Log error but allow construction - connection will be attempted later
+        std::cerr << "Warning: Failed to create database connection during MarketData construction: " 
+                  << conn_result.getErrorMessage() << std::endl;
+        db_connection_ = nullptr;
+    }
 }
 
 MarketData::MarketData(std::unique_ptr<DatabaseConnection> db_conn) 
@@ -35,27 +45,34 @@ MarketData& MarketData::operator=(MarketData&& other) noexcept {
 }
 
 // Helper methods
-bool MarketData::ensureConnection() const {
+Result<void> MarketData::ensureConnection() const {
     if (!db_connection_) {
-        return false;
+        return Result<void>(ErrorCode::DATABASE_CONNECTION_FAILED, "No database connection available");
     }
-    return db_connection_->isConnected() || db_connection_->connect();
+    
+    if (db_connection_->isConnected()) {
+        return Result<void>();
+    }
+    
+    return db_connection_->connect();
 }
 
 void MarketData::cachePrice(const std::string& symbol, double price) const {
     if (cache_enabled_) {
+        std::lock_guard<std::mutex> lock(cache_mutex_);
         price_cache_[symbol] = price;
     }
 }
 
-double MarketData::getCachedPrice(const std::string& symbol) const {
+Result<double> MarketData::getCachedPrice(const std::string& symbol) const {
     if (cache_enabled_) {
+        std::lock_guard<std::mutex> lock(cache_mutex_);
         auto it = price_cache_.find(symbol);
         if (it != price_cache_.end()) {
-            return it->second;
+            return Result<double>(it->second);
         }
     }
-    return 0.0;
+    return Result<double>(ErrorCode::DATA_SYMBOL_NOT_FOUND, "Symbol not found in cache: " + symbol);
 }
 
 // Configuration
@@ -76,81 +93,95 @@ bool MarketData::isConnected() const {
 }
 
 // Basic price access
-double MarketData::getPrice(const std::string& symbol) const {
-    return getLatestPrice(symbol);
-}
-
-double MarketData::getLatestPrice(const std::string& symbol) const {
+Result<double> MarketData::getLatestPrice(const std::string& symbol) const {
     // Check cache first
     if (cache_enabled_) {
-        double cached = getCachedPrice(symbol);
-        if (cached > 0.0) {
+        auto cached = getCachedPrice(symbol);
+        if (cached.isSuccess()) {
             return cached;
         }
     }
     
-    if (!ensureConnection()) {
-        std::cerr << "Database connection failed" << std::endl;
-        return 0.0;
+    auto conn_result = ensureConnection();
+    if (conn_result.isError()) {
+        return Result<double>(conn_result.getError());
     }
     
     // Query for the latest price
-    std::stringstream query;
-    query << "SELECT close FROM stock_prices_daily "
-          << "WHERE symbol = '" << symbol << "' "
-          << "ORDER BY time DESC LIMIT 1;";
+    std::string query = "SELECT close FROM stock_prices_daily "
+                       "WHERE symbol = $1 "
+                       "ORDER BY time DESC LIMIT 1;";
     
-    auto results = db_connection_->selectQuery(query.str());
+    std::vector<std::string> params = {symbol};
+    auto results = db_connection_->executePreparedQuery(query, params);
     
-    if (!results.empty()) {
-        auto it = results[0].find("close");
-        if (it != results[0].end() && !it->second.empty()) {
-            double price = std::stod(it->second);
-            cachePrice(symbol, price);
-            return price;
+    if (results.isError()) {
+        return Result<double>(results.getError());
+    }
+    
+    const auto& result_data = results.getValue();
+    if (!result_data.empty()) {
+        auto it = result_data[0].find("close");
+        if (it != result_data[0].end() && !it->second.empty()) {
+            try {
+                double price = std::stod(it->second);
+                cachePrice(symbol, price);
+                return Result<double>(price);
+            } catch (const std::exception& e) {
+                return Result<double>(ErrorCode::DATA_PARSING_FAILED, 
+                                    "Failed to parse price data: " + std::string(e.what()));
+            }
         }
     }
     
-    return 0.0;
+    return Result<double>(ErrorCode::DATA_SYMBOL_NOT_FOUND, "Symbol not found: " + symbol);
 }
 
-std::map<std::string, double> MarketData::getCurrentPrices() const {
-    auto symbols = getAvailableSymbols();
-    return getCurrentPrices(symbols);
+Result<std::map<std::string, double>> MarketData::getCurrentPrices() const {
+    auto symbols_result = getAvailableSymbols();
+    if (symbols_result.isError()) {
+        return Result<std::map<std::string, double>>(symbols_result.getError());
+    }
+    return getCurrentPrices(symbols_result.getValue());
 }
 
-std::map<std::string, double> MarketData::getCurrentPrices(const std::vector<std::string>& symbols) const {
+Result<std::map<std::string, double>> MarketData::getCurrentPrices(const std::vector<std::string>& symbols) const {
     std::map<std::string, double> prices;
     
     for (const auto& symbol : symbols) {
-        double price = getLatestPrice(symbol);
-        if (price > 0.0) {
-            prices[symbol] = price;
+        auto price_result = getLatestPrice(symbol);
+        if (price_result.isSuccess()) {
+            prices[symbol] = price_result.getValue();
+        } else {
+            // Check if it's a symbol not found error (continue) or database error (stop)
+            if (price_result.getErrorCode() == ErrorCode::DATA_SYMBOL_NOT_FOUND) {
+                // Log warning but continue with other symbols
+                std::cerr << "Warning: " << price_result.getErrorMessage() << std::endl;
+            } else {
+                // Database or other critical errors - return error
+                return Result<std::map<std::string, double>>(price_result.getError());
+            }
         }
     }
     
-    return prices;
+    return Result<std::map<std::string, double>>(std::move(prices));
 }
 
 // Historical data access
-std::vector<std::map<std::string, std::string>> MarketData::getHistoricalPrices(
+Result<std::vector<std::map<std::string, std::string>>> MarketData::getHistoricalPrices(
     const std::string& symbol,
     const std::string& start_date,
     const std::string& end_date) const {
     
-    std::vector<std::map<std::string, std::string>> prices;
-    
-    if (!ensureConnection()) {
-        std::cerr << "Database connection failed" << std::endl;
-        return prices;
+    auto conn_result = ensureConnection();
+    if (conn_result.isError()) {
+        return Result<std::vector<std::map<std::string, std::string>>>(conn_result.getError());
     }
     
-    auto results = db_connection_->getStockPrices(symbol, start_date, end_date);
-    
-    return results;
+    return db_connection_->getStockPrices(symbol, start_date, end_date);
 }
 
-std::map<std::string, std::vector<std::map<std::string, std::string>>> MarketData::getHistoricalPrices(
+Result<std::map<std::string, std::vector<std::map<std::string, std::string>>>> MarketData::getHistoricalPrices(
     const std::vector<std::string>& symbols,
     const std::string& start_date,
     const std::string& end_date) const {
@@ -158,14 +189,18 @@ std::map<std::string, std::vector<std::map<std::string, std::string>>> MarketDat
     std::map<std::string, std::vector<std::map<std::string, std::string>>> all_prices;
     
     for (const auto& symbol : symbols) {
-        all_prices[symbol] = getHistoricalPrices(symbol, start_date, end_date);
+        auto prices_result = getHistoricalPrices(symbol, start_date, end_date);
+        if (prices_result.isError()) {
+            return Result<std::map<std::string, std::vector<std::map<std::string, std::string>>>>(prices_result.getError());
+        }
+        all_prices[symbol] = prices_result.getValue();
     }
     
-    return all_prices;
+    return Result<std::map<std::string, std::vector<std::map<std::string, std::string>>>>(std::move(all_prices));
 }
 
 // Date range utilities
-std::vector<std::map<std::string, std::string>> MarketData::getPricesForDateRange(
+Result<std::vector<std::map<std::string, std::string>>> MarketData::getPricesForDateRange(
     const std::string& symbol,
     const std::string& start_date,
     const std::string& end_date) const {
@@ -173,123 +208,178 @@ std::vector<std::map<std::string, std::string>> MarketData::getPricesForDateRang
     return getHistoricalPrices(symbol, start_date, end_date);
 }
 
-std::map<std::string, std::string> MarketData::getPriceForDate(const std::string& symbol, const std::string& date) const {
-    auto prices = getHistoricalPrices(symbol, date, date);
+Result<std::map<std::string, std::string>> MarketData::getPriceForDate(const std::string& symbol, const std::string& date) const {
+    auto prices_result = getHistoricalPrices(symbol, date, date);
     
-    if (!prices.empty()) {
-        return prices[0];
+    if (prices_result.isError()) {
+        return Result<std::map<std::string, std::string>>(prices_result.getError());
     }
     
-    return std::map<std::string, std::string>(); // Return empty price data
+    const auto& prices = prices_result.getValue();
+    if (!prices.empty()) {
+        return Result<std::map<std::string, std::string>>(prices[0]);
+    }
+    
+    return Result<std::map<std::string, std::string>>(ErrorCode::DATA_SYMBOL_NOT_FOUND, 
+                                                     "No price data found for symbol " + symbol + " on date " + date);
 }
 
 // Symbol validation and discovery
-bool MarketData::symbolExists(const std::string& symbol) const {
-    if (!ensureConnection()) {
-        return false;
+Result<bool> MarketData::symbolExists(const std::string& symbol) const {
+    auto conn_result = ensureConnection();
+    if (conn_result.isError()) {
+        return Result<bool>(conn_result.getError());
     }
     
     return db_connection_->checkSymbolExists(symbol);
 }
 
-std::vector<std::string> MarketData::getAvailableSymbols() const {
-    if (!ensureConnection()) {
-        return {};
+Result<std::vector<std::string>> MarketData::getAvailableSymbols() const {
+    auto conn_result = ensureConnection();
+    if (conn_result.isError()) {
+        return Result<std::vector<std::string>>(conn_result.getError());
     }
     
     return db_connection_->getAvailableSymbols();
 }
 
 // Data validation and statistics
-int MarketData::getDataPointCount(const std::string& symbol, 
-                                 const std::string& start_date, 
-                                 const std::string& end_date) const {
+Result<int> MarketData::getDataPointCount(const std::string& symbol, 
+                                        const std::string& start_date, 
+                                        const std::string& end_date) const {
     
-    if (!ensureConnection()) {
-        return 0;
+    auto conn_result = ensureConnection();
+    if (conn_result.isError()) {
+        return Result<int>(conn_result.getError());
     }
     
-    std::stringstream query;
-    query << "SELECT COUNT(*) as count FROM stock_prices_daily "
-          << "WHERE symbol = '" << symbol << "' "
-          << "AND time >= '" << start_date << "' "
-          << "AND time <= '" << end_date << "';";
+    std::string query = "SELECT COUNT(*) as count FROM stock_prices_daily "
+                       "WHERE symbol = $1 "
+                       "AND time >= $2 "
+                       "AND time <= $3;";
     
-    auto results = db_connection_->selectQuery(query.str());
+    std::vector<std::string> params = {symbol, start_date, end_date};
+    auto results = db_connection_->executePreparedQuery(query, params);
     
-    if (!results.empty()) {
-        auto it = results[0].find("count");
-        if (it != results[0].end()) {
-            return std::stoi(it->second);
+    if (results.isError()) {
+        return Result<int>(results.getError());
+    }
+    
+    const auto& result_data = results.getValue();
+    if (!result_data.empty()) {
+        auto it = result_data[0].find("count");
+        if (it != result_data[0].end()) {
+            try {
+                int count = std::stoi(it->second);
+                return Result<int>(count);
+            } catch (const std::exception& e) {
+                return Result<int>(ErrorCode::DATA_PARSING_FAILED, 
+                                 "Failed to parse count result: " + std::string(e.what()));
+            }
         }
     }
     
-    return 0;
+    return Result<int>(ErrorCode::DATA_SYMBOL_NOT_FOUND, "No count result returned for query");
 }
 
-std::pair<std::string, std::string> MarketData::getDateRange(const std::string& symbol) const {
-    if (!ensureConnection()) {
-        return {"", ""};
+Result<std::pair<std::string, std::string>> MarketData::getDateRange(const std::string& symbol) const {
+    auto conn_result = ensureConnection();
+    if (conn_result.isError()) {
+        return Result<std::pair<std::string, std::string>>(conn_result.getError());
     }
     
-    std::stringstream query;
-    query << "SELECT MIN(time) as min_date, MAX(time) as max_date "
-          << "FROM stock_prices_daily WHERE symbol = '" << symbol << "';";
+    std::string query = "SELECT MIN(time) as min_date, MAX(time) as max_date "
+                       "FROM stock_prices_daily WHERE symbol = $1;";
     
-    auto results = db_connection_->selectQuery(query.str());
+    std::vector<std::string> params = {symbol};
+    auto results = db_connection_->executePreparedQuery(query, params);
     
-    if (!results.empty()) {
-        auto min_it = results[0].find("min_date");
-        auto max_it = results[0].find("max_date");
+    if (results.isError()) {
+        return Result<std::pair<std::string, std::string>>(results.getError());
+    }
+    
+    const auto& result_data = results.getValue();
+    if (!result_data.empty()) {
+        auto min_it = result_data[0].find("min_date");
+        auto max_it = result_data[0].find("max_date");
         
-        if (min_it != results[0].end() && max_it != results[0].end()) {
-            std::string min_date = min_it->second.substr(0, 10);
-            std::string max_date = max_it->second.substr(0, 10);
-            return {min_date, max_date};
+        if (min_it != result_data[0].end() && max_it != result_data[0].end()) {
+            try {
+                std::string min_date = min_it->second.substr(0, 10);
+                std::string max_date = max_it->second.substr(0, 10);
+                return Result<std::pair<std::string, std::string>>(std::make_pair(min_date, max_date));
+            } catch (const std::exception& e) {
+                return Result<std::pair<std::string, std::string>>(ErrorCode::DATA_PARSING_FAILED, 
+                                                                  "Failed to parse date range: " + std::string(e.what()));
+            }
         }
     }
     
-    return {"", ""};
+    return Result<std::pair<std::string, std::string>>(ErrorCode::DATA_SYMBOL_NOT_FOUND, 
+                                                       "No date range found for symbol: " + symbol);
 }
 
 // Utility methods
 void MarketData::clearCache() {
+    std::lock_guard<std::mutex> lock(cache_mutex_);
     price_cache_.clear();
 }
 
-nlohmann::json MarketData::getDataSummary(const std::string& symbol,
-                                         const std::string& start_date,
-                                         const std::string& end_date) const {
+Result<nlohmann::json> MarketData::getDataSummary(const std::string& symbol,
+                                                  const std::string& start_date,
+                                                  const std::string& end_date) const {
     nlohmann::json summary;
     summary["symbol"] = symbol;
     summary["start_date"] = start_date;
     summary["end_date"] = end_date;
-    summary["data_points"] = getDataPointCount(symbol, start_date, end_date);
     
-    auto date_range = getDateRange(symbol);
+    // Get data point count
+    auto count_result = getDataPointCount(symbol, start_date, end_date);
+    if (count_result.isError()) {
+        return Result<nlohmann::json>(count_result.getError());
+    }
+    summary["data_points"] = count_result.getValue();
+    
+    // Get date range
+    auto date_range_result = getDateRange(symbol);
+    if (date_range_result.isError()) {
+        return Result<nlohmann::json>(date_range_result.getError());
+    }
+    auto date_range = date_range_result.getValue();
     summary["available_range"] = {
         {"start", date_range.first},
         {"end", date_range.second}
     };
     
-    summary["status"] = symbolExists(symbol) ? "success" : "symbol_not_found";
+    // Check if symbol exists
+    auto exists_result = symbolExists(symbol);
+    if (exists_result.isError()) {
+        return Result<nlohmann::json>(exists_result.getError());
+    }
+    summary["status"] = exists_result.getValue() ? "success" : "symbol_not_found";
     
-    return summary;
+    return Result<nlohmann::json>(std::move(summary));
 }
 
 // Test methods
-bool MarketData::testDatabaseConnection() const {
+Result<void> MarketData::testDatabaseConnection() const {
     if (!db_connection_) {
-        return false;
+        return Result<void>(ErrorCode::DATABASE_CONNECTION_FAILED, "No database connection available");
     }
     return db_connection_->testConnection();
 }
 
-nlohmann::json MarketData::getDatabaseInfo() const {
+Result<nlohmann::json> MarketData::getDatabaseInfo() const {
     if (!db_connection_) {
-        return nlohmann::json::object();
+        return Result<nlohmann::json>(ErrorCode::DATABASE_CONNECTION_FAILED, "No database connection available");
     }
-    return db_connection_->getConnectionInfo();
+    try {
+        auto info = db_connection_->getConnectionInfo();
+        return Result<nlohmann::json>(std::move(info));
+    } catch (const std::exception& e) {
+        return Result<nlohmann::json>(ErrorCode::DATABASE_CONNECTION_FAILED, 
+                                    "Failed to get database info: " + std::string(e.what()));
+    }
 }
 
 // Static helper methods

@@ -1,7 +1,5 @@
 import logging
-import re
 from typing import Dict, Any, Optional, List
-from datetime import datetime
 from .error_types import SimulationError, ErrorCode, ErrorSeverity
 from .error_categorizers import (
     ErrorCategorizer, TimeoutErrorCategorizer, PermissionErrorCategorizer,

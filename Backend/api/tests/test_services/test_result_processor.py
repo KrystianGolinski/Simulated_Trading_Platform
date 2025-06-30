@@ -1,9 +1,9 @@
 import pytest
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from datetime import datetime, timedelta
 from services.result_processor import ResultProcessor
-from models import SimulationResults, SimulationStatus, PerformanceMetrics, TradeRecord, SimulationConfig, StrategyType
+from models import SimulationResults, SimulationStatus, SimulationConfig
 
 class TestResultProcessor:
     

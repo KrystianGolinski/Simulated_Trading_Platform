@@ -1,6 +1,7 @@
 #include "argument_parser.h"
 #include <sstream>
 #include <algorithm>
+#include <iostream>
 
 ArgumentParser::ArgumentParser() {}
 

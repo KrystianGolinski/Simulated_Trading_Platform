@@ -1,5 +1,4 @@
-#ifndef DATA_CONVERSION_H
-#define DATA_CONVERSION_H
+#pragma once
 
 #include "technical_indicators.h"
 #include <vector>
@@ -29,5 +28,3 @@ namespace DataConversion {
                              const std::string& field, 
                              const std::string& fallback = "");
 }
-
-#endif // DATA_CONVERSION_H

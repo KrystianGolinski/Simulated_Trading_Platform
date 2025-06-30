@@ -1,9 +1,7 @@
-#ifndef ARGUMENT_PARSER_H
-#define ARGUMENT_PARSER_H
+#pragma once
 
 #include <string>
 #include <vector>
-#include <iostream>
 
 struct SimulationConfig {
     std::vector<std::string> symbols;
@@ -37,5 +35,3 @@ private:
     
     std::string trimWhitespace(const std::string& str);
 };
-
-#endif

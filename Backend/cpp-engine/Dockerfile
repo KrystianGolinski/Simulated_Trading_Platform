@@ -27,8 +27,7 @@ COPY tests/ tests/
 # Make build script executable and build
 RUN chmod +x build.sh && ./build.sh
 
-# Run tests to verify build
-RUN ./build/test_basic
+# Build completes - tests will be run after services are up
 
 # Health check for the C++ engine
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \

@@ -1,12 +1,11 @@
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from models import PerformanceMetrics
 
 logger = logging.getLogger(__name__)
 
 class PerformanceCalculator:
-    def __init__(self):
-        pass
+    # No initialization needed for stateless calculation operations
     
     def calculate_performance_metrics(self, result_data: Dict[str, Any]) -> PerformanceMetrics:
         # Process performance metrics from C++ engine output

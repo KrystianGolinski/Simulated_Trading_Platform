@@ -13,9 +13,16 @@ from models import (
 from simulation_engine import simulation_engine
 from validation import SimulationValidator
 from response_models import StandardResponse, create_success_response, create_error_response, create_warning_response, ApiError
+from base_router import BaseRouter
 
 router = APIRouter(tags=["simulation"])
 logger = logging.getLogger(__name__)
+
+class SimulationRouter(BaseRouter):
+    # Simulation router with standardized error handling and validation
+    pass
+
+simulation_router = SimulationRouter()
 
 async def _validate_config(config: SimulationConfig, db: DatabaseManager) -> ValidationResult:
     # Centralized validation logic for simulation configurations
@@ -35,27 +42,8 @@ def _handle_validation_warnings(validation_result: ValidationResult) -> None:
 @router.post("/simulation/validate", response_model=StandardResponse[ValidationResult])
 async def validate_simulation_config(config: SimulationConfig, db: DatabaseManager = Depends(get_database)):
     # Validate simulation configuration without starting simulation
-    try:
-        validation_result = await _validate_config(config, db)
-        if validation_result.is_valid:
-            if validation_result.warnings:
-                return create_warning_response(
-                    validation_result,
-                    "Configuration is valid with warnings",
-                    validation_result.warnings
-                )
-            else:
-                return create_success_response(validation_result, "Configuration is valid")
-        else:
-            return create_error_response(
-                "Configuration validation failed",
-                [ApiError(code="VALIDATION_FAILED", message=error.message, field=error.field) for error in validation_result.errors]
-            )
-    except Exception as e:
-        return create_error_response(
-            "Validation system error",
-            [ApiError(code="VALIDATION_SYSTEM_ERROR", message=str(e))]
-        )
+    validation_result = await _validate_config(config, db)
+    return simulation_router.handle_validation_result(validation_result, "Configuration is valid")
 
 @router.post("/simulation/start", response_model=StandardResponse[SimulationResponse])
 async def start_simulation(config: SimulationConfig, db: DatabaseManager = Depends(get_database)):

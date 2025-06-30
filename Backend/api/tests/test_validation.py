@@ -1,8 +1,8 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 from datetime import date
 from validation import SimulationValidator
-from models import SimulationConfig, ValidationError, ValidationResult, StrategyType
+from models import SimulationConfig, StrategyType
 
 class TestSimulationValidator:
     

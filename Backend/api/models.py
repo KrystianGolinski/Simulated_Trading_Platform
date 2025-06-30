@@ -3,7 +3,29 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, date, timedelta
 from enum import Enum
 
+# Dynamic strategy type generation - strategies are loaded from registry
+# This replaces the hardcoded enum with dynamic strategy discovery
+def get_available_strategy_types():
+    try:
+        from strategy_registry import get_strategy_registry
+        registry = get_strategy_registry()
+        strategies = registry.get_available_strategies()
+        return {strategy_id: strategy_id for strategy_id in strategies.keys()}
+    except ImportError:
+        # Fallback to core strategies if registry not available
+        return {"ma_crossover": "ma_crossover", "rsi": "rsi"}
+
 class StrategyType(str, Enum):
+    # Dynamic strategy enumeration based on registered strategies
+    @classmethod
+    def _missing_(cls, value):
+        # Allow dynamic strategy values not explicitly defined
+        available_strategies = get_available_strategy_types()
+        if value in available_strategies:
+            return value
+        return None
+    
+    # Core strategies (always available)
     MA_CROSSOVER = "ma_crossover"
     RSI = "rsi"
 
@@ -18,14 +40,10 @@ class SimulationConfig(BaseModel):
     start_date: date = Field(..., description="Start date for simulation")
     end_date: date = Field(..., description="End date for simulation")
     starting_capital: float = Field(10000.0, gt=0, le=1000000, description="Starting capital in USD")
-    strategy: StrategyType = Field(StrategyType.MA_CROSSOVER, description="Trading strategy to use")
+    strategy: str = Field(..., description="Trading strategy to use (dynamic strategy ID)")
     
-    # Strategy-specific parameters
-    short_ma: Optional[int] = Field(20, gt=0, le=200, description="Short moving average period")
-    long_ma: Optional[int] = Field(50, gt=0, le=200, description="Long moving average period")
-    rsi_period: Optional[int] = Field(14, gt=0, le=100, description="RSI period")
-    rsi_oversold: Optional[float] = Field(30.0, gt=0, lt=100, description="RSI oversold threshold")
-    rsi_overbought: Optional[float] = Field(70.0, gt=0, lt=100, description="RSI overbought threshold")
+    # Dynamic strategy parameters - allows arbitrary strategy-specific parameters
+    strategy_parameters: Dict[str, Any] = Field(default_factory=dict, description="Strategy-specific parameters")
     
     @model_validator(mode='after')
     def validate_model(self):
@@ -39,11 +57,6 @@ class SimulationConfig(BaseModel):
         today = date.today()
         if self.start_date > today or self.end_date > today:
             raise ValueError('Dates cannot be in the future')
-        
-        # Critical validation: MA parameters if provided
-        if self.strategy == StrategyType.MA_CROSSOVER and self.short_ma and self.long_ma:
-            if self.long_ma <= self.short_ma:
-                raise ValueError('Long MA must be greater than short MA')
         
         return self
     

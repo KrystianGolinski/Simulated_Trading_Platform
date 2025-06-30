@@ -24,28 +24,20 @@ set(CORE_SOURCES
     src/command_dispatcher.cpp
     src/data_conversion.cpp
     src/json_helpers.cpp
+    src/logger.cpp
+    src/database_service.cpp
+    src/execution_service.cpp
+    src/progress_service.cpp
+    src/result.cpp
+    src/error_utils.cpp
 )
 
-set(CORE_HEADERS
-    include/position.h
-    include/portfolio.h
-    include/order.h
-    include/market_data.h
-    include/trading_engine.h
-    include/database_connection.h
-    include/technical_indicators.h
-    include/trading_strategy.h
-    include/argument_parser.h
-    include/command_dispatcher.h
-    include/data_conversion.h
-    include/json_helpers.h
-)
 
 # Main executable
-add_executable(trading_engine src/main.cpp ${CORE_SOURCES} ${CORE_HEADERS})
+add_executable(trading_engine src/main.cpp ${CORE_SOURCES})
 
-# Test executable
-add_executable(test_basic tests/test_basic.cpp ${CORE_SOURCES} ${CORE_HEADERS})
+# Comprehensive test executable (replaces all individual tests)
+add_executable(test_comprehensive tests/test_comprehensive.cpp ${CORE_SOURCES})
 
 # Find required packages
 find_package(PkgConfig REQUIRED)
@@ -70,12 +62,12 @@ endif()
 target_include_directories(trading_engine PRIVATE ${LIBPQ_INCLUDE_DIRS})
 target_compile_options(trading_engine PRIVATE ${LIBPQ_CFLAGS_OTHER})
 
-# Link libraries to test executable
+# Link libraries to comprehensive test executable
 if(nlohmann_json_FOUND)
-    target_link_libraries(test_basic ${LIBPQ_LIBRARIES} nlohmann_json::nlohmann_json)
+    target_link_libraries(test_comprehensive ${LIBPQ_LIBRARIES} nlohmann_json::nlohmann_json)
 else()
-    target_link_libraries(test_basic ${LIBPQ_LIBRARIES})
-    target_include_directories(test_basic PRIVATE ${NLOHMANN_JSON_INCLUDE_DIRS})
+    target_link_libraries(test_comprehensive ${LIBPQ_LIBRARIES})
+    target_include_directories(test_comprehensive PRIVATE ${NLOHMANN_JSON_INCLUDE_DIRS})
 endif()
-target_include_directories(test_basic PRIVATE ${LIBPQ_INCLUDE_DIRS})
-target_compile_options(test_basic PRIVATE ${LIBPQ_CFLAGS_OTHER})
+target_include_directories(test_comprehensive PRIVATE ${LIBPQ_INCLUDE_DIRS})
+target_compile_options(test_comprehensive PRIVATE ${LIBPQ_CFLAGS_OTHER})

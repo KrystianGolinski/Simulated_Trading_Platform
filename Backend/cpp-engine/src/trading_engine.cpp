@@ -1,6 +1,9 @@
 #include "trading_engine.h"
 #include "data_conversion.h"
 #include "json_helpers.h"
+#include "logger.h"
+#include "trading_exceptions.h"
+#include "error_utils.h"
 #include <sstream>
 #include <algorithm>
 #include <cmath>
@@ -9,28 +12,47 @@
 #include <thread>
 
 // Constructors
-TradingEngine::TradingEngine() : portfolio_(10000.0) {
+TradingEngine::TradingEngine() : portfolio_(10000.0), cache_enabled_(false) {
+    initializeServices();
     setMovingAverageStrategy();
 }
 
-TradingEngine::TradingEngine(double initial_capital) : portfolio_(initial_capital) {
+TradingEngine::TradingEngine(double initial_capital) : portfolio_(initial_capital), cache_enabled_(false) {
+    initializeServices();
+    setMovingAverageStrategy();
+}
+
+TradingEngine::TradingEngine(double initial_capital,
+                           std::unique_ptr<DatabaseService> db_service,
+                           std::unique_ptr<ExecutionService> exec_service,
+                           std::unique_ptr<ProgressService> progress_service)
+    : portfolio_(initial_capital), cache_enabled_(false),
+      database_service_(std::move(db_service)),
+      execution_service_(std::move(exec_service)),
+      progress_service_(std::move(progress_service)) {
     setMovingAverageStrategy();
 }
 
 // Move constructor
 TradingEngine::TradingEngine(TradingEngine&& other) noexcept
     : portfolio_(std::move(other.portfolio_)),
-      market_data_(std::move(other.market_data_)),
       strategy_(std::move(other.strategy_)),
-      executed_signals_(std::move(other.executed_signals_)) {}
+      database_service_(std::move(other.database_service_)),
+      execution_service_(std::move(other.execution_service_)),
+      progress_service_(std::move(other.progress_service_)),
+      price_data_cache_(std::move(other.price_data_cache_)),
+      cache_enabled_(other.cache_enabled_) {}
 
 // Move assignment
 TradingEngine& TradingEngine::operator=(TradingEngine&& other) noexcept {
     if (this != &other) {
         portfolio_ = std::move(other.portfolio_);
-        market_data_ = std::move(other.market_data_);
         strategy_ = std::move(other.strategy_);
-        executed_signals_ = std::move(other.executed_signals_);
+        database_service_ = std::move(other.database_service_);
+        execution_service_ = std::move(other.execution_service_);
+        progress_service_ = std::move(other.progress_service_);
+        price_data_cache_ = std::move(other.price_data_cache_);
+        cache_enabled_ = other.cache_enabled_;
     }
     return *this;
 }
@@ -48,13 +70,21 @@ void TradingEngine::setRSIStrategy(int period, double oversold, double overbough
     strategy_ = std::make_unique<RSIStrategy>(period, oversold, overbought);
 }
 
-// Simulation method with parameters
-std::string TradingEngine::runSimulationWithParams(const std::string& symbol, const std::string& start_date, const std::string& end_date, double capital) {
-    std::cerr << "[DEBUG] TradingEngine::runSimulationWithParams called with:" << std::endl;
-    std::cerr << "[DEBUG]   symbol = '" << symbol << "'" << std::endl;
-    std::cerr << "[DEBUG]   start_date = '" << start_date << "'" << std::endl;
-    std::cerr << "[DEBUG]   end_date = '" << end_date << "'" << std::endl;
-    std::cerr << "[DEBUG]   capital = " << capital << std::endl;
+// Simulation method with parameters - now using Result<T> patterns
+Result<std::string> TradingEngine::runSimulationWithParams(const std::string& symbol, const std::string& start_date, const std::string& end_date, double capital) {
+    Logger::debug("TradingEngine::runSimulationWithParams called with: symbol='", symbol, 
+                 "', start_date='", start_date, "', end_date='", end_date, "', capital=", capital);
+    
+    // Validate input parameters first
+    if (symbol.empty()) {
+        return Result<std::string>(ErrorCode::ENGINE_INVALID_SYMBOL, "Symbol cannot be empty");
+    }
+    if (capital <= 0) {
+        return Result<std::string>(ErrorCode::ENGINE_INVALID_CAPITAL, "Starting capital must be positive");
+    }
+    if (start_date.empty() || end_date.empty()) {
+        return Result<std::string>(ErrorCode::ENGINE_INVALID_DATE_RANGE, "Start date and end date cannot be empty");
+    }
     
     BacktestConfig config;
     config.symbol = symbol;
@@ -62,73 +92,105 @@ std::string TradingEngine::runSimulationWithParams(const std::string& symbol, co
     config.end_date = end_date;
     config.starting_capital = capital;
     
-    std::cerr << "[DEBUG] BacktestConfig created:" << std::endl;
-    std::cerr << "[DEBUG]   config.symbol = '" << config.symbol << "'" << std::endl;
-    std::cerr << "[DEBUG]   config.start_date = '" << config.start_date << "'" << std::endl;
-    std::cerr << "[DEBUG]   config.end_date = '" << config.end_date << "'" << std::endl;
-    std::cerr << "[DEBUG]   config.starting_capital = " << config.starting_capital << std::endl;
+    Logger::debug("BacktestConfig created: symbol='", config.symbol, "', start_date='", 
+                 config.start_date, "', end_date='", config.end_date, "', capital=", config.starting_capital);
     
     // Reset portfolio with new capital
     portfolio_ = Portfolio(capital);
-    std::cerr << "[DEBUG] Portfolio initialized with capital: " << capital << std::endl;
-    std::cerr << "[DEBUG] Portfolio initial capital: " << portfolio_.getInitialCapital() << std::endl;
+    Logger::debug("Portfolio initialized with capital: ", capital, ", initial capital: ", portfolio_.getInitialCapital());
     
-    BacktestResult result = runBacktest(config);
+    // Use ErrorUtils::chain for error handling pipeline
+    auto backtest_result = runBacktest(config);
+    if (backtest_result.isError()) {
+        return Result<std::string>(backtest_result.getError());
+    }
     
-    std::cerr << "[DEBUG] Backtest completed. Result:" << std::endl;
-    std::cerr << "[DEBUG]   starting_capital = " << result.starting_capital << std::endl;
-    std::cerr << "[DEBUG]   ending_value = " << result.ending_value << std::endl;
-    std::cerr << "[DEBUG]   total_return_pct = " << result.total_return_pct << std::endl;
-    std::cerr << "[DEBUG]   total_trades = " << result.total_trades << std::endl;
+    const auto& result = backtest_result.getValue();
+    Logger::debug("Backtest completed. Result: starting_capital=", result.starting_capital, 
+                 ", ending_value=", result.ending_value, ", total_return_pct=", result.total_return_pct,
+                 ", total_trades=", result.total_trades);
     
-    return getBacktestResultsAsJson(result).dump(2);
+    auto json_result = getBacktestResultsAsJson(result);
+    if (json_result.isError()) {
+        return Result<std::string>(json_result.getError());
+    }
+    
+    return Result<std::string>(json_result.getValue().dump(2));
 }
 
-// Main backtesting implementation
-BacktestResult TradingEngine::runBacktest(const BacktestConfig& config) {
-    std::cerr << "[DEBUG] TradingEngine::runBacktest called with:" << std::endl;
-    std::cerr << "[DEBUG]   config.symbol = '" << config.symbol << "'" << std::endl;
-    std::cerr << "[DEBUG]   config.start_date = '" << config.start_date << "'" << std::endl;
-    std::cerr << "[DEBUG]   config.end_date = '" << config.end_date << "'" << std::endl;
-    std::cerr << "[DEBUG]   config.starting_capital = " << config.starting_capital << std::endl;
+// Main backtesting implementation - now using Result<T> patterns
+Result<BacktestResult> TradingEngine::runBacktest(const BacktestConfig& config) {
+    Logger::debug("TradingEngine::runBacktest called with: symbol='", config.symbol,
+                 "', start_date='", config.start_date, "', end_date='", config.end_date,
+                 "', starting_capital=", config.starting_capital);
     
     BacktestResult result;
     
-    if (!validateBacktestConfig(config)) {
-        return result;
+    // Sequential error handling with proper Result<T> patterns
+    auto validation_result = validateBacktestConfig(config);
+    if (validation_result.isError()) {
+        return Result<BacktestResult>(validation_result.getError());
     }
     
-    initializeBacktest(config, result);
-    
-    auto price_data = prepareMarketData(config);
-    if (price_data.empty()) {
-        return result;
+    auto init_result = initializeBacktest(config, result);
+    if (init_result.isError()) {
+        return Result<BacktestResult>(init_result.getError());
     }
     
-    runSimulationLoop(price_data, config, result);
+    auto market_data_result = prepareMarketData(config);
+    if (market_data_result.isError()) {
+        return Result<BacktestResult>(market_data_result.getError());
+    }
     
-    finalizeBacktestResults(result);
+    auto simulation_result = runSimulationLoop(market_data_result.getValue(), config, result);
+    if (simulation_result.isError()) {
+        return Result<BacktestResult>(simulation_result.getError());
+    }
     
-    return result;
+    auto finalize_result = finalizeBacktestResults(result);
+    if (finalize_result.isError()) {
+        return Result<BacktestResult>(finalize_result.getError());
+    }
+    
+    return Result<BacktestResult>(result);
 }
 
-BacktestResult TradingEngine::runBacktestMultiSymbol(const std::vector<std::string>& symbols,
-                                                   const std::string& start_date,
-                                                   const std::string& end_date,
-                                                   double starting_capital) {
+Result<BacktestResult> TradingEngine::runBacktestMultiSymbol(const std::vector<std::string>& symbols,
+                                                                const std::string& start_date,
+                                                                const std::string& end_date,
+                                                                double starting_capital) {
+    // Validate input parameters
+    if (symbols.empty()) {
+        return Result<BacktestResult>(ErrorCode::ENGINE_INVALID_SYMBOL, "Symbol list cannot be empty");
+    }
+    if (starting_capital <= 0) {
+        return Result<BacktestResult>(ErrorCode::ENGINE_INVALID_CAPITAL, "Starting capital must be positive");
+    }
+    if (start_date.empty() || end_date.empty()) {
+        return Result<BacktestResult>(ErrorCode::ENGINE_INVALID_DATE_RANGE, "Start date and end date cannot be empty");
+    }
+    
     BacktestResult combined_result;
     combined_result.starting_capital = starting_capital;
     combined_result.start_date = start_date;
     combined_result.end_date = end_date;
     
-    // Reset portfolio and set up multi-symbol allocation
-    portfolio_ = Portfolio(starting_capital);
-    double capital_per_symbol = starting_capital / symbols.size();
+    try {
+        // Reset portfolio and set up multi-symbol allocation
+        portfolio_ = Portfolio(starting_capital);
+        double capital_per_symbol = starting_capital / symbols.size();
     
     // Get historical data for all symbols and convert to PriceData format
     std::map<std::string, std::vector<PriceData>> symbol_price_data;
     for (const auto& symbol : symbols) {
-        auto raw_data = market_data_.getHistoricalPrices(symbol, start_date, end_date);
+        auto raw_data_result = database_service_->getHistoricalPrices(symbol, start_date, end_date);
+        
+        if (raw_data_result.isError()) {
+            Logger::error("Error getting historical data for ", symbol, ": ", raw_data_result.getErrorMessage());
+            continue;
+        }
+        
+        const auto& raw_data = raw_data_result.getValue();
         std::vector<PriceData> price_data;
         
         for (const auto& row : raw_data) {
@@ -136,7 +198,7 @@ BacktestResult TradingEngine::runBacktestMultiSymbol(const std::vector<std::stri
                 PriceData pd = DataConversion::convertRowToPriceData(row);
                 price_data.push_back(pd);
             } catch (const std::exception& e) {
-                std::cerr << "Error parsing data for " << symbol << ": " << e.what() << std::endl;
+                Logger::error("Error parsing data for ", symbol, ": ", e.what());
                 continue;
             }
         }
@@ -144,7 +206,7 @@ BacktestResult TradingEngine::runBacktestMultiSymbol(const std::vector<std::stri
         if (!price_data.empty()) {
             symbol_price_data[symbol] = price_data;
         } else {
-            std::cerr << "Warning: No valid data found for symbol " << symbol << std::endl;
+            Logger::warning("No valid data found for symbol ", symbol);
         }
     }
     
@@ -193,17 +255,31 @@ BacktestResult TradingEngine::runBacktestMultiSymbol(const std::vector<std::stri
         }
     }
     
-    combined_result.ending_value = portfolio_.getTotalValue(final_prices);
-    combined_result.total_return_pct = ((combined_result.ending_value - combined_result.starting_capital) / combined_result.starting_capital) * 100.0;
-    combined_result.win_rate = combined_result.total_trades > 0 ? 
-        (static_cast<double>(combined_result.winning_trades) / combined_result.total_trades) * 100.0 : 0.0;
-    
-    return combined_result;
+        combined_result.ending_value = portfolio_.getTotalValue(final_prices);
+        combined_result.total_return_pct = ((combined_result.ending_value - combined_result.starting_capital) / combined_result.starting_capital) * 100.0;
+        combined_result.win_rate = combined_result.total_trades > 0 ? 
+            (static_cast<double>(combined_result.winning_trades) / combined_result.total_trades) * 100.0 : 0.0;
+        
+        return Result<BacktestResult>(combined_result);
+        
+    } catch (const std::exception& e) {
+        Logger::error("Error in multi-symbol backtest: ", e.what());
+        return Result<BacktestResult>(ErrorCode::ENGINE_MULTI_SYMBOL_FAILED, 
+                                     "Multi-symbol backtest failed", e.what());
+    }
 }
 
-std::string TradingEngine::getPortfolioStatus() {
-    auto current_prices = market_data_.getCurrentPrices();
-    return portfolio_.toDetailedString(current_prices);
+Result<std::string> TradingEngine::getPortfolioStatus() {
+    return ErrorUtils::chain(database_service_->getCurrentPrices(), [this](const std::map<std::string, double>& current_prices) {
+        try {
+            std::string status = portfolio_.toDetailedString(current_prices);
+            return Result<std::string>(status);
+        } catch (const std::exception& e) {
+            Logger::error("Error generating portfolio status: ", e.what());
+            return Result<std::string>(ErrorCode::ENGINE_PORTFOLIO_ACCESS_FAILED, 
+                                      "Failed to generate portfolio status", e.what());
+        }
+    });
 }
 
 Portfolio& TradingEngine::getPortfolio() {
@@ -216,74 +292,45 @@ const Portfolio& TradingEngine::getPortfolio() const {
 
 // Results and analytics
 std::vector<TradingSignal> TradingEngine::getExecutedSignals() const {
-    return executed_signals_;
+    return execution_service_->getExecutedSignals();
 }
 
-nlohmann::json TradingEngine::getBacktestResultsAsJson(const BacktestResult& result) const {
-    nlohmann::json json_result = JsonHelpers::backTestResultToJson(result);
-    
-    // Add equity curve with actual dates from market data
-    auto price_data_raw = market_data_.getHistoricalPrices(result.symbol, result.start_date, result.end_date);
-    auto price_data = convertToTechnicalData(price_data_raw);
-    json_result["equity_curve"] = JsonHelpers::createEquityCurveJson(result.equity_curve, price_data, result.start_date);
-    
-    return json_result;
-}
-
-// Private helper methods
-bool TradingEngine::executeSignal(const TradingSignal& signal, const std::string& symbol) {
-    std::cerr << "[DEBUG] executeSignal called: " << (signal.signal == Signal::BUY ? "BUY" : "SELL") 
-              << " symbol=" << symbol << " confidence=" << signal.confidence << std::endl;
-    
+Result<nlohmann::json> TradingEngine::getBacktestResultsAsJson(const BacktestResult& result) const {
     try {
-        if (signal.signal == Signal::BUY) {
-            // Allow position increases - can buy regardless of existing position
-            bool has_position = portfolio_.hasPosition(symbol);
-            int current_shares = has_position ? portfolio_.getPosition(symbol).getShares() : 0;
-            
-            std::cerr << "[DEBUG] BUY signal - has_position=" << has_position 
-                      << " current_shares=" << current_shares << std::endl;
-            
-            // Calculate portfolio value for position sizing
-            std::map<std::string, double> current_prices;
-            current_prices[symbol] = signal.price;
-            double portfolio_value = portfolio_.getTotalValue(current_prices);
-            
-            double position_size = strategy_->calculatePositionSize(portfolio_, symbol, signal.price, portfolio_value);
-            
-            std::cerr << "[DEBUG] BUY order: cash=" << portfolio_.getCashBalance() 
-                      << " portfolio_value=" << portfolio_value
-                      << " position_size=" << position_size 
-                      << " price=" << signal.price << std::endl;
-            
-            if (position_size > 0) {
-                bool success = portfolio_.buyStock(symbol, static_cast<int>(position_size), signal.price);
-                std::cerr << "[DEBUG] Buy order " << (success ? "SUCCESS" : "FAILED") << std::endl;
-                return success;
-            }
-        } else if (signal.signal == Signal::SELL) {
-            // Only sell if we have a position
-            bool has_position = portfolio_.hasPosition(symbol);
-            int shares_owned = has_position ? portfolio_.getPosition(symbol).getShares() : 0;
-            
-            std::cerr << "[DEBUG] SELL signal - has_position=" << has_position 
-                      << " shares_owned=" << shares_owned << std::endl;
-            
-            if (has_position && shares_owned > 0) {
-                std::cerr << "[DEBUG] SELL order: shares_owned=" << shares_owned 
-                          << " price=" << signal.price << std::endl;
-                
-                bool success = portfolio_.sellStock(symbol, shares_owned, signal.price);
-                std::cerr << "[DEBUG] Sell order " << (success ? "SUCCESS" : "FAILED") << std::endl;
-                return success;
-            }
-        }
+        nlohmann::json json_result = JsonHelpers::backTestResultToJson(result);
+        
+        // Add equity curve with actual dates from market data using Result<T> patterns
+        return ErrorUtils::chain(database_service_->getHistoricalPrices(result.symbol, result.start_date, result.end_date), 
+            [this, &json_result, &result](const std::vector<std::map<std::string, std::string>>& price_data_raw) {
+                auto price_data = convertToTechnicalData(price_data_raw);
+                json_result["equity_curve"] = JsonHelpers::createEquityCurveJson(result.equity_curve, price_data, result.start_date);
+                return Result<nlohmann::json>(json_result);
+            });
     } catch (const std::exception& e) {
-        std::cerr << "[ERROR] executeSignal exception: " << e.what() << std::endl;
+        Logger::error("Error generating backtest results JSON: ", e.what());
+        return Result<nlohmann::json>(ErrorCode::ENGINE_RESULTS_GENERATION_FAILED, 
+                                     "Failed to generate backtest results JSON", e.what());
     }
-    
-    std::cerr << "[DEBUG] executeSignal returning false (no action taken)" << std::endl;
-    return false;
+}
+
+// Service initialization
+void TradingEngine::initializeServices() {
+    database_service_ = std::make_unique<DatabaseService>();
+    execution_service_ = std::make_unique<ExecutionService>();
+    progress_service_ = std::make_unique<ProgressService>();
+}
+
+// Service accessors
+DatabaseService* TradingEngine::getDatabaseService() const {
+    return database_service_.get();
+}
+
+ExecutionService* TradingEngine::getExecutionService() const {
+    return execution_service_.get();
+}
+
+ProgressService* TradingEngine::getProgressService() const {
+    return progress_service_.get();
 }
 
 std::vector<PriceData> TradingEngine::convertToTechnicalData(const std::vector<std::map<std::string, std::string>>& db_data) const {
@@ -340,125 +387,148 @@ std::vector<double> TradingEngine::calculateDailyReturns(const std::vector<doubl
     return returns;
 }
 
-// Decomposed backtest methods
-bool TradingEngine::validateBacktestConfig(const BacktestConfig& config) const {
+// Decomposed backtest methods - now using Result<T> patterns
+Result<void> TradingEngine::validateBacktestConfig(const BacktestConfig& config) const {
     if (!strategy_) {
-        std::cerr << "[ERROR] No strategy configured for backtesting" << std::endl;
-        return false;
+        Logger::error("No strategy configured for backtesting");
+        return Result<void>(ErrorCode::ENGINE_NO_STRATEGY_CONFIGURED, "No strategy configured for backtesting");
     }
     
     if (config.symbol.empty()) {
-        std::cerr << "[ERROR] Symbol cannot be empty" << std::endl;
-        return false;
+        Logger::error("Symbol cannot be empty");
+        return Result<void>(ErrorCode::ENGINE_INVALID_SYMBOL, "Symbol cannot be empty");
     }
     
     if (config.starting_capital <= 0) {
-        std::cerr << "[ERROR] Starting capital must be positive" << std::endl;
-        return false;
+        Logger::error("Starting capital must be positive");
+        return Result<void>(ErrorCode::ENGINE_INVALID_CAPITAL, "Starting capital must be positive", 
+                           "Provided capital: " + std::to_string(config.starting_capital));
     }
     
-    return true;
+    return Result<void>(); // Success
 }
 
-void TradingEngine::initializeBacktest(const BacktestConfig& config, BacktestResult& result) {
-    result.symbol = config.symbol;
-    result.starting_capital = config.starting_capital;
-    result.start_date = config.start_date;
-    result.end_date = config.end_date;
-    
-    portfolio_ = Portfolio(config.starting_capital);
-    executed_signals_.clear();
-    
-    std::cerr << "[DEBUG] Backtest initialized with capital: " << config.starting_capital << std::endl;
-}
-
-std::vector<PriceData> TradingEngine::prepareMarketData(const BacktestConfig& config) {
-    std::cerr << "[DEBUG] Getting historical price data..." << std::endl;
-    
-    auto price_data_raw = market_data_.getHistoricalPrices(config.symbol, config.start_date, config.end_date);
-    std::cerr << "[DEBUG] Retrieved " << price_data_raw.size() << " price records" << std::endl;
-    
-    if (price_data_raw.empty()) {
-        std::cerr << "[ERROR] No price data available for " << config.symbol << std::endl;
-        return {};
+Result<void> TradingEngine::initializeBacktest(const BacktestConfig& config, BacktestResult& result) {
+    try {
+        result.symbol = config.symbol;
+        result.starting_capital = config.starting_capital;
+        result.start_date = config.start_date;
+        result.end_date = config.end_date;
+        
+        portfolio_ = Portfolio(config.starting_capital);
+        execution_service_->clearExecutedSignals();
+        
+        Logger::debug("Backtest initialized with capital: ", config.starting_capital);
+        return Result<void>(); // Success
+    } catch (const std::exception& e) {
+        Logger::error("Error initializing backtest: ", e.what());
+        return Result<void>(ErrorCode::ENGINE_BACKTEST_FAILED, "Failed to initialize backtest", e.what());
     }
-    
-    auto price_data = convertToTechnicalData(price_data_raw);
-    std::cerr << "[DEBUG] Converted to " << price_data.size() << " technical data points" << std::endl;
-    
-    if (price_data.empty()) {
-        std::cerr << "[ERROR] Failed to convert price data" << std::endl;
-        return {};
-    }
-    
-    return price_data;
 }
 
-void TradingEngine::runSimulationLoop(const std::vector<PriceData>& price_data, const BacktestConfig& config, BacktestResult& result) {
+Result<std::vector<PriceData>> TradingEngine::prepareMarketData(const BacktestConfig& config) {
+    Logger::debug("Getting historical price data...");
+    
+    return ErrorUtils::chain(database_service_->getHistoricalPrices(config.symbol, config.start_date, config.end_date),
+        [this, &config](const std::vector<std::map<std::string, std::string>>& price_data_raw) {
+            Logger::debug("Retrieved ", price_data_raw.size(), " price records");
+            
+            if (price_data_raw.empty()) {
+                return Result<std::vector<PriceData>>(ErrorCode::ENGINE_NO_DATA_AVAILABLE, 
+                    "No historical price data available for symbol " + config.symbol + 
+                    " in date range " + config.start_date + " to " + config.end_date);
+            }
+            
+            try {
+                auto price_data = convertToTechnicalData(price_data_raw);
+                Logger::debug("Converted to ", price_data.size(), " technical data points");
+                
+                if (price_data.empty()) {
+                    return Result<std::vector<PriceData>>(ErrorCode::ENGINE_NO_DATA_AVAILABLE, 
+                        "Failed to convert price data for symbol " + config.symbol);
+                }
+                
+                return Result<std::vector<PriceData>>(price_data);
+            } catch (const std::exception& e) {
+                Logger::error("Error converting price data: ", e.what());
+                return Result<std::vector<PriceData>>(ErrorCode::DATA_PARSING_FAILED, 
+                    "Failed to convert price data", e.what());
+            }
+        });
+}
+
+Result<void> TradingEngine::runSimulationLoop(const std::vector<PriceData>& price_data, const BacktestConfig& config, BacktestResult& result) {
     result.equity_curve.reserve(price_data.size());
     result.equity_curve.push_back(config.starting_capital);
     
+    // Pre-allocate containers to avoid repeated allocations
     std::vector<PriceData> historical_window;
     historical_window.reserve(price_data.size());
-    std::map<std::string, double> current_prices;
+    // Initialize with first data point
+    historical_window.push_back(price_data[0]);
     
-    std::cerr << "[DEBUG] Starting backtest loop with " << price_data.size() << " data points" << std::endl;
-    std::cerr << "[DEBUG] Initial portfolio value: " << portfolio_.getTotalValue({}) << std::endl;
+    std::map<std::string, double> current_prices;
+    current_prices[config.symbol] = 0.0; // Pre-initialize map entry
+    
+    Logger::info("Starting backtest loop with ", price_data.size(), " data points");
+    Logger::debug("Initial portfolio value: ", portfolio_.getTotalValue({}));
     
     for (size_t i = 1; i < price_data.size(); ++i) {
         const auto& data_point = price_data[i];
         
-        reportProgress(i, price_data.size(), data_point, config.symbol);
-        
-        if (i % 50 == 0) {
-            std::cerr << "[DEBUG] Day " << i << ": Price = " << data_point.close 
-                      << ", Portfolio = " << portfolio_.getTotalValue({{config.symbol, data_point.close}}) << std::endl;
+        auto progress_result = progress_service_->reportProgress(i, price_data.size(), data_point, config.symbol, portfolio_);
+        if (progress_result.isError()) {
+            Logger::warning("Progress reporting failed: ", progress_result.getErrorMessage());
         }
         
-        historical_window.clear();
-        historical_window.assign(price_data.begin(), price_data.begin() + i + 1);
+        if (i % 50 == 0) {
+            Logger::debug("Day ", i, ": Price = ", data_point.close, 
+                         ", Portfolio = ", portfolio_.getTotalValue({{config.symbol, data_point.close}}));
+        }
         
-        Portfolio portfolio_copy = portfolio_;
-        TradingSignal signal = strategy_->evaluateSignal(historical_window, portfolio_copy, config.symbol);
+        // Efficiently build historical window by appending only new data point
+        historical_window.push_back(data_point);
+        
+        TradingSignal signal = strategy_->evaluateSignal(historical_window, portfolio_, config.symbol);
         
         if (signal.signal != Signal::HOLD) {
-            std::cerr << "[DEBUG] Generated signal: " << (signal.signal == Signal::BUY ? "BUY" : "SELL") 
-                      << " confidence=" << signal.confidence << " at price=" << signal.price << std::endl;
+            Logger::debug("Generated signal: ", (signal.signal == Signal::BUY ? "BUY" : "SELL"), 
+                         " confidence=", signal.confidence, " at price=", signal.price);
             
-            if (executeSignal(signal, config.symbol)) {
-                executed_signals_.push_back(signal);
+            auto execution_result = execution_service_->executeSignal(signal, config.symbol, portfolio_, strategy_.get());
+            if (execution_result.isSuccess()) {
                 result.signals_generated.push_back(signal);
                 result.total_trades++;
-                std::cerr << "[DEBUG] Signal EXECUTED" << std::endl;
+                Logger::debug("Signal EXECUTED");
             } else {
-                std::cerr << "[DEBUG] Signal REJECTED" << std::endl;
+                Logger::debug("Signal REJECTED: ", execution_result.getErrorMessage());
             }
         }
         
-        current_prices.clear();
+        // Reuse existing map entry instead of clearing
         current_prices[config.symbol] = data_point.close;
         double portfolio_value = portfolio_.getTotalValue(current_prices);
         result.equity_curve.push_back(portfolio_value);
     }
     
-    std::cerr << "[DEBUG] Backtest loop completed" << std::endl;
-    std::cerr << "[DEBUG] Total signals generated: " << executed_signals_.size() << std::endl;
-    std::cerr << "[DEBUG] Total trades executed: " << result.total_trades << std::endl;
+    Logger::info("Backtest loop completed");
+    Logger::info("Total signals generated: ", execution_service_->getTotalExecutions());
+    Logger::info("Total trades executed: ", result.total_trades);
+    
+    return Result<void>(); // Success
 }
 
-void TradingEngine::finalizeBacktestResults(BacktestResult& result) {
+Result<void> TradingEngine::finalizeBacktestResults(BacktestResult& result) {
     if (!result.equity_curve.empty()) {
         result.ending_value = result.equity_curve.back();
         result.total_return_pct = ((result.ending_value - result.starting_capital) / result.starting_capital) * 100.0;
         
-        std::cerr << "[DEBUG] Final calculations:" << std::endl;
-        std::cerr << "[DEBUG]   Portfolio cash: " << portfolio_.getCashBalance() << std::endl;
-        std::cerr << "[DEBUG]   Calculated ending value: " << result.ending_value << std::endl;
-        std::cerr << "[DEBUG]   Calculated return: " << result.total_return_pct << "%" << std::endl;
+        Logger::debug("Final calculations: Portfolio cash=", portfolio_.getCashBalance(),
+                     ", ending value=", result.ending_value, ", return=", result.total_return_pct, "%");
     } else {
         result.ending_value = result.starting_capital;
         result.total_return_pct = 0.0;
-        std::cerr << "[DEBUG] Empty equity curve, using starting capital as ending value" << std::endl;
+        Logger::warning("Empty equity curve, using starting capital as ending value");
     }
     
     auto daily_returns = calculateDailyReturns(result.equity_curve);
@@ -483,20 +553,7 @@ void TradingEngine::finalizeBacktestResults(BacktestResult& result) {
     
     result.win_rate = result.total_trades > 0 ? 
         (static_cast<double>(result.winning_trades) / result.total_trades) * 100.0 : 0.0;
+    
+    return Result<void>(); // Success
 }
 
-void TradingEngine::reportProgress(size_t current_day, size_t total_days, const PriceData& data_point, const std::string& symbol) {
-    if (current_day % (total_days / 20) == 0 || current_day == total_days - 1 || total_days <= 20) {
-        double progress_pct = (static_cast<double>(current_day) / (total_days - 1)) * 100.0;
-        std::map<std::string, double> current_prices;
-        current_prices[symbol] = data_point.close;
-        double current_value = portfolio_.getTotalValue(current_prices);
-        
-        nlohmann::json progress = JsonHelpers::createProgressJson(
-            progress_pct, data_point.date, current_value, data_point.close,
-            static_cast<int>(current_day), static_cast<int>(total_days)
-        );
-        
-        std::cerr << progress.dump() << std::endl;
-    }
-}

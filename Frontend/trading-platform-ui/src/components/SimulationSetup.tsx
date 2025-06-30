@@ -28,11 +28,10 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
     end_date: '',
     starting_capital: 10000,
     strategy: 'ma_crossover',
-    short_ma: 20,
-    long_ma: 50,
-    rsi_period: 14,
-    rsi_oversold: 30,
-    rsi_overbought: 70
+    strategy_parameters: {
+      short_ma: 20,
+      long_ma: 50
+    }
   });
 
   const [validation, setValidation] = useState<ValidationDisplay>({
@@ -285,7 +284,16 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
                 <label style={{ fontSize: '0.9rem', fontWeight: '500', color: '#374151' }}>Strategy Type</label>
                 <select
                   value={config.strategy}
-                  onChange={(e) => setConfig(prev => ({ ...prev, strategy: e.target.value as 'ma_crossover' | 'rsi' }))}
+                  onChange={(e) => {
+                    const newStrategy = e.target.value;
+                    setConfig(prev => ({
+                      ...prev,
+                      strategy: newStrategy,
+                      strategy_parameters: newStrategy === 'ma_crossover' 
+                        ? { short_ma: 20, long_ma: 50 }
+                        : { rsi_period: 14, rsi_oversold: 30, rsi_overbought: 70 }
+                    }));
+                  }}
                   style={{
                     width: '100%',
                     maxWidth: '300px',
@@ -311,8 +319,11 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
                       type="number"
                       min="5"
                       max="50"
-                      value={config.short_ma}
-                      onChange={(e) => setConfig(prev => ({ ...prev, short_ma: Number(e.target.value) }))}
+                      value={config.strategy_parameters.short_ma || 20}
+                      onChange={(e) => setConfig(prev => ({ 
+                        ...prev, 
+                        strategy_parameters: { ...prev.strategy_parameters, short_ma: Number(e.target.value) }
+                      }))}
                       required
                     />
                     <FormInput
@@ -320,8 +331,11 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
                       type="number"
                       min="20"
                       max="200"
-                      value={config.long_ma}
-                      onChange={(e) => setConfig(prev => ({ ...prev, long_ma: Number(e.target.value) }))}
+                      value={config.strategy_parameters.long_ma || 50}
+                      onChange={(e) => setConfig(prev => ({ 
+                        ...prev, 
+                        strategy_parameters: { ...prev.strategy_parameters, long_ma: Number(e.target.value) }
+                      }))}
                       required
                     />
                   </div>
@@ -341,8 +355,11 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
                       type="number"
                       min="2"
                       max="50"
-                      value={config.rsi_period}
-                      onChange={(e) => setConfig(prev => ({ ...prev, rsi_period: Number(e.target.value) }))}
+                      value={config.strategy_parameters.rsi_period || 14}
+                      onChange={(e) => setConfig(prev => ({ 
+                        ...prev, 
+                        strategy_parameters: { ...prev.strategy_parameters, rsi_period: Number(e.target.value) }
+                      }))}
                       required
                     />
                     <FormInput
@@ -350,8 +367,11 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
                       type="number"
                       min="10"
                       max="40"
-                      value={config.rsi_oversold}
-                      onChange={(e) => setConfig(prev => ({ ...prev, rsi_oversold: Number(e.target.value) }))}
+                      value={config.strategy_parameters.rsi_oversold || 30}
+                      onChange={(e) => setConfig(prev => ({ 
+                        ...prev, 
+                        strategy_parameters: { ...prev.strategy_parameters, rsi_oversold: Number(e.target.value) }
+                      }))}
                       required
                     />
                     <FormInput
@@ -359,8 +379,11 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
                       type="number"
                       min="60"
                       max="90"
-                      value={config.rsi_overbought}
-                      onChange={(e) => setConfig(prev => ({ ...prev, rsi_overbought: Number(e.target.value) }))}
+                      value={config.strategy_parameters.rsi_overbought || 70}
+                      onChange={(e) => setConfig(prev => ({ 
+                        ...prev, 
+                        strategy_parameters: { ...prev.strategy_parameters, rsi_overbought: Number(e.target.value) }
+                      }))}
                       required
                     />
                   </div>
@@ -399,8 +422,8 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
                     type="submit"
                     disabled={
                       config.symbols.length === 0 || 
-                      (config.strategy === 'ma_crossover' && config.short_ma! >= config.long_ma!) ||
-                      (config.strategy === 'rsi' && config.rsi_oversold! >= config.rsi_overbought!) ||
+                      (config.strategy === 'ma_crossover' && (config.strategy_parameters.short_ma || 0) >= (config.strategy_parameters.long_ma || 0)) ||
+                      (config.strategy === 'rsi' && (config.strategy_parameters.rsi_oversold || 0) >= (config.strategy_parameters.rsi_overbought || 0)) ||
                       isLoading || 
                       validation.errors.length > 0
                     }
@@ -418,11 +441,11 @@ export const SimulationSetup: React.FC<SimulationSetupProps> = ({
                   </Button>
                 </div>
                 
-                {config.strategy === 'ma_crossover' && config.short_ma! >= config.long_ma! && (
+                {config.strategy === 'ma_crossover' && (config.strategy_parameters.short_ma || 0) >= (config.strategy_parameters.long_ma || 0) && (
                   <p style={{ color: '#ef4444', fontSize: '0.875rem', textAlign: 'center' }}>Short MA period must be less than Long MA period</p>
                 )}
                 
-                {config.strategy === 'rsi' && config.rsi_oversold! >= config.rsi_overbought! && (
+                {config.strategy === 'rsi' && (config.strategy_parameters.rsi_oversold || 0) >= (config.strategy_parameters.rsi_overbought || 0) && (
                   <p style={{ color: '#ef4444', fontSize: '0.875rem', textAlign: 'center' }}>Oversold threshold must be less than Overbought threshold</p>
                 )}
                 

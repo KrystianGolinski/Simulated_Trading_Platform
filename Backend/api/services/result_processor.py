@@ -1,9 +1,9 @@
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 
-from models import SimulationResults, SimulationStatus, PerformanceMetrics, TradeRecord, SimulationConfig
+from models import SimulationResults, SimulationStatus, SimulationConfig
 from .performance_calculator import PerformanceCalculator
 from .trade_converter import TradeConverter
 from .equity_processor import EquityProcessor

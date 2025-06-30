@@ -1,29 +1,7 @@
 import React, { useRef, useEffect } from 'react';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  TimeScale,
-} from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import 'chartjs-adapter-date-fns';
 import { SimulationResults as SimulationResultsType } from '../services/api';
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  TimeScale
-);
 
 interface SimulationResultsProps {
   results: SimulationResultsType | null;
@@ -278,14 +256,34 @@ export const SimulationResults: React.FC<SimulationResultsProps> = ({
                   <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Stocks:</span>
                   <span style={{ fontWeight: '600' }}>{results.config.symbols.length} symbols</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Short MA:</span>
-                  <span style={{ fontWeight: '600' }}>{results.config.short_ma} days</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Long MA:</span>
-                  <span style={{ fontWeight: '600' }}>{results.config.long_ma} days</span>
-                </div>
+                {results.config.strategy === 'ma_crossover' && (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Short MA:</span>
+                      <span style={{ fontWeight: '600' }}>{results.config.strategy_parameters.short_ma} days</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Long MA:</span>
+                      <span style={{ fontWeight: '600' }}>{results.config.strategy_parameters.long_ma} days</span>
+                    </div>
+                  </>
+                )}
+                {results.config.strategy === 'rsi' && (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>RSI Period:</span>
+                      <span style={{ fontWeight: '600' }}>{results.config.strategy_parameters.rsi_period} days</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Oversold:</span>
+                      <span style={{ fontWeight: '600' }}>{results.config.strategy_parameters.rsi_oversold}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Overbought:</span>
+                      <span style={{ fontWeight: '600' }}>{results.config.strategy_parameters.rsi_overbought}</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>

@@ -1,7 +1,6 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from services.error_handler import ErrorHandler, ErrorCode, ErrorSeverity, SimulationError
-from datetime import datetime
 
 class TestErrorHandler:
     
@@ -41,7 +40,7 @@ class TestErrorHandler:
         assert error.message == 'Unknown error'
     
     def test_categorize_cpp_timeout_error(self):
-        # Test C++ timeout error categorization.""
+        # Test C++ timeout error categorization
         handler = ErrorHandler()
         
         error = handler.categorize_cpp_engine_error(

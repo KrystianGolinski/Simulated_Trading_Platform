@@ -4,8 +4,7 @@ from typing import Dict, Any, List
 logger = logging.getLogger(__name__)
 
 class EquityProcessor:
-    def __init__(self):
-        pass
+    # No initialization needed for stateless processing operations
     
     def process_equity_curve(self, result_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         # Process equity curve data from C++ engine output

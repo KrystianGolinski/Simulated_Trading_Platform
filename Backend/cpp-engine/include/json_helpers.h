@@ -1,5 +1,4 @@
-#ifndef JSON_HELPERS_H
-#define JSON_HELPERS_H
+#pragma once
 
 #include <nlohmann/json.hpp>
 #include <vector>
@@ -43,5 +42,3 @@ namespace JsonHelpers {
     // Validate required JSON fields
     bool validateJsonFields(const nlohmann::json& json, const std::vector<std::string>& required_fields);
 }
-
-#endif // JSON_HELPERS_H

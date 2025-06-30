@@ -40,8 +40,10 @@ describe('SimulationResults Component', () => {
       end_date: '2023-12-31',
       starting_capital: 10000,
       strategy: 'ma_crossover',
-      short_ma: 20,
-      long_ma: 50
+      strategy_parameters: {
+        short_ma: 20,
+        long_ma: 50
+      }
     },
     created_at: '2023-01-01T00:00:00Z'
   };
