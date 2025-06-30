@@ -109,18 +109,6 @@
   @apply flex flex-col items-center;
 }
 
-/* Spinner Utilities */
-.spinner-lg-blue {
-  @apply animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600;
-}
-
-.spinner-md-blue {
-  @apply animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600;
-}
-
-.spinner-sm-white {
-  @apply animate-spin rounded-full h-4 w-4 border-b-2 border-white;
-}
 
 /* Color/Status Utilities */
 .text-success,

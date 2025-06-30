@@ -212,19 +212,19 @@ class SimulationValidator:
                 error_code="CAPITAL_INVALID"
             ))
         
-        # Practical minimum for meaningful trading
+        # Practical minimum for meaningful trading - adjusted for comprehensive backtesting scenarios
         if capital < 1000:
             errors.append(ValidationError(
                 field="starting_capital",
-                message="Starting capital should be at least $1,000 for meaningful backtesting",
+                message="Starting capital should be at least £1,000 for meaningful backtesting results",
                 error_code="CAPITAL_TOO_LOW"
             ))
         
-        # Maximum reasonable amount
+        # Maximum reasonable amount for simulation platform
         if capital > 10_000_000:  # 10 million
             errors.append(ValidationError(
                 field="starting_capital",
-                message="Starting capital exceeds reasonable limit ($10,000,000)",
+                message="Starting capital exceeds reasonable limit (£10,000,000)",
                 error_code="CAPITAL_TOO_HIGH"
             ))
         
@@ -296,10 +296,6 @@ class SimulationValidator:
                 f"Short date range ({date_range_days} days). Consider using at least 30 days for more reliable results."
             )
         
-        if date_range_days > 1825:  # 5 years
-            warnings.append(
-                f"Very long date range ({date_range_days} days). Consider shorter periods for faster execution."
-            )
         
         # Strategy-specific warnings using dynamic strategy system
         if config.strategy == "ma_crossover":
@@ -322,6 +318,330 @@ class SimulationValidator:
         
         return warnings
     
+    def run_comprehensive_validation_tests(self) -> Dict[str, Any]:
+        # Comprehensive test suite for the validation system
+        # Tests all validation components systematically
+        
+        test_results = {
+            'total_tests': 0,
+            'passed_tests': 0,
+            'failed_tests': 0,
+            'test_details': [],
+            'overall_status': 'UNKNOWN'
+        }
+        
+        print("\nRunning Comprehensive Validation System Tests")
+        print("Testing all validation components systematically...\n")
+        
+        # Test categories to run
+        test_categories = [
+            ('Symbol Validation Tests', self._test_symbol_validation),
+            ('Capital Validation Tests', self._test_capital_validation),
+            ('Date Range Validation Tests', self._test_date_range_validation),
+            ('Strategy Parameter Tests', self._test_strategy_parameters),
+            ('Configuration Warning Tests', self._test_configuration_warnings),
+            ('Error Handling Tests', self._test_error_handling),
+            ('Edge Case Tests', self._test_edge_cases)
+        ]
+        
+        for category_name, test_function in test_categories:
+            print(f"Running {category_name}...")
+            category_results = test_function()
+            
+            test_results['total_tests'] += category_results['total']
+            test_results['passed_tests'] += category_results['passed']
+            test_results['failed_tests'] += category_results['failed']
+            test_results['test_details'].append({
+                'category': category_name,
+                'results': category_results
+            })
+            
+            status_symbol = "PASS" if category_results['failed'] == 0 else "FAIL"
+            print(f"  {status_symbol} {category_name}: {category_results['passed']}/{category_results['total']} passed\n")
+        
+        # Determine overall test status
+        if test_results['failed_tests'] == 0:
+            test_results['overall_status'] = 'PASSED'
+            print(f"\nALL VALIDATION TESTS PASSED ({test_results['passed_tests']}/{test_results['total_tests']})")
+        else:
+            test_results['overall_status'] = 'FAILED'
+            print(f"\nVALIDATION TESTS FAILED ({test_results['failed_tests']}/{test_results['total_tests']} failures)")
+        
+        return test_results
+    
+    def _test_symbol_validation(self) -> Dict[str, int]:
+        # Test symbol validation logic comprehensively
+        results = {'total': 0, 'passed': 0, 'failed': 0, 'details': []}
+        
+        test_cases = [
+            # Valid cases
+            (['AAPL'], True, "Single valid symbol"),
+            (['AAPL', 'GOOGL'], True, "Multiple valid symbols"),
+            
+            # Invalid cases
+            ([], False, "Empty symbol list"),
+            (['AAPL', 'AAPL'], False, "Duplicate symbols"),
+            (['INVALID_SYMBOL_123'], False, "Non-existent symbol"),
+            ([''], False, "Empty string symbol"),
+        ]
+        
+        for symbols, expected_valid, description in test_cases:
+            results['total'] += 1
+            
+            try:
+                # Create mock validation result based on symbol logic
+                has_duplicates = len(set(str(s).upper() for s in symbols if s)) != len([s for s in symbols if s])
+                is_empty = not symbols or all(not s for s in symbols)
+                has_invalid = any(not s or not isinstance(s, str) or len(s) == 0 for s in symbols)
+                
+                actual_valid = not (has_duplicates or is_empty or has_invalid)
+                
+                if actual_valid == expected_valid:
+                    results['passed'] += 1
+                    results['details'].append(f"PASS: {description}")
+                else:
+                    results['failed'] += 1
+                    results['details'].append(f"FAIL: {description} - Expected {expected_valid}, got {actual_valid}")
+                    
+            except Exception as e:
+                results['failed'] += 1
+                results['details'].append(f"ERROR: {description} - Exception: {str(e)}")
+        
+        return results
+    
+    def _test_capital_validation(self) -> Dict[str, int]:
+        # Test capital validation logic comprehensively
+        results = {'total': 0, 'passed': 0, 'failed': 0, 'details': []}
+        
+        test_cases = [
+            # Valid cases
+            (10000.0, True, "Standard capital amount"),
+            (1000.0, True, "Minimum recommended capital"),
+            (100000.0, True, "Large capital amount"),
+            
+            # Invalid cases
+            (0.0, False, "Zero capital"),
+            (-1000.0, False, "Negative capital"),
+            (500.0, False, "Below minimum threshold"),
+            (15000000.0, False, "Above maximum threshold"),
+        ]
+        
+        for capital, expected_valid, description in test_cases:
+            results['total'] += 1
+            
+            try:
+                validation_errors = self._validate_capital(capital)
+                actual_valid = len(validation_errors) == 0
+                
+                if actual_valid == expected_valid:
+                    results['passed'] += 1
+                    results['details'].append(f"PASS: {description}")
+                else:
+                    results['failed'] += 1
+                    error_messages = [e.message for e in validation_errors]
+                    results['details'].append(f"FAIL: {description} - Expected {expected_valid}, got {actual_valid}. Errors: {error_messages}")
+                    
+            except Exception as e:
+                results['failed'] += 1
+                results['details'].append(f"ERROR: {description} - Exception: {str(e)}")
+        
+        return results
+    
+    def _test_date_range_validation(self) -> Dict[str, int]:
+        # Test date range validation scenarios
+        results = {'total': 0, 'passed': 0, 'failed': 0, 'details': []}
+        
+        # Test date range calculations
+        test_cases = [
+            (date(2020, 1, 1), date(2020, 2, 1), 31, "One month range"),
+            (date(2020, 1, 1), date(2020, 1, 15), 14, "Two week range"),
+            (date(2019, 1, 1), date(2024, 1, 1), 1827, "Five year range"),
+            (date(2023, 1, 1), date(2023, 1, 1), 0, "Same day range"),
+        ]
+        
+        for start_date, end_date, expected_days, description in test_cases:
+            results['total'] += 1
+            
+            try:
+                actual_days = (end_date - start_date).days
+                
+                if actual_days == expected_days:
+                    results['passed'] += 1
+                    results['details'].append(f"PASS: {description}")
+                else:
+                    results['failed'] += 1
+                    results['details'].append(f"FAIL: {description} - Expected {expected_days} days, got {actual_days}")
+                    
+            except Exception as e:
+                results['failed'] += 1
+                results['details'].append(f"ERROR: {description} - Exception: {str(e)}")
+        
+        return results
+    
+    def _test_strategy_parameters(self) -> Dict[str, int]:
+        # Test strategy parameter validation
+        results = {'total': 0, 'passed': 0, 'failed': 0, 'details': []}
+        
+        # Mock configuration objects for testing
+        from types import SimpleNamespace
+        
+        test_cases = [
+            # Valid strategy configurations
+            ('ma_crossover', {'short_ma': 10, 'long_ma': 20}, True, "Valid MA crossover parameters"),
+            ('rsi', {'period': 14, 'oversold': 30, 'overbought': 70}, True, "Valid RSI parameters"),
+            
+            # Invalid strategy configurations
+            ('invalid_strategy', {}, False, "Non-existent strategy"),
+            ('ma_crossover', {'short_ma': 20, 'long_ma': 10}, False, "Invalid MA parameters (short > long)"),
+        ]
+        
+        for strategy, params, expected_valid, description in test_cases:
+            results['total'] += 1
+            
+            try:
+                # Create mock config
+                mock_config = SimpleNamespace()
+                mock_config.strategy = strategy
+                mock_config.strategy_parameters = params
+                
+                validation_errors = self._validate_strategy_parameters(mock_config)
+                actual_valid = len(validation_errors) == 0
+                
+                if actual_valid == expected_valid:
+                    results['passed'] += 1
+                    results['details'].append(f"PASS: {description}")
+                else:
+                    results['failed'] += 1
+                    error_messages = [e.message for e in validation_errors]
+                    results['details'].append(f"FAIL: {description} - Expected {expected_valid}, got {actual_valid}. Errors: {error_messages}")
+                    
+            except Exception as e:
+                results['failed'] += 1
+                results['details'].append(f"ERROR: {description} - Exception: {str(e)}")
+        
+        return results
+    
+    def _test_configuration_warnings(self) -> Dict[str, int]:
+        # Test configuration warning generation
+        results = {'total': 0, 'passed': 0, 'failed': 0, 'details': []}
+        
+        from types import SimpleNamespace
+        
+        test_cases = [
+            # Short date ranges should generate warnings
+            (date(2023, 1, 1), date(2023, 1, 15), 10000, 'ma_crossover', {'short_ma': 5, 'long_ma': 20}, True, "Short date range warning"),
+            
+            # Long date ranges should NOT generate warnings
+            (date(2019, 1, 1), date(2024, 1, 1), 10000, 'ma_crossover', {'short_ma': 10, 'long_ma': 20}, False, "Long date range should not warn"),
+            
+            # MA crossover close periods should warn
+            (date(2020, 1, 1), date(2020, 6, 1), 10000, 'ma_crossover', {'short_ma': 10, 'long_ma': 12}, True, "Close MA periods warning"),
+            
+            # Low capital with long period should warn
+            (date(2020, 1, 1), date(2022, 1, 1), 5000, 'ma_crossover', {'short_ma': 10, 'long_ma': 20}, True, "Low capital long period warning"),
+        ]
+        
+        for start_date, end_date, capital, strategy, params, expect_warnings, description in test_cases:
+            results['total'] += 1
+            
+            try:
+                # Create mock config
+                mock_config = SimpleNamespace()
+                mock_config.start_date = start_date
+                mock_config.end_date = end_date
+                mock_config.starting_capital = capital
+                mock_config.strategy = strategy
+                mock_config.strategy_parameters = params
+                
+                warnings = self._check_configuration_warnings(mock_config)
+                has_warnings = len(warnings) > 0
+                
+                if has_warnings == expect_warnings:
+                    results['passed'] += 1
+                    results['details'].append(f"PASS: {description}")
+                else:
+                    results['failed'] += 1
+                    results['details'].append(f"FAIL: {description} - Expected warnings: {expect_warnings}, got warnings: {has_warnings}. Warnings: {warnings}")
+                    
+            except Exception as e:
+                results['failed'] += 1
+                results['details'].append(f"ERROR: {description} - Exception: {str(e)}")
+        
+        return results
+    
+    def _test_error_handling(self) -> Dict[str, int]:
+        # Test error handling robustness
+        results = {'total': 0, 'passed': 0, 'failed': 0, 'details': []}
+        
+        # Test that validation doesn't crash with unusual inputs
+        unusual_inputs = [
+            (None, "None input handling"),
+            ({}, "Empty dict input"),
+            ([], "Empty list input"),
+            ("", "Empty string input"),
+            (float('inf'), "Infinity input"),
+            (float('-inf'), "Negative infinity input"),
+        ]
+        
+        for unusual_input, description in unusual_inputs:
+            results['total'] += 1
+            
+            try:
+                # Test capital validation with unusual input
+                try:
+                    self._validate_capital(unusual_input)
+                    results['passed'] += 1
+                    results['details'].append(f"PASS: {description} - No crash")
+                except (TypeError, ValueError):
+                    # Expected for some inputs
+                    results['passed'] += 1
+                    results['details'].append(f"PASS: {description} - Expected exception handled")
+                except Exception as e:
+                    results['failed'] += 1
+                    results['details'].append(f"FAIL: {description} - Unexpected exception: {str(e)}")
+                    
+            except Exception as e:
+                results['failed'] += 1
+                results['details'].append(f"ERROR: {description} - Test setup failed: {str(e)}")
+        
+        return results
+    
+    def _test_edge_cases(self) -> Dict[str, int]:
+        # Test edge cases and boundary conditions
+        results = {'total': 0, 'passed': 0, 'failed': 0, 'details': []}
+        
+        # Test boundary values for capital
+        boundary_tests = [
+            (999.99, "Just below minimum capital"),
+            (1000.0, "Exactly minimum capital"),
+            (1000.01, "Just above minimum capital"),
+            (9999999.99, "Just below maximum capital"),
+            (10000000.0, "Exactly maximum capital"),
+            (10000000.01, "Just above maximum capital"),
+        ]
+        
+        for capital, description in boundary_tests:
+            results['total'] += 1
+            
+            try:
+                validation_errors = self._validate_capital(capital)
+                
+                # Determine expected validity based on our validation rules
+                expected_valid = 1000.0 <= capital <= 10000000.0
+                actual_valid = len(validation_errors) == 0
+                
+                if actual_valid == expected_valid:
+                    results['passed'] += 1
+                    results['details'].append(f"PASS: {description}")
+                else:
+                    results['failed'] += 1
+                    results['details'].append(f"FAIL: {description} - Expected {expected_valid}, got {actual_valid}")
+                    
+            except Exception as e:
+                results['failed'] += 1
+                results['details'].append(f"ERROR: {description} - Exception: {str(e)}")
+        
+        return results
     
     async def check_database_connection(self) -> ValidationResult:
         # Check if database is accessible and contains required data

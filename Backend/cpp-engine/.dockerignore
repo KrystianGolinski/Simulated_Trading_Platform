@@ -1,0 +1,13 @@
+build/
+*.o
+*.so
+*.dylib
+*.dll
+.git
+.gitignore
+README.md
+.DS_Store
+.vscode
+.idea
+*.log
+*.tmp

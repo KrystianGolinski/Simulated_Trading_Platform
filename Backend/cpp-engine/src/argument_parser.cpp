@@ -1,4 +1,5 @@
 #include "argument_parser.h"
+#include "logger.h"
 #include <sstream>
 #include <algorithm>
 #include <iostream>
@@ -8,14 +9,14 @@ ArgumentParser::ArgumentParser() {}
 SimulationConfig ArgumentParser::parseArguments(int argc, char* argv[]) {
     SimulationConfig config;
     
-    std::cerr << "[DEBUG] Parsing " << argc << " arguments:" << std::endl;
+    Logger::debug("Parsing ", argc, " arguments:");
     for (int i = 0; i < argc; ++i) {
-        std::cerr << "[DEBUG] argv[" << i << "] = '" << argv[i] << "'" << std::endl;
+        Logger::debug("argv[", i, "] = '", argv[i], "'");
     }
     
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
-        std::cerr << "[DEBUG] Processing argument: '" << arg << "'" << std::endl;
+        Logger::debug("Processing argument: '", arg, "'");
         
         if (arg.find('=') != std::string::npos) {
             parseKeyValueFormat(arg, config);
@@ -47,68 +48,68 @@ void ArgumentParser::parseKeyValueFormat(const std::string& arg, SimulationConfi
     if (arg.find("--symbol=") == 0) {
         std::string symbol_list = arg.substr(9);
         parseSymbols(symbol_list, config.symbols);
-        std::cerr << "[DEBUG] Set symbols from key=value format" << std::endl;
+        Logger::debug("Set symbols from key=value format");
     } else if (arg.find("--start=") == 0) {
         config.start_date = arg.substr(8);
-        std::cerr << "[DEBUG] Set start_date = '" << config.start_date << "'" << std::endl;
+        Logger::debug("Set start_date = '", config.start_date, "'");
     } else if (arg.find("--end=") == 0) {
         config.end_date = arg.substr(6);
-        std::cerr << "[DEBUG] Set end_date = '" << config.end_date << "'" << std::endl;
+        Logger::debug("Set end_date = '", config.end_date, "'");
     } else if (arg.find("--capital=") == 0) {
         config.capital = std::stod(arg.substr(10));
-        std::cerr << "[DEBUG] Set capital = " << config.capital << std::endl;
+        Logger::debug("Set capital = ", config.capital);
     } else if (arg.find("--short-ma=") == 0) {
         config.short_ma = std::stoi(arg.substr(11));
-        std::cerr << "[DEBUG] Set short_ma = " << config.short_ma << std::endl;
+        Logger::debug("Set short_ma = ", config.short_ma);
     } else if (arg.find("--long-ma=") == 0) {
         config.long_ma = std::stoi(arg.substr(10));
-        std::cerr << "[DEBUG] Set long_ma = " << config.long_ma << std::endl;
+        Logger::debug("Set long_ma = ", config.long_ma);
     } else if (arg.find("--strategy=") == 0) {
         config.strategy = arg.substr(11);
-        std::cerr << "[DEBUG] Set strategy = '" << config.strategy << "'" << std::endl;
+        Logger::debug("Set strategy = '", config.strategy, "'");
     } else if (arg.find("--rsi-period=") == 0) {
         config.rsi_period = std::stoi(arg.substr(13));
-        std::cerr << "[DEBUG] Set rsi_period = " << config.rsi_period << std::endl;
+        Logger::debug("Set rsi_period = ", config.rsi_period);
     } else if (arg.find("--rsi-oversold=") == 0) {
         config.rsi_oversold = std::stod(arg.substr(15));
-        std::cerr << "[DEBUG] Set rsi_oversold = " << config.rsi_oversold << std::endl;
+        Logger::debug("Set rsi_oversold = ", config.rsi_oversold);
     } else if (arg.find("--rsi-overbought=") == 0) {
         config.rsi_overbought = std::stod(arg.substr(17));
-        std::cerr << "[DEBUG] Set rsi_overbought = " << config.rsi_overbought << std::endl;
+        Logger::debug("Set rsi_overbought = ", config.rsi_overbought);
     }
 }
 
 void ArgumentParser::parseKeyValuePairFormat(const std::string& key, const std::string& value, SimulationConfig& config) {
     if (key == "--symbol") {
         parseSymbols(value, config.symbols);
-        std::cerr << "[DEBUG] Set symbols from key value format" << std::endl;
+        Logger::debug("Set symbols from key value format");
     } else if (key == "--start") {
         config.start_date = value;
-        std::cerr << "[DEBUG] Set start_date = '" << config.start_date << "'" << std::endl;
+        Logger::debug("Set start_date = '", config.start_date, "'");
     } else if (key == "--end") {
         config.end_date = value;
-        std::cerr << "[DEBUG] Set end_date = '" << config.end_date << "'" << std::endl;
+        Logger::debug("Set end_date = '", config.end_date, "'");
     } else if (key == "--capital") {
         config.capital = std::stod(value);
-        std::cerr << "[DEBUG] Set capital = " << config.capital << std::endl;
+        Logger::debug("Set capital = ", config.capital);
     } else if (key == "--short-ma") {
         config.short_ma = std::stoi(value);
-        std::cerr << "[DEBUG] Set short_ma = " << config.short_ma << std::endl;
+        Logger::debug("Set short_ma = ", config.short_ma);
     } else if (key == "--long-ma") {
         config.long_ma = std::stoi(value);
-        std::cerr << "[DEBUG] Set long_ma = " << config.long_ma << std::endl;
+        Logger::debug("Set long_ma = ", config.long_ma);
     } else if (key == "--strategy") {
         config.strategy = value;
-        std::cerr << "[DEBUG] Set strategy = '" << config.strategy << "'" << std::endl;
+        Logger::debug("Set strategy = '", config.strategy, "'");
     } else if (key == "--rsi-period") {
         config.rsi_period = std::stoi(value);
-        std::cerr << "[DEBUG] Set rsi_period = " << config.rsi_period << std::endl;
+        Logger::debug("Set rsi_period = ", config.rsi_period);
     } else if (key == "--rsi-oversold") {
         config.rsi_oversold = std::stod(value);
-        std::cerr << "[DEBUG] Set rsi_oversold = " << config.rsi_oversold << std::endl;
+        Logger::debug("Set rsi_oversold = ", config.rsi_oversold);
     } else if (key == "--rsi-overbought") {
         config.rsi_overbought = std::stod(value);
-        std::cerr << "[DEBUG] Set rsi_overbought = " << config.rsi_overbought << std::endl;
+        Logger::debug("Set rsi_overbought = ", config.rsi_overbought);
     }
 }
 
@@ -125,22 +126,26 @@ void ArgumentParser::setDefaults(SimulationConfig& config) {
 }
 
 void ArgumentParser::debugPrintConfig(const SimulationConfig& config) {
-    std::cerr << "[DEBUG] Final parsed values:" << std::endl;
-    std::cerr << "[DEBUG]   symbols = { ";
+    Logger::debug("Final parsed values:");
+    
+    std::ostringstream symbols_stream;
+    symbols_stream << "  symbols = { ";
     for (size_t i = 0; i < config.symbols.size(); ++i) {
-        std::cerr << "'" << config.symbols[i] << "'";
-        if (i < config.symbols.size() - 1) std::cerr << ", ";
+        symbols_stream << "'" << config.symbols[i] << "'";
+        if (i < config.symbols.size() - 1) symbols_stream << ", ";
     }
-    std::cerr << " }" << std::endl;
-    std::cerr << "[DEBUG]   start_date = '" << config.start_date << "'" << std::endl;
-    std::cerr << "[DEBUG]   end_date = '" << config.end_date << "'" << std::endl;
-    std::cerr << "[DEBUG]   capital = " << config.capital << std::endl;
-    std::cerr << "[DEBUG]   short_ma = " << config.short_ma << std::endl;
-    std::cerr << "[DEBUG]   long_ma = " << config.long_ma << std::endl;
-    std::cerr << "[DEBUG]   strategy = '" << config.strategy << "'" << std::endl;
-    std::cerr << "[DEBUG]   rsi_period = " << config.rsi_period << std::endl;
-    std::cerr << "[DEBUG]   rsi_oversold = " << config.rsi_oversold << std::endl;
-    std::cerr << "[DEBUG]   rsi_overbought = " << config.rsi_overbought << std::endl;
+    symbols_stream << " }";
+    Logger::debug(symbols_stream.str());
+    
+    Logger::debug("  start_date = '", config.start_date, "'");
+    Logger::debug("  end_date = '", config.end_date, "'");
+    Logger::debug("  capital = ", config.capital);
+    Logger::debug("  short_ma = ", config.short_ma);
+    Logger::debug("  long_ma = ", config.long_ma);
+    Logger::debug("  strategy = '", config.strategy, "'");
+    Logger::debug("  rsi_period = ", config.rsi_period);
+    Logger::debug("  rsi_oversold = ", config.rsi_oversold);
+    Logger::debug("  rsi_overbought = ", config.rsi_overbought);
 }
 
 std::string ArgumentParser::trimWhitespace(const std::string& str) {

@@ -221,12 +221,6 @@ double Portfolio::getTotalReturnPercentage(const std::map<std::string, double>& 
     return ((current_value - initial_capital_) / initial_capital_) * 100.0;
 }
 
-void Portfolio::updateValue(const std::map<std::string, double>& current_prices) {
-    // This method can be used to update internal state with current market values
-    // For now, it's a placeholder for future functionality like position rebalancing
-    // or portfolio optimization based on current prices
-    // The actual value calculations are handled by the getter methods
-}
 
 // Utility
 std::string Portfolio::toString() const {

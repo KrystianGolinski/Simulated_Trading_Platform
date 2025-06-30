@@ -1,4 +1,3 @@
-import React, { useRef, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
 import 'chartjs-adapter-date-fns';
 import { StockData } from '../services/api';
@@ -22,16 +21,6 @@ export const StockChart: React.FC<StockChartProps> = ({
   chartType = 'line',
   showVolume = false // Will be used for volume charts later
 }) => {
-  const chartRef = useRef(null);
-
-  useEffect(() => {
-    const chart = chartRef.current;
-    return () => {
-      if (chart) {
-        (chart as any).destroy();
-      }
-    };
-  }, []);
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -194,8 +183,8 @@ export const StockChart: React.FC<StockChartProps> = ({
     },
   };
 
-  // Volume chart data
-  const volumeChartData = {
+  // Volume chart data - only prepare when needed
+  const volumeChartData = showVolume ? {
     datasets: [
       {
         label: `${symbol} Volume`,
@@ -206,9 +195,9 @@ export const StockChart: React.FC<StockChartProps> = ({
         pointRadius: 0,
       }
     ],
-  };
+  } : null;
 
-  const volumeOptions = {
+  const volumeOptions = showVolume ? {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -229,11 +218,11 @@ export const StockChart: React.FC<StockChartProps> = ({
         }
       },
     },
-  };
+  } : null;
 
   const renderChart = () => {
     // All chart types use Line component for now since we removed the financial package
-    return <Line ref={chartRef} data={chartData} options={options as any} />;
+    return <Line data={chartData} options={options as any} />;
   };
 
   return (
@@ -244,7 +233,7 @@ export const StockChart: React.FC<StockChartProps> = ({
       </div>
       
       {/* Volume chart */}
-      {showVolume && (
+      {showVolume && volumeChartData && volumeOptions && (
         <div style={{ height: '150px' }}>
           <Line data={volumeChartData} options={volumeOptions} />
         </div>

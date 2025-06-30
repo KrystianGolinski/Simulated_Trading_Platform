@@ -159,8 +159,3 @@ int ExecutionService::getSuccessfulExecutions() const {
     return static_cast<int>(executed_signals_.size());
 }
 
-int ExecutionService::getFailedExecutions() const {
-    // TODO: Track failed executions separately by adding a failed_executions_ counter
-    // that gets incremented when executeSignal returns false
-    return 0;
-}

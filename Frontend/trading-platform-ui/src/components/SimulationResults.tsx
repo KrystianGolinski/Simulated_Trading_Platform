@@ -1,4 +1,3 @@
-import React, { useRef, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
 import 'chartjs-adapter-date-fns';
 import { SimulationResults as SimulationResultsType } from '../services/api';
@@ -12,16 +11,6 @@ export const SimulationResults: React.FC<SimulationResultsProps> = ({
   results, 
   onStartNew 
 }) => {
-  const chartRef = useRef(null);
-
-  useEffect(() => {
-    const chart = chartRef.current;
-    return () => {
-      if (chart) {
-        (chart as any).destroy();
-      }
-    };
-  }, []);
 
   if (!results) {
     return (
@@ -294,7 +283,7 @@ export const SimulationResults: React.FC<SimulationResultsProps> = ({
           <h2 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.5rem', color: '#374151', textAlign: 'center' }}>Portfolio Growth</h2>
           <div style={{ backgroundColor: 'white', borderRadius: '8px', padding: '16px', boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)', height: '400px' }}>
             <div style={{ height: '100%' }}>
-              <Line ref={chartRef} data={chartData} options={chartOptions} />
+              <Line data={chartData} options={chartOptions} />
             </div>
           </div>
         </div>

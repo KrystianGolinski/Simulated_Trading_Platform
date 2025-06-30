@@ -76,14 +76,10 @@ services:
       start_period: 30s
     command: >
       sh -c "
-        ls -la / &&
-        ls -la /app/build/ &&
         mkdir -p /shared &&
-        ls -la /shared &&
         cp /app/build/trading_engine /shared/ &&
         chmod +x /shared/trading_engine &&
         echo 'C++ engine binary copied to /shared/trading_engine' &&
-        ls -la /shared/ &&
         tail -f /dev/null
       "
 

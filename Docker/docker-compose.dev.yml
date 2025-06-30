@@ -64,11 +64,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DB_HOST: postgres
-      DB_PORT: "5432"
-      DB_NAME: simulated_trading_platform
-      DB_USER: trading_user
-      DB_PASSWORD: trading_password
+      DATABASE_URL: ${DATABASE_URL:-postgresql://trading_user:trading_password@postgres:5432/simulated_trading_platform}
     volumes:
       - cpp_engine_shared:/shared
     healthcheck:

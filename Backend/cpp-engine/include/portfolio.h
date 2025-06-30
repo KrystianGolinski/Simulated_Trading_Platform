@@ -51,7 +51,6 @@ public:
     double getTotalStockValue(const std::map<std::string, double>& current_prices) const;
     double getTotalUnrealizedPnL(const std::map<std::string, double>& current_prices) const;
     double getTotalReturnPercentage(const std::map<std::string, double>& current_prices) const;
-    void updateValue(const std::map<std::string, double>& current_prices); // Update internal state with current values
     
     // Utility
     std::string toString() const;

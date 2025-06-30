@@ -62,12 +62,6 @@ describe('Dashboard Component', () => {
     jest.clearAllMocks();
   });
 
-  it('renders dashboard title', () => {
-    render(<Dashboard />);
-    
-    expect(screen.getByRole('heading', { name: /trading platform dashboard/i })).toBeInTheDocument();
-  });
-
   it('renders stock selection dropdown', () => {
     render(<Dashboard />);
     

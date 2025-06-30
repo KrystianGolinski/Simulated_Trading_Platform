@@ -6,13 +6,8 @@
 
 # Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
 *.py[cod]
 *.so
-build/
-dist/
 *.egg-info/
 
 # Virtual environments
@@ -40,7 +35,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-package-lock.json
 
 # IDE and Editor files
 .vscode/
@@ -61,15 +55,11 @@ Database/historical_data/
 logs/
 *.log.*
 
-# Docker
-.dockerignore
-
 # Temporary Files
 **/tmp/
 **/temp/
 *.tmp
 *.temp
-
 
 # Backup files
 *.bak
@@ -80,7 +70,3 @@ logs/
 htmlcov/
 .pytest_cache/
 .tox/
-
-# Initial documentation
-Project_Documentation/Diagrams/
-Project_Documentation/DOCX files/

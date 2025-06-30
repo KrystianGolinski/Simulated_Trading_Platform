@@ -145,6 +145,84 @@ setup_frontend() {
     print_success "Frontend setup complete"
 }
 
+# Function to setup Python API dependencies
+setup_api_dependencies() {
+    print_status "Setting up Python API dependencies..."
+    
+    if [ ! -d "Backend/api" ]; then
+        print_error "API directory not found"
+        exit 1
+    fi
+    
+    cd Backend/api
+    
+    # Check if requirements.txt exists
+    if [ ! -f "requirements.txt" ]; then
+        print_error "requirements.txt not found"
+        exit 1
+    fi
+    
+    # Check if python3 is available
+    if ! command -v python3 &> /dev/null; then
+        print_error "Python3 not found"
+        exit 1
+    fi
+    
+    # Create virtual environment if it doesn't exist
+    if [ ! -d "venv" ]; then
+        print_status "Creating Python virtual environment..."
+        python3 -m venv venv
+        
+        if [ $? -ne 0 ]; then
+            print_error "Failed to create virtual environment"
+            exit 1
+        fi
+        
+        print_success "Virtual environment created"
+    else
+        print_status "Virtual environment already exists"
+    fi
+    
+    # Activate virtual environment
+    source venv/bin/activate
+    
+    # Upgrade pip in virtual environment
+    python -m pip install --upgrade pip -q --disable-pip-version-check
+    
+    # Check if dependencies are already installed in venv
+    print_status "Checking Python dependencies in virtual environment..."
+    
+    # Check if all required packages are available
+    deps_missing=false
+    
+    # Check each package individually (some have different import names)
+    if ! python -c "import fastapi" 2>/dev/null; then deps_missing=true; fi
+    if ! python -c "import uvicorn" 2>/dev/null; then deps_missing=true; fi
+    if ! python -c "import pydantic" 2>/dev/null; then deps_missing=true; fi
+    if ! python -c "import asyncpg" 2>/dev/null; then deps_missing=true; fi
+    if ! python -c "import pytest" 2>/dev/null; then deps_missing=true; fi
+    if ! python -c "import httpx" 2>/dev/null; then deps_missing=true; fi
+    
+    if [ "$deps_missing" = true ]; then
+        print_status "Installing missing Python dependencies in virtual environment..."
+        python -m pip install -r requirements.txt -q --disable-pip-version-check
+        
+        if [ $? -eq 0 ]; then
+            print_success "Python dependencies installed successfully in virtual environment"
+        else
+            print_error "Failed to install Python dependencies"
+            exit 1
+        fi
+    else
+        print_success "Python dependencies already available in virtual environment"
+    fi
+    
+    # Deactivate virtual environment
+    deactivate
+    
+    cd ../..
+}
+
 # Function to setup environment
 setup_environment() {
     print_status "Setting up environment..."
@@ -246,11 +324,58 @@ run_cpp_tests() {
     
     ./build/test_comprehensive
     if [ $? -eq 0 ]; then
-        print_success "C++ comprehensive test suite passed - all 1187 tests successful"
+        print_success "[PASS] C++ comprehensive tests"
     else
-        print_error "C++ comprehensive test suite failed"
+        print_error "[FAIL] C++ comprehensive tests"
         exit 1
     fi
+    
+    cd ../..
+}
+
+# Function to run comprehensive API tests
+run_api_tests() {
+    print_status "Running comprehensive API test suite..."
+    
+    if [ ! -f "Backend/api/tests/run_comprehensive_tests.py" ]; then
+        print_error "API comprehensive test suite not found"
+        exit 1
+    fi
+    
+    cd Backend/api
+    
+    # Check if python3 is available
+    if ! command -v python3 &> /dev/null; then
+        print_error "Python3 not found - cannot run API tests"
+        exit 1
+    fi
+    
+    # Check if virtual environment exists
+    if [ ! -d "venv" ]; then
+        print_error "Virtual environment not found. Run setup first."
+        exit 1
+    fi
+    
+    # Activate virtual environment
+    source venv/bin/activate
+    
+    # Set testing mode environment variable
+    export TESTING=true
+    
+    # Run the comprehensive API test suite using venv python
+    python tests/run_comprehensive_tests.py
+    if [ $? -eq 0 ]; then
+        print_success "API comprehensive tests"
+    else
+        print_error "API comprehensive tests"
+        exit 1
+    fi
+    
+    # Unset testing mode
+    unset TESTING
+    
+    # Deactivate virtual environment
+    deactivate
     
     cd ../..
 }
@@ -290,17 +415,11 @@ setup_docker_services() {
 }
 
 # Function to run development mode
-run_development_mode() {
-    print_status "Starting development mode..."
-    
+run_confirmation() {
     echo ""
-    echo "Trading Platform Setup Complete!"
-    echo ""
-    echo "Services Available:"
-    echo "  Frontend:    http://localhost:3000"
-    echo "  FastAPI:     http://localhost:8000"
-    echo "  API Docs:    http://localhost:8000/docs"
-    echo "  PostgreSQL:  localhost:5433"
+    print_status "Trading Platform Setup Complete!"
+    print_status "Services Available:"
+    print_status "Frontend:    http://localhost:3000"
 }
 
 # Main execution flow
@@ -311,9 +430,11 @@ main() {
     setup_environment
     build_cpp_engine
     setup_frontend
+    setup_api_dependencies
     setup_docker_services
     run_cpp_tests
-    run_development_mode
+    run_api_tests
+    run_confirmation
 }
 
 # Handle script arguments
@@ -332,14 +453,28 @@ case "${1:-}" in
         setup_environment
         setup_docker_services
         ;;
+    --api-only)
+        print_status "Setting up API dependencies only..."
+        setup_api_dependencies
+        ;;
+    --tests-only)
+        print_status "Running comprehensive test suites only..."
+        check_docker_permissions
+        setup_api_dependencies
+        wait_for_database
+        run_cpp_tests
+        run_api_tests
+        ;;
     --help)
         echo "Usage: $0 [option]"
         echo ""
         echo "Options:"
-        echo "  (no option)     Full setup - C++, Frontend, and Docker"
+        echo "  (no option)     Full setup - C++, Frontend, API, Docker, and Tests"
         echo "  --cpp-only      Build C++ engine only"
         echo "  --frontend-only Setup frontend only"
+        echo "  --api-only      Setup API dependencies only"
         echo "  --docker-only   Setup Docker services only"
+        echo "  --tests-only    Run comprehensive test suites only"
         echo "  --help          Show this help"
         ;;
     *)

@@ -36,7 +36,6 @@ public:
     // Execution statistics
     int getTotalExecutions() const;
     int getSuccessfulExecutions() const;
-    int getFailedExecutions() const;
     
 private:
     // Internal execution logic

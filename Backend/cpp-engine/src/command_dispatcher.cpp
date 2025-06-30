@@ -54,8 +54,7 @@ int CommandDispatcher::executeTest(const SimulationConfig& config) {
 }
 
 int CommandDispatcher::executeBacktest(const SimulationConfig& config) {
-    runBacktest(config);
-    return 0;
+    return runBacktest(config);
 }
 
 int CommandDispatcher::executeSimulation(const SimulationConfig& config) {
@@ -126,11 +125,11 @@ int CommandDispatcher::executeSimulation(const SimulationConfig& config) {
 int CommandDispatcher::executeSimulationFromConfig(const std::string& config_file) {
     std::cerr << "[DEBUG] Using JSON config file: " << config_file << std::endl;
     
-    if (!runSimulationFromConfig(config_file)) {
+    int result = runSimulationFromConfig(config_file);
+    if (result != 0) {
         std::cerr << "Error: Failed to run simulation from config file" << std::endl;
-        return 1;
     }
-    return 0;
+    return result;
 }
 
 int CommandDispatcher::executeStatus() {
@@ -232,7 +231,7 @@ void CommandDispatcher::testDatabase(const std::string& symbol, const std::strin
     }
 }
 
-void CommandDispatcher::runBacktest(const SimulationConfig& config) {
+int CommandDispatcher::runBacktest(const SimulationConfig& config) {
     std::cout << "Running backtest..." << std::endl;
     std::cout << "Symbols: ";
     for (size_t i = 0; i < config.symbols.size(); ++i) {
@@ -302,15 +301,17 @@ void CommandDispatcher::runBacktest(const SimulationConfig& config) {
         
     } catch (const std::exception& e) {
         std::cout << "[ERROR] Backtest failed: " << e.what() << std::endl;
+        return 1;
     }
+    return 0;
 }
 
-bool CommandDispatcher::runSimulationFromConfig(const std::string& config_file) {
+int CommandDispatcher::runSimulationFromConfig(const std::string& config_file) {
     try {
         std::ifstream file(config_file);
         if (!file.is_open()) {
             std::cerr << "Error: Cannot open config file: " << config_file << std::endl;
-            return false;
+            return 1;
         }
         
         json config;
@@ -368,20 +369,20 @@ bool CommandDispatcher::runSimulationFromConfig(const std::string& config_file) 
             auto result = engine.runSimulationWithParams(symbols[0], start_date, end_date, capital);
             if (result.isError()) {
                 std::cerr << "Error: " << result.getErrorMessage() << std::endl;
-                return false;
+                return 1;
             }
             std::cout << result.getValue() << std::endl;
         } else {
             auto backtest_result = engine.runBacktestMultiSymbol(symbols, start_date, end_date, capital);
             if (backtest_result.isError()) {
                 std::cerr << "Error: " << backtest_result.getErrorMessage() << std::endl;
-                return false;
+                return 1;
             }
             
             auto json_result = engine.getBacktestResultsAsJson(backtest_result.getValue());
             if (json_result.isError()) {
                 std::cerr << "Error generating results: " << json_result.getErrorMessage() << std::endl;
-                return false;
+                return 1;
             }
             std::cout << json_result.getValue().dump(2) << std::endl;
         }
@@ -391,10 +392,10 @@ bool CommandDispatcher::runSimulationFromConfig(const std::string& config_file) 
             std::cerr << "[DEBUG] Config file cleaned up" << std::endl;
         }
         
-        return true;
+        return 0;
         
     } catch (const std::exception& e) {
         std::cerr << "Error parsing config file: " << e.what() << std::endl;
-        return false;
+        return 1;
     }
 }

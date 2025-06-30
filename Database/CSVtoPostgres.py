@@ -245,13 +245,13 @@ class CSVToPostgreSQLLoader:
 
 # Usage
 if __name__ == "__main__":
-    # Database configuration for Docker environment
+    # Database configuration from environment variables (using TEST_* for local execution)
     DB_CONFIG = {
-        "host": "localhost",
-        "database": "simulated_trading_platform",
-        "user": "trading_user",
-        "password": "trading_password",
-        "port": 5433
+        "host": os.getenv("TEST_DB_HOST", "localhost"),
+        "database": os.getenv("TEST_DB_NAME", "simulated_trading_platform"),
+        "user": os.getenv("TEST_DB_USER", "trading_user"),
+        "password": os.getenv("TEST_DB_PASSWORD", "trading_password"),
+        "port": int(os.getenv("TEST_DB_PORT", "5433"))
     }
     
     # Initialize loader

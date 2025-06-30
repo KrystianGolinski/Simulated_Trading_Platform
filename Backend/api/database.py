@@ -18,11 +18,23 @@ logger = logging.getLogger(__name__)
 class DatabaseManager:
     def __init__(self):
         self.pool: Optional[asyncpg.Pool] = None
-        # Get credentials from environment - assume Docker environment
-        self.database_url = os.getenv(
-            "DATABASE_URL", 
-            f"postgresql://{os.getenv('DB_USER', 'trading_user')}:{os.getenv('DB_PASSWORD', 'trading_password')}@postgres:5432/simulated_trading_platform"
-        )
+        # Determine if we're in test mode and use appropriate credentials
+        test_mode = os.getenv('TESTING', 'false').lower() == 'true'
+        
+        if test_mode:
+            # Use test database credentials for local testing
+            db_host = os.getenv('TEST_DB_HOST', 'localhost')
+            db_port = os.getenv('TEST_DB_PORT', '5433')
+            db_name = os.getenv('TEST_DB_NAME', 'simulated_trading_platform')
+            db_user = os.getenv('TEST_DB_USER', 'trading_user')
+            db_password = os.getenv('TEST_DB_PASSWORD', 'trading_password')
+            self.database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+        else:
+            # Use Docker environment credentials
+            self.database_url = os.getenv(
+                "DATABASE_URL", 
+                f"postgresql://{os.getenv('DB_USER', 'trading_user')}:{os.getenv('DB_PASSWORD', 'trading_password')}@postgres:5432/simulated_trading_platform"
+            )
         # Initialize cachetools caches
         self._stock_data_cache = TTLCache(maxsize=1024, ttl=300)  # 5 minutes TTL, max 1024 entries
         self._stocks_list_cache = TTLCache(maxsize=1, ttl=300)    # Cache for available stocks list
