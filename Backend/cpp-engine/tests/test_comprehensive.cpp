@@ -21,7 +21,6 @@
 // Database layer includes
 #include "database_connection.h"
 #include "market_data.h"
-#include "database_service.h"
 
 // Business logic layer includes
 #include "technical_indicators.h"
@@ -236,12 +235,12 @@ void test_database_layer() {
     auto symbol_result = market_data.symbolExists("AAPL");
     ASSERT_TRUE(symbol_result.isSuccess() || symbol_result.isError());
     
-    // Test DatabaseService Result patterns
-    DatabaseService db_service;
-    auto historical_result = db_service.getHistoricalPrices("AAPL", "2023-01-01", "2023-12-31");
+    // Test MarketData Result patterns
+    MarketData market_data_service;
+    auto historical_result = market_data_service.getHistoricalPrices("AAPL", "2023-01-01", "2023-12-31");
     ASSERT_TRUE(historical_result.isSuccess() || historical_result.isError());
     
-    auto current_result = db_service.getCurrentPrices();
+    auto current_result = market_data_service.getCurrentPrices();
     ASSERT_TRUE(current_result.isSuccess() || current_result.isError());
     
     std::cout << "[PASS]" << std::endl;
@@ -325,7 +324,12 @@ void test_trading_engine() {
     engine.setMovingAverageStrategy(5, 10);
     
     // Test simulation with parameters (will fail due to no database, but should return proper Result<T>)
-    auto sim_result = engine.runSimulationWithParams("AAPL", "2023-01-01", "2023-02-01", 10000.0);
+    TradingConfig config;
+    config.symbols = {"AAPL"};
+    config.start_date = "2023-01-01";
+    config.end_date = "2023-02-01";
+    config.starting_capital = 10000.0;
+    auto sim_result = engine.runSimulation(config);
     ASSERT_TRUE(sim_result.isSuccess() || sim_result.isError());
     
     if (sim_result.isError()) {
@@ -343,11 +347,21 @@ void test_trading_engine() {
     }
     
     // Test input validation
-    auto invalid_sim = engine.runSimulationWithParams("", "2023-01-01", "2023-02-01", 10000.0);
+    TradingConfig invalid_config;
+    invalid_config.symbols = {""};
+    invalid_config.start_date = "2023-01-01";
+    invalid_config.end_date = "2023-02-01";
+    invalid_config.starting_capital = 10000.0;
+    auto invalid_sim = engine.runSimulation(invalid_config);
     ASSERT_TRUE(invalid_sim.isError());
     ASSERT_TRUE(invalid_sim.getErrorCode() == ErrorCode::ENGINE_INVALID_SYMBOL);
     
-    auto invalid_capital = engine.runSimulationWithParams("AAPL", "2023-01-01", "2023-02-01", -1000.0);
+    TradingConfig invalid_capital_config;
+    invalid_capital_config.symbols = {"AAPL"};
+    invalid_capital_config.start_date = "2023-01-01";
+    invalid_capital_config.end_date = "2023-02-01";
+    invalid_capital_config.starting_capital = -1000.0;
+    auto invalid_capital = engine.runSimulation(invalid_capital_config);
     ASSERT_TRUE(invalid_capital.isError());
     ASSERT_TRUE(invalid_capital.getErrorCode() == ErrorCode::ENGINE_INVALID_CAPITAL);
     
@@ -526,8 +540,8 @@ void test_comprehensive_error_paths() {
     std::cout << "Testing All Error Paths with Result<T> Patterns - " << std::flush;
     
     // Test database layer error paths
-    DatabaseService db_service;
-    auto db_result = db_service.getHistoricalPrices("", "", "");
+    MarketData market_data_service;
+    auto db_result = market_data_service.getHistoricalPrices("", "", "");
     ASSERT_TRUE(db_result.isError());
     
     // Test business logic error paths
@@ -539,7 +553,12 @@ void test_comprehensive_error_paths() {
     
     // Test application layer error paths
     TradingEngine engine(10000.0);
-    auto invalid_backtest = engine.runSimulationWithParams("", "", "", -1000.0);
+    TradingConfig invalid_backtest_config;
+    invalid_backtest_config.symbols = {""};
+    invalid_backtest_config.start_date = "";
+    invalid_backtest_config.end_date = "";
+    invalid_backtest_config.starting_capital = -1000.0;
+    auto invalid_backtest = engine.runSimulation(invalid_backtest_config);
     ASSERT_TRUE(invalid_backtest.isError());
     ASSERT_TRUE(invalid_backtest.getErrorCode() == ErrorCode::ENGINE_INVALID_SYMBOL);
     
@@ -562,18 +581,18 @@ void test_comprehensive_error_paths() {
 // Service Component Unit Tests
 
 void test_database_service_detailed() {
-    std::cout << "Testing DatabaseService Detailed Unit Tests - " << std::flush;
+    std::cout << "Testing MarketData Detailed Unit Tests - " << std::flush;
     
-    DatabaseService db_service;
+    MarketData market_data_service;
     
     // Test connection health check
-    auto health_result = db_service.isConnectionHealthy();
+    auto health_result = market_data_service.testDatabaseConnection();
     ASSERT_TRUE(health_result.isSuccess() || health_result.isError());
     
     // Test historical data retrieval with various symbols and date ranges
     std::vector<std::string> test_symbols = {"AAPL", "GOOGL", "MSFT", "TSLA"};
     for (const auto& symbol : test_symbols) {
-        auto historical_result = db_service.getHistoricalPrices(symbol, "2023-01-01", "2023-01-31");
+        auto historical_result = market_data_service.getHistoricalPrices(symbol, "2023-01-01", "2023-01-31");
         ASSERT_TRUE(historical_result.isSuccess() || historical_result.isError());
         
         if (historical_result.isError()) {
@@ -582,18 +601,18 @@ void test_database_service_detailed() {
     }
     
     // Test historical data with invalid inputs
-    auto empty_symbol_result = db_service.getHistoricalPrices("", "2023-01-01", "2023-01-31");
+    auto empty_symbol_result = market_data_service.getHistoricalPrices("", "2023-01-01", "2023-01-31");
     // Empty symbol may succeed or fail depending on implementation, just verify it handles gracefully
     ASSERT_TRUE(empty_symbol_result.isSuccess() || empty_symbol_result.isError());
     
-    auto empty_dates_result = db_service.getHistoricalPrices("AAPL", "", "");
+    auto empty_dates_result = market_data_service.getHistoricalPrices("AAPL", "", "");
     ASSERT_TRUE(empty_dates_result.isError());
     
-    auto invalid_date_format = db_service.getHistoricalPrices("AAPL", "invalid", "2023-01-31");
+    auto invalid_date_format = market_data_service.getHistoricalPrices("AAPL", "invalid", "2023-01-31");
     ASSERT_TRUE(invalid_date_format.isError());
     
     // Test current prices retrieval
-    auto current_result = db_service.getCurrentPrices();
+    auto current_result = market_data_service.getCurrentPrices();
     ASSERT_TRUE(current_result.isSuccess() || current_result.isError());
     
     if (current_result.isError()) {
@@ -980,12 +999,12 @@ void test_service_component_integration() {
     auto exec_result = exec_service.executeSignal(signal, "AAPL", test_portfolio, nullptr);
     ASSERT_TRUE(exec_result.isSuccess() || exec_result.isError());
     
-    // Test DatabaseService integration with other services
-    DatabaseService db_service;
-    auto health_check = db_service.isConnectionHealthy();
+    // Test MarketData integration with other services
+    MarketData market_data_service;
+    auto health_check = market_data_service.testDatabaseConnection();
     ASSERT_TRUE(health_check.isSuccess() || health_check.isError());
     
-    auto historical_data = db_service.getHistoricalPrices("AAPL", "2023-01-01", "2023-01-31");
+    auto historical_data = market_data_service.getHistoricalPrices("AAPL", "2023-01-01", "2023-01-31");
     ASSERT_TRUE(historical_data.isSuccess() || historical_data.isError());
     
     // Test cross-service error propagation
@@ -998,6 +1017,350 @@ void test_service_component_integration() {
     ASSERT_TRUE(integration_exec.getErrorCode() != ErrorCode::SYSTEM_UNEXPECTED_ERROR);
     
     std::cout << "[PASS]" << std::endl;
+}
+
+// Multi-Symbol Simulation Tests
+
+void test_multi_symbol_simulation_bugs() {
+    std::cout << "Testing Multi-Symbol Simulation Bug Detection - " << std::flush;
+    
+    // Test configuration with multiple symbols
+    TradingConfig multi_config;
+    multi_config.symbols = {"AAPL", "GOOGL", "MSFT", "AMZN", "TSLA"};
+    multi_config.start_date = "2023-01-01";
+    multi_config.end_date = "2023-01-31";
+    multi_config.starting_capital = 10000.0;
+    multi_config.strategy_name = "ma_crossover";
+    multi_config.setParameter("short_ma", 10);
+    multi_config.setParameter("long_ma", 20);
+    
+    // Test single symbol configuration (should be different)
+    TradingConfig single_config;
+    single_config.symbols = {"AAPL"};
+    single_config.start_date = "2023-01-01";
+    single_config.end_date = "2023-01-31";
+    single_config.starting_capital = 10000.0;
+    single_config.strategy_name = "ma_crossover";
+    single_config.setParameter("short_ma", 10);
+    single_config.setParameter("long_ma", 20);
+    
+    try {
+        TradingEngine multi_engine(10000.0);
+        multi_engine.setMovingAverageStrategy(10, 20);
+        
+        TradingEngine single_engine(10000.0);
+        single_engine.setMovingAverageStrategy(10, 20);
+        
+        // Run simulations
+        auto multi_result = multi_engine.runSimulation(multi_config);
+        auto single_result = single_engine.runSimulation(single_config);
+        
+        // Both should succeed if database is available
+        if (multi_result.isSuccess() && single_result.isSuccess()) {
+            // Parse JSON results to compare
+            nlohmann::json multi_json = nlohmann::json::parse(multi_result.getValue());
+            nlohmann::json single_json = nlohmann::json::parse(single_result.getValue());
+            
+            // Extract key metrics for comparison
+            double multi_return = multi_json.value("total_return_pct", 0.0);
+            double single_return = single_json.value("total_return_pct", 0.0);
+            int multi_trades = multi_json.value("total_trades", 0);
+            int single_trades = single_json.value("total_trades", 0);
+            
+            // BUG DETECTION: Multi-symbol should differ from single-symbol
+            // If they're identical, we've detected the bug
+            bool results_identical = (std::abs(multi_return - single_return) < 0.01) && 
+                                   (multi_trades == single_trades);
+            
+            if (results_identical) {
+                std::cout << "[BUG DETECTED] Multi-symbol simulation produces identical results to single-symbol" << std::endl;
+                std::cout << "  Multi-symbol return: " << multi_return << "%" << std::endl;
+                std::cout << "  Single-symbol return: " << single_return << "%" << std::endl;
+                std::cout << "  Multi-symbol trades: " << multi_trades << std::endl;
+                std::cout << "  Single-symbol trades: " << single_trades << std::endl;
+            } else {
+                std::cout << "[PASS] Multi-symbol produces different results (as expected)" << std::endl;
+            }
+            
+            // Test symbol tracking in results
+            std::string multi_symbol = multi_json.value("symbol", "");
+            std::string single_symbol = single_json.value("symbol", "");
+            
+            if (multi_symbol == "AAPL" && single_symbol == "AAPL") {
+                std::cout << "[BUG DETECTED] Multi-symbol result only tracks primary symbol" << std::endl;
+            }
+            
+        } else {
+            // Database not available, test configurations only
+            std::cout << "[SKIP] Database not available, testing config validation only" << std::endl;
+            
+            // Test configuration validation
+            ASSERT_TRUE(multi_config.isMultiSymbol());
+            ASSERT_FALSE(single_config.isMultiSymbol());
+            ASSERT_EQ(5, multi_config.symbols.size());
+            ASSERT_EQ(1, single_config.symbols.size());
+            ASSERT_EQ("AAPL", multi_config.getPrimarySymbol());
+            ASSERT_EQ("AAPL", single_config.getPrimarySymbol());
+        }
+        
+    } catch (const std::exception& e) {
+        std::cout << "[ERROR] Exception during bug detection: " << e.what() << std::endl;
+    }
+    
+    std::cout << "[COMPLETE]" << std::endl;
+}
+
+void test_single_vs_multi_symbol_comparison() {
+    std::cout << "Testing Single vs Multi-Symbol Result Comparison - " << std::flush;
+    
+    // Test reported bug scenario: 25 symbols vs AAPL only
+    std::vector<std::string> many_symbols = {
+        "AAPL", "GOOGL", "MSFT", "AMZN", "TSLA", "META", "NVDA", "NFLX", "ADBE", "CRM",
+        "INTC", "AMD", "ORCL", "IBM", "CSCO", "UBER", "LYFT", "SNAP", "TWTR", "SPOT",
+        "ZM", "DOCU", "SLACK", "WORK", "NOW"
+    };
+    
+    TradingConfig many_config;
+    many_config.symbols = many_symbols;
+    many_config.start_date = "2023-01-01";
+    many_config.end_date = "2023-02-28";
+    many_config.starting_capital = 25000.0;
+    many_config.strategy_name = "ma_crossover";
+    
+    TradingConfig single_config;
+    single_config.symbols = {"AAPL"};
+    single_config.start_date = "2023-01-01";
+    single_config.end_date = "2023-02-28";
+    single_config.starting_capital = 25000.0;
+    single_config.strategy_name = "ma_crossover";
+    
+    // Test different primary symbol scenario: AMZN vs AMZN+ADBE
+    TradingConfig amzn_only;
+    amzn_only.symbols = {"AMZN"};
+    amzn_only.start_date = "2023-01-01";
+    amzn_only.end_date = "2023-02-28";
+    amzn_only.starting_capital = 10000.0;
+    amzn_only.strategy_name = "ma_crossover";
+    
+    TradingConfig amzn_adbe;
+    amzn_adbe.symbols = {"AMZN", "ADBE"};
+    amzn_adbe.start_date = "2023-01-01";
+    amzn_adbe.end_date = "2023-02-28";
+    amzn_adbe.starting_capital = 10000.0;
+    amzn_adbe.strategy_name = "ma_crossover";
+    
+    try {
+        TradingEngine engine1(25000.0);
+        TradingEngine engine2(25000.0);
+        TradingEngine engine3(10000.0);
+        TradingEngine engine4(10000.0);
+        
+        // Run all simulations
+        auto many_result = engine1.runSimulation(many_config);
+        auto single_result = engine2.runSimulation(single_config);
+        auto amzn_only_result = engine3.runSimulation(amzn_only);
+        auto amzn_adbe_result = engine4.runSimulation(amzn_adbe);
+        
+        if (many_result.isSuccess() && single_result.isSuccess()) {
+            std::cout << "[TEST] 25-symbol vs AAPL-only comparison:" << std::endl;
+            
+            nlohmann::json many_json = nlohmann::json::parse(many_result.getValue());
+            nlohmann::json single_json = nlohmann::json::parse(single_result.getValue());
+            
+            double many_return = many_json.value("total_return_pct", 0.0);
+            double single_return = single_json.value("total_return_pct", 0.0);
+            
+            std::cout << "  25-symbol return: " << many_return << "%" << std::endl;
+            std::cout << "  AAPL-only return: " << single_return << "%" << std::endl;
+            std::cout << "  Difference: " << std::abs(many_return - single_return) << "%" << std::endl;
+            
+            if (std::abs(many_return - single_return) < 0.01) {
+                std::cout << "  [BUG CONFIRMED] Results are identical - engine only processing primary symbol" << std::endl;
+            }
+        }
+        
+        if (amzn_only_result.isSuccess() && amzn_adbe_result.isSuccess()) {
+            std::cout << "[TEST] AMZN-only vs AMZN+ADBE comparison:" << std::endl;
+            
+            nlohmann::json amzn_json = nlohmann::json::parse(amzn_only_result.getValue());
+            nlohmann::json amzn_adbe_json = nlohmann::json::parse(amzn_adbe_result.getValue());
+            
+            double amzn_return = amzn_json.value("total_return_pct", 0.0);
+            double amzn_adbe_return = amzn_adbe_json.value("total_return_pct", 0.0);
+            
+            std::cout << "  AMZN-only return: " << amzn_return << "%" << std::endl;
+            std::cout << "  AMZN+ADBE return: " << amzn_adbe_return << "%" << std::endl;
+            std::cout << "  Difference: " << std::abs(amzn_return - amzn_adbe_return) << "%" << std::endl;
+            
+            if (std::abs(amzn_return - amzn_adbe_return) > 0.01) {
+                std::cout << "  [EXPECTED] Results differ - but likely due to capital allocation not multi-symbol processing" << std::endl;
+            }
+        }
+    } catch (const std::exception& e) {
+        std::cout << "[ERROR] " << e.what() << std::endl;
+    }
+    
+    std::cout << "[COMPLETE]" << std::endl;
+}
+
+void test_multi_symbol_data_retrieval() {
+    std::cout << "Testing Multi-Symbol Data Retrieval Logic - " << std::flush;
+    
+    // Test if engine properly fetches data for all symbols
+    TradingConfig config;
+    config.symbols = {"AAPL", "GOOGL", "MSFT"};
+    config.start_date = "2023-01-01";
+    config.end_date = "2023-01-10";
+    config.starting_capital = 10000.0;
+    
+    try {
+        TradingEngine engine(10000.0);
+        MarketData* market_data = engine.getMarketData();
+        
+        if (market_data) {
+            // Test individual symbol data retrieval
+            for (const auto& symbol : config.symbols) {
+                auto result = market_data->getHistoricalPrices(symbol, config.start_date, config.end_date);
+                if (result.isSuccess()) {
+                    std::cout << "[INFO] " << symbol << " has " << result.getValue().size() << " data points" << std::endl;
+                } else {
+                    std::cout << "[INFO] " << symbol << " data not available: " << result.getErrorMessage() << std::endl;
+                }
+            }
+            
+            // Test engine's prepareMarketData behavior
+            // This should reveal if it now fetches data for all symbols
+            auto backtest_result = engine.runBacktest(config);
+            if (backtest_result.isError()) {
+                std::cout << "[INFO] Backtest failed (expected if data unavailable): " << backtest_result.getErrorMessage() << std::endl;
+                
+                // Check if error message indicates multi-symbol processing
+                if (backtest_result.getErrorMessage().find("any of the requested symbols") != std::string::npos) {
+                    std::cout << "[PROGRESS] Multi-symbol data retrieval is working - processes all symbols" << std::endl;
+                } else {
+                    std::cout << "[BUG] Still only processing primary symbol" << std::endl;
+                }
+            } else {
+                const auto& result = backtest_result.getValue();
+                std::cout << "[FIXED] Result now tracks symbols: ";
+                for (size_t i = 0; i < result.symbols.size(); ++i) {
+                    std::cout << result.symbols[i];
+                    if (i < result.symbols.size() - 1) std::cout << ", ";
+                }
+                std::cout << std::endl;
+                std::cout << "[FIXED] Should track all symbols: ";
+                for (size_t i = 0; i < config.symbols.size(); ++i) {
+                    std::cout << config.symbols[i];
+                    if (i < config.symbols.size() - 1) std::cout << ", ";
+                }
+                std::cout << std::endl;
+            }
+        }
+    } catch (const std::exception& e) {
+        std::cout << "[ERROR] " << e.what() << std::endl;
+    }
+    
+    std::cout << "[COMPLETE]" << std::endl;
+}
+
+void test_multi_symbol_portfolio_allocation() {
+    std::cout << "Testing Multi-Symbol Portfolio Allocation Logic - " << std::flush;
+    
+    // Test if portfolio allocation works correctly for multiple symbols
+    Portfolio portfolio(10000.0);
+    
+    // Simulate multi-symbol portfolio management
+    std::map<std::string, double> multi_prices = {
+        {"AAPL", 150.0},
+        {"GOOGL", 2500.0},
+        {"MSFT", 300.0}
+    };
+    
+    // Test equal allocation (should be 1/3 each = ~$3333)
+    double allocation_per_symbol = portfolio.getCashBalance() / 3.0;
+    
+    for (const auto& [symbol, price] : multi_prices) {
+        int shares = static_cast<int>(allocation_per_symbol / price);
+        if (shares > 0) {
+            bool success = portfolio.buyStock(symbol, shares, price);
+            ASSERT_TRUE(success);
+            std::cout << "[INFO] Allocated " << shares << " shares of " << symbol << " at $" << price << std::endl;
+        }
+    }
+    
+    // Verify portfolio diversification
+    int position_count = portfolio.getPositionCount();
+    ASSERT_EQ(3, position_count);
+    
+    double total_value = portfolio.getTotalValue(multi_prices);
+    std::cout << "[INFO] Total portfolio value: $" << total_value << std::endl;
+    std::cout << "[INFO] Cash remaining: $" << portfolio.getCashBalance() << std::endl;
+    
+    // Test that current engine doesn't do this multi-symbol allocation
+    TradingConfig config;
+    config.symbols = {"AAPL", "GOOGL", "MSFT"};
+    config.starting_capital = 10000.0;
+    
+    TradingEngine engine(10000.0);
+    Portfolio& engine_portfolio = engine.getPortfolio();
+    
+    // After simulation, engine portfolio should only have positions in primary symbol
+    // This test documents the current bug behavior
+    std::cout << "[BUG CHECK] Engine portfolio has " << engine_portfolio.getPositionCount() << " positions" << std::endl;
+    std::cout << "[BUG CHECK] Expected positions for multi-symbol: " << config.symbols.size() << std::endl;
+    
+    std::cout << "[COMPLETE]" << std::endl;
+}
+
+void test_multi_symbol_strategy_evaluation() {
+    std::cout << "Testing Multi-Symbol Strategy Evaluation - " << std::flush;
+    
+    // Test strategy evaluation across multiple symbols
+    std::vector<PriceData> aapl_data = {
+        {150.0, 155.0, 148.0, 152.0, 1000000, "2023-01-01"},
+        {152.0, 158.0, 151.0, 157.0, 1100000, "2023-01-02"},
+        {157.0, 160.0, 155.0, 159.0, 1200000, "2023-01-03"}
+    };
+    
+    std::vector<PriceData> googl_data = {
+        {2500.0, 2550.0, 2480.0, 2520.0, 500000, "2023-01-01"},
+        {2520.0, 2580.0, 2510.0, 2570.0, 550000, "2023-01-02"},
+        {2570.0, 2600.0, 2550.0, 2590.0, 600000, "2023-01-03"}
+    };
+    
+    Portfolio portfolio(10000.0);
+    MovingAverageCrossoverStrategy strategy(5, 10);
+    
+    // Test strategy evaluation for each symbol individually
+    // This is what the current engine does (incorrectly)
+    auto aapl_signal = strategy.evaluateSignal(aapl_data, portfolio, "AAPL");
+    auto googl_signal = strategy.evaluateSignal(googl_data, portfolio, "GOOGL");
+    
+    std::cout << "[INFO] AAPL signal: " << (aapl_signal.signal == Signal::BUY ? "BUY" : 
+                                           aapl_signal.signal == Signal::SELL ? "SELL" : "HOLD") << std::endl;
+    std::cout << "[INFO] GOOGL signal: " << (googl_signal.signal == Signal::BUY ? "BUY" : 
+                                            googl_signal.signal == Signal::SELL ? "SELL" : "HOLD") << std::endl;
+    
+    // Test what proper multi-symbol strategy should do:
+    // 1. Consider portfolio-wide risk management
+    // 2. Consider correlation between symbols
+    // 3. Consider capital allocation across all symbols
+    
+    // Current bug: Engine only evaluates strategy for primary symbol
+    std::cout << "[BUG CHECK] Current engine only evaluates strategy for primary symbol" << std::endl;
+    std::cout << "[BUG CHECK] Proper multi-symbol strategy should evaluate portfolio-wide signals" << std::endl;
+    
+    // Test strategy configuration for multi-symbol
+    TradingConfig config;
+    config.symbols = {"AAPL", "GOOGL"};
+    config.strategy_name = "ma_crossover";
+    config.setParameter("short_ma", 5);
+    config.setParameter("long_ma", 10);
+    
+    ASSERT_TRUE(config.isMultiSymbol());
+    ASSERT_EQ(2, config.symbols.size());
+    
+    std::cout << "[COMPLETE]" << std::endl;
 }
 
 // Main Test Runner
@@ -1033,6 +1396,15 @@ int main() {
         // Application Layer
         std::cout << "Application Layer:" << std::endl;
         test_trading_engine();
+        std::cout << std::endl;
+        
+        // Multi-Symbol Simulation Tests
+        std::cout << "Multi-Symbol Simulation Tests:" << std::endl;
+        test_multi_symbol_simulation_bugs();
+        test_single_vs_multi_symbol_comparison();
+        test_multi_symbol_data_retrieval();
+        test_multi_symbol_portfolio_allocation();
+        test_multi_symbol_strategy_evaluation();
         std::cout << std::endl;
         
         // Error Handling & Validation

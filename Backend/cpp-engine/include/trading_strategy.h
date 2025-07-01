@@ -36,26 +36,83 @@ struct StrategyConfig {
     }
 };
 
-struct BacktestResult {
-    std::string symbol;
-    double starting_capital;
-    double ending_value;
-    double total_return_pct;
-    int total_trades;
-    int winning_trades;
-    int losing_trades;
-    double win_rate;
-    double max_drawdown;
-    double sharpe_ratio;
-    std::vector<TradingSignal> signals_generated;
-    std::vector<double> equity_curve;
-    std::string start_date;
-    std::string end_date;
-    std::string error_message;  // For error reporting
+// Per-symbol performance metrics for multi-symbol backtesting
+struct SymbolPerformance {
+    std::string symbol;                          // Symbol ticker
+    int trades_count;                            // Number of trades for this symbol
+    int winning_trades;                          // Number of profitable trades
+    int losing_trades;                           // Number of losing trades
+    double win_rate;                             // Win rate percentage for this symbol
+    double total_return_pct;                     // Return percentage for this symbol
+    double symbol_allocation_pct;                // Percentage of portfolio allocated to this symbol
+    double final_position_value;                 // Final value of position in this symbol
+    std::vector<TradingSignal> symbol_signals;   // All signals generated for this symbol
     
-    BacktestResult() : starting_capital(0), ending_value(0), total_return_pct(0),
-                      total_trades(0), winning_trades(0), losing_trades(0),
-                      win_rate(0), max_drawdown(0), sharpe_ratio(0), error_message("") {}
+    SymbolPerformance() : trades_count(0), winning_trades(0), losing_trades(0),
+                         win_rate(0.0), total_return_pct(0.0), symbol_allocation_pct(0.0),
+                         final_position_value(0.0) {}
+    
+    SymbolPerformance(const std::string& sym) : symbol(sym), trades_count(0), winning_trades(0), 
+                                               losing_trades(0), win_rate(0.0), total_return_pct(0.0),
+                                               symbol_allocation_pct(0.0), final_position_value(0.0) {}
+};
+
+struct BacktestResult {
+    // Multi-symbol portfolio: all symbols processed in this backtest
+    std::vector<std::string> symbols;            // All symbols included in backtest
+    
+    // Portfolio-wide performance metrics
+    double starting_capital;                     // Initial capital
+    double ending_value;                         // Final portfolio value
+    double total_return_pct;                     // Total portfolio return percentage
+    double cash_remaining;                       // Cash balance at end
+    
+    // Trade statistics (across all symbols)
+    int total_trades;                            // Total number of trades executed
+    int winning_trades;                          // Total number of profitable trades
+    int losing_trades;                           // Total number of losing trades
+    double win_rate;                             // Overall win rate percentage
+    
+    // Risk and performance metrics
+    double max_drawdown;                         // Maximum drawdown percentage
+    double sharpe_ratio;                         // Risk-adjusted return metric
+    double volatility;                           // Portfolio volatility
+    double profit_factor;                        // Ratio of gross profit to gross loss
+    double average_win;                          // Average winning trade amount
+    double average_loss;                         // Average losing trade amount
+    
+    // Time series data
+    std::vector<TradingSignal> signals_generated; // All signals generated across all symbols
+    std::vector<double> equity_curve;            // Portfolio value over time
+    
+    // Per-symbol performance breakdown
+    std::map<std::string, SymbolPerformance> symbol_performance; // Individual symbol metrics
+    
+    // Additional metrics for comprehensive analysis
+    double annualized_return;                    // Annualized return percentage
+    int signals_generated_count;                 // Total signals generated (including HOLD)
+    double portfolio_diversification_ratio;     // Measure of diversification effectiveness
+    
+    // Metadata
+    std::string start_date;                      // Backtest start date
+    std::string end_date;                        // Backtest end date
+    std::string strategy_name;                   // Strategy used for backtest
+    std::string error_message;                   // Error message if backtest failed
+    
+    // Constructor
+    BacktestResult() : starting_capital(0), ending_value(0), total_return_pct(0), 
+                      cash_remaining(0), total_trades(0), winning_trades(0), losing_trades(0), 
+                      win_rate(0), max_drawdown(0), sharpe_ratio(0), volatility(0), 
+                      profit_factor(0), average_win(0), average_loss(0), annualized_return(0), 
+                      signals_generated_count(0), portfolio_diversification_ratio(0), error_message("") {}
+    
+    // Multi-symbol support methods
+    void addSymbol(const std::string& symbol) {
+        if (std::find(symbols.begin(), symbols.end(), symbol) == symbols.end()) {
+            symbols.push_back(symbol);
+            symbol_performance[symbol] = SymbolPerformance(symbol);
+        }
+    }
 };
 
 class TradingStrategy {

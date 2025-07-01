@@ -20,12 +20,12 @@ set(CORE_SOURCES
     src/database_connection.cpp
     src/technical_indicators.cpp
     src/trading_strategy.cpp
+    src/portfolio_allocator.cpp
     src/argument_parser.cpp
     src/command_dispatcher.cpp
     src/data_conversion.cpp
     src/json_helpers.cpp
     src/logger.cpp
-    src/database_service.cpp
     src/execution_service.cpp
     src/progress_service.cpp
     src/result.cpp

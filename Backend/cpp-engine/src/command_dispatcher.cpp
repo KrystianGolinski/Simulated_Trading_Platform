@@ -5,6 +5,7 @@
 #include "result.h"
 #include <iostream>
 #include <fstream>
+#include <algorithm>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -21,16 +22,16 @@ int CommandDispatcher::execute(int argc, char* argv[]) {
             }
             
             if (command == "--test-db") {
-                SimulationConfig config = arg_parser.parseArguments(argc, argv);
+                TradingConfig config = arg_parser.parseArguments(argc, argv);
                 return executeTest(config);
             } else if (command == "--backtest") {
-                SimulationConfig config = arg_parser.parseArguments(argc, argv);
+                TradingConfig config = arg_parser.parseArguments(argc, argv);
                 return executeBacktest(config);
             } else if (command == "--simulate") {
                 if (argc > 3 && std::string(argv[2]) == "--config") {
                     return executeSimulationFromConfig(argv[3]);
                 } else {
-                    SimulationConfig config = arg_parser.parseArguments(argc, argv);
+                    TradingConfig config = arg_parser.parseArguments(argc, argv);
                     return executeSimulation(config);
                 }
             } else if (command == "--status") {
@@ -47,17 +48,78 @@ int CommandDispatcher::execute(int argc, char* argv[]) {
     }
 }
 
-int CommandDispatcher::executeTest(const SimulationConfig& config) {
+int CommandDispatcher::executeTest(const TradingConfig& config) {
     testDatabase(config.symbols.empty() ? "AAPL" : config.symbols[0], 
                 config.start_date, config.end_date);
     return 0;
 }
 
-int CommandDispatcher::executeBacktest(const SimulationConfig& config) {
-    return runBacktest(config);
+int CommandDispatcher::executeBacktest(const TradingConfig& config) {
+    // Print backtest information
+    std::cout << "Running backtest..." << std::endl;
+    std::cout << "Symbols: ";
+    for (size_t i = 0; i < config.symbols.size(); ++i) {
+        std::cout << config.symbols[i];
+        if (i < config.symbols.size() - 1) std::cout << ", ";
+    }
+    std::cout << std::endl;
+    std::cout << "Period: " << config.start_date << " to " << config.end_date << std::endl;
+    std::cout << "Starting Capital: $" << config.starting_capital << std::endl;
+    std::cout << "Strategy: " << config.strategy_name << std::endl;
+    
+    // Print strategy parameters
+    if (config.strategy_name == "ma_crossover") {
+        int short_ma = config.getIntParameter("short_ma", 20);
+        int long_ma = config.getIntParameter("long_ma", 50);
+        std::cout << "MA Crossover Parameters: Short=" << short_ma << ", Long=" << long_ma << std::endl;
+    } else if (config.strategy_name == "rsi") {
+        int rsi_period = config.getIntParameter("rsi_period", 14);
+        double rsi_oversold = config.getDoubleParameter("rsi_oversold", 30.0);
+        double rsi_overbought = config.getDoubleParameter("rsi_overbought", 70.0);
+        std::cout << "RSI Parameters: Period=" << rsi_period << ", Oversold=" << rsi_oversold << ", Overbought=" << rsi_overbought << std::endl;
+    } else {
+        std::cout << "Unknown strategy, defaulting to MA Crossover" << std::endl;
+    }
+    
+    // Handle single-symbol backtest with proper BacktestConfig structure
+    if (config.symbols.size() == 1) {
+        try {
+            TradingEngine engine(config.starting_capital);
+            setupStrategy(engine, config);
+            
+            // For single-symbol backtests, ensure we have exactly one symbol
+            TradingConfig backtest_config = config;
+            if (backtest_config.symbols.size() != 1) {
+                backtest_config.symbols = {config.symbols[0]}; // Take only the first symbol
+            }
+            
+            auto backtest_result = engine.runBacktest(backtest_config);
+            if (backtest_result.isError()) {
+                std::cout << "[ERROR] Backtest failed: " << backtest_result.getErrorMessage() << std::endl;
+                return 1;
+            }
+            
+            auto json_result = engine.getBacktestResultsAsJson(backtest_result.getValue());
+            if (json_result.isError()) {
+                std::cout << "[ERROR] Failed to generate backtest results: " << json_result.getErrorMessage() << std::endl;
+                return 1;
+            }
+            std::cout << json_result.getValue().dump(2) << std::endl;
+            
+        } catch (const std::exception& e) {
+            std::cout << "[ERROR] Backtest failed: " << e.what() << std::endl;
+            return 1;
+        }
+    } else {
+        // Use common method for multi-symbol backtests
+        return executeCommonSimulation(config, false);
+    }
+    
+    return 0;
 }
 
-int CommandDispatcher::executeSimulation(const SimulationConfig& config) {
+int CommandDispatcher::executeSimulation(const TradingConfig& config) {
+    // Print debug information about the simulation configuration
     std::cerr << "[DEBUG] About to run simulation with:" << std::endl;
     std::cerr << "[DEBUG]   symbols = { ";
     for (size_t i = 0; i < config.symbols.size(); ++i) {
@@ -67,8 +129,8 @@ int CommandDispatcher::executeSimulation(const SimulationConfig& config) {
     std::cerr << " }" << std::endl;
     std::cerr << "[DEBUG]   start_date = '" << config.start_date << "'" << std::endl;
     std::cerr << "[DEBUG]   end_date = '" << config.end_date << "'" << std::endl;
-    std::cerr << "[DEBUG]   capital = " << config.capital << std::endl;
-    std::cerr << "[DEBUG]   strategy = '" << config.strategy << "'" << std::endl;
+    std::cerr << "[DEBUG]   capital = " << config.starting_capital << std::endl;
+    std::cerr << "[DEBUG]   strategy = '" << config.strategy_name << "'" << std::endl;
     
     // Print all strategy parameters dynamically
     std::cerr << "[DEBUG]   strategy_parameters = {" << std::endl;
@@ -77,70 +139,62 @@ int CommandDispatcher::executeSimulation(const SimulationConfig& config) {
     }
     std::cerr << "[DEBUG]   }" << std::endl;
     
-    TradingEngine engine(config.capital);
-    
-    if (config.strategy == "ma_crossover") {
-        int short_ma = config.getIntParameter("short_ma", 20);
-        int long_ma = config.getIntParameter("long_ma", 50);
-        std::cerr << "[DEBUG]   Using MA crossover: short=" << short_ma << ", long=" << long_ma << std::endl;
-        engine.setMovingAverageStrategy(short_ma, long_ma);
-    } else if (config.strategy == "rsi") {
-        int rsi_period = config.getIntParameter("rsi_period", 14);
-        double rsi_oversold = config.getDoubleParameter("rsi_oversold", 30.0);
-        double rsi_overbought = config.getDoubleParameter("rsi_overbought", 70.0);
-        std::cerr << "[DEBUG]   Using RSI: period=" << rsi_period << ", oversold=" << rsi_oversold << ", overbought=" << rsi_overbought << std::endl;
-        engine.setRSIStrategy(rsi_period, rsi_oversold, rsi_overbought);
-    } else {
-        std::cerr << "[DEBUG] Unknown strategy '" << config.strategy << "', defaulting to MA crossover" << std::endl;
-        int short_ma = config.getIntParameter("short_ma", 20);
-        int long_ma = config.getIntParameter("long_ma", 50);
-        engine.setMovingAverageStrategy(short_ma, long_ma);
-    }
-    
-    try {
-        if (config.symbols.size() == 1) {
-            auto result = engine.runSimulationWithParams(config.symbols[0], config.start_date, config.end_date, config.capital);
-            if (result.isError()) {
-                std::cerr << "Error: " << result.getErrorMessage() << std::endl;
-                if (!result.getErrorDetails().empty()) {
-                    std::cerr << "Details: " << result.getErrorDetails() << std::endl;
-                }
-                return 1;
-            }
-            std::cout << result.getValue() << std::endl;
-        } else {
-            auto backtest_result = engine.runBacktestMultiSymbol(config.symbols, config.start_date, config.end_date, config.capital);
-            if (backtest_result.isError()) {
-                std::cerr << "Error: " << backtest_result.getErrorMessage() << std::endl;
-                if (!backtest_result.getErrorDetails().empty()) {
-                    std::cerr << "Details: " << backtest_result.getErrorDetails() << std::endl;
-                }
-                return 1;
-            }
-            
-            auto json_result = engine.getBacktestResultsAsJson(backtest_result.getValue());
-            if (json_result.isError()) {
-                std::cerr << "Error generating results: " << json_result.getErrorMessage() << std::endl;
-                return 1;
-            }
-            std::cout << json_result.getValue().dump(2) << std::endl;
-        }
-    } catch (const std::exception& e) {
-        std::cerr << "Unexpected error: " << e.what() << std::endl;
-        return 1;
-    }
-    
-    return 0;
+    // Use common execution method with verbose output
+    return executeCommonSimulation(config, true);
 }
 
 int CommandDispatcher::executeSimulationFromConfig(const std::string& config_file) {
     std::cerr << "[DEBUG] Using JSON config file: " << config_file << std::endl;
     
-    int result = runSimulationFromConfig(config_file);
-    if (result != 0) {
-        std::cerr << "Error: Failed to run simulation from config file" << std::endl;
+    try {
+        // Load configuration from file using common method
+        TradingConfig config = loadConfigFromFile(config_file);
+        
+        // Print debug information about loaded configuration
+        std::cerr << "[DEBUG] Config loaded successfully:" << std::endl;
+        std::cerr << "[DEBUG]   symbols = { ";
+        for (size_t i = 0; i < config.symbols.size(); ++i) {
+            std::cerr << "'" << config.symbols[i] << "'";
+            if (i < config.symbols.size() - 1) std::cerr << ", ";
+        }
+        std::cerr << " }" << std::endl;
+        std::cerr << "[DEBUG]   start_date = '" << config.start_date << "'" << std::endl;
+        std::cerr << "[DEBUG]   end_date = '" << config.end_date << "'" << std::endl;
+        std::cerr << "[DEBUG]   capital = " << config.starting_capital << std::endl;
+        std::cerr << "[DEBUG]   strategy = '" << config.strategy_name << "'" << std::endl;
+        
+        // Print strategy-specific parameters
+        if (config.strategy_name == "ma_crossover") {
+            std::cerr << "[DEBUG]   short_ma = " << config.getIntParameter("short_ma", 20) << std::endl;
+            std::cerr << "[DEBUG]   long_ma = " << config.getIntParameter("long_ma", 50) << std::endl;
+        } else if (config.strategy_name == "rsi") {
+            std::cerr << "[DEBUG]   rsi_period = " << config.getIntParameter("rsi_period", 14) << std::endl;
+            std::cerr << "[DEBUG]   rsi_oversold = " << config.getDoubleParameter("rsi_oversold", 30.0) << std::endl;
+            std::cerr << "[DEBUG]   rsi_overbought = " << config.getDoubleParameter("rsi_overbought", 70.0) << std::endl;
+        }
+        
+        // Execute simulation using common method
+        int result = executeCommonSimulation(config, false);
+        
+        // Clean up config file if requested (check original file for cleanup flag)
+        std::ifstream file(config_file);
+        if (file.is_open()) {
+            json file_config;
+            file >> file_config;
+            file.close();
+            
+            if (file_config.value("cleanup", true)) {
+                std::remove(config_file.c_str());
+                std::cerr << "[DEBUG] Config file cleaned up" << std::endl;
+            }
+        }
+        
+        return result;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "Error: Failed to run simulation from config file: " << e.what() << std::endl;
+        return 1;
     }
-    return result;
 }
 
 int CommandDispatcher::executeStatus() {
@@ -242,178 +296,109 @@ void CommandDispatcher::testDatabase(const std::string& symbol, const std::strin
     }
 }
 
-int CommandDispatcher::runBacktest(const SimulationConfig& config) {
-    std::cout << "Running backtest..." << std::endl;
-    std::cout << "Symbols: ";
-    for (size_t i = 0; i < config.symbols.size(); ++i) {
-        std::cout << config.symbols[i];
-        if (i < config.symbols.size() - 1) std::cout << ", ";
+void CommandDispatcher::setupStrategy(TradingEngine& engine, const TradingConfig& config, bool verbose) {
+    if (config.strategy_name == "ma_crossover") {
+        int short_ma = config.getIntParameter("short_ma", 20);
+        int long_ma = config.getIntParameter("long_ma", 50);
+        if (verbose) {
+            std::cerr << "[DEBUG]   Using MA crossover: short=" << short_ma << ", long=" << long_ma << std::endl;
+        }
+        engine.setMovingAverageStrategy(short_ma, long_ma);
+    } else if (config.strategy_name == "rsi") {
+        int rsi_period = config.getIntParameter("rsi_period", 14);
+        double rsi_oversold = config.getDoubleParameter("rsi_oversold", 30.0);
+        double rsi_overbought = config.getDoubleParameter("rsi_overbought", 70.0);
+        if (verbose) {
+            std::cerr << "[DEBUG]   Using RSI: period=" << rsi_period << ", oversold=" << rsi_oversold << ", overbought=" << rsi_overbought << std::endl;
+        }
+        engine.setRSIStrategy(rsi_period, rsi_oversold, rsi_overbought);
+    } else {
+        if (verbose) {
+            std::cerr << "[DEBUG] Unknown strategy '" << config.strategy_name << "', defaulting to MA crossover" << std::endl;
+        }
+        int short_ma = config.getIntParameter("short_ma", 20);
+        int long_ma = config.getIntParameter("long_ma", 50);
+        engine.setMovingAverageStrategy(short_ma, long_ma);
     }
-    std::cout << std::endl;
-    std::cout << "Period: " << config.start_date << " to " << config.end_date << std::endl;
-    std::cout << "Starting Capital: $" << config.capital << std::endl;
-    std::cout << "Strategy: " << config.strategy << std::endl;
+}
+
+int CommandDispatcher::executeCommonSimulation(const TradingConfig& config, bool verbose) {
+    TradingEngine engine(config.starting_capital);
+    setupStrategy(engine, config, verbose);
     
     try {
-        TradingEngine engine(config.capital);
-        
-        if (config.strategy == "ma_crossover") {
-            int short_ma = config.getIntParameter("short_ma", 20);
-            int long_ma = config.getIntParameter("long_ma", 50);
-            std::cout << "MA Crossover Parameters: Short=" << short_ma << ", Long=" << long_ma << std::endl;
-            engine.setMovingAverageStrategy(short_ma, long_ma);
-        } else if (config.strategy == "rsi") {
-            int rsi_period = config.getIntParameter("rsi_period", 14);
-            double rsi_oversold = config.getDoubleParameter("rsi_oversold", 30.0);
-            double rsi_overbought = config.getDoubleParameter("rsi_overbought", 70.0);
-            std::cout << "RSI Parameters: Period=" << rsi_period << ", Oversold=" << rsi_oversold << ", Overbought=" << rsi_overbought << std::endl;
-            engine.setRSIStrategy(rsi_period, rsi_oversold, rsi_overbought);
-        } else {
-            std::cout << "Unknown strategy, defaulting to MA Crossover" << std::endl;
-            int short_ma = config.getIntParameter("short_ma", 20);
-            int long_ma = config.getIntParameter("long_ma", 50);
-            engine.setMovingAverageStrategy(short_ma, long_ma);
-        }
-        
-        BacktestResult result;
-        if (config.symbols.size() == 1) {
-            BacktestConfig backtest_config;
-            backtest_config.symbol = config.symbols[0];
-            backtest_config.start_date = config.start_date;
-            backtest_config.end_date = config.end_date;
-            backtest_config.starting_capital = config.capital;
-            backtest_config.strategy_name = config.strategy;
-            
-            if (config.strategy == "ma_crossover") {
-                backtest_config.strategy_config.setParameter("short_period", config.getDoubleParameter("short_ma", 20.0));
-                backtest_config.strategy_config.setParameter("long_period", config.getDoubleParameter("long_ma", 50.0));
-            } else if (config.strategy == "rsi") {
-                backtest_config.strategy_config.setParameter("rsi_period", config.getDoubleParameter("rsi_period", 14.0));
-                backtest_config.strategy_config.setParameter("oversold_threshold", config.getDoubleParameter("rsi_oversold", 30.0));
-                backtest_config.strategy_config.setParameter("overbought_threshold", config.getDoubleParameter("rsi_overbought", 70.0));
+        // Use unified runSimulation method for all cases
+        auto result = engine.runSimulation(config);
+        if (result.isError()) {
+            std::cerr << "Error: " << result.getErrorMessage() << std::endl;
+            if (!result.getErrorDetails().empty()) {
+                std::cerr << "Details: " << result.getErrorDetails() << std::endl;
             }
-            backtest_config.strategy_config.max_position_size = 0.1;
-            backtest_config.strategy_config.enable_risk_management = true;
-            
-            auto backtest_result = engine.runBacktest(backtest_config);
-            if (backtest_result.isError()) {
-                std::cout << "[ERROR] Backtest failed: " << backtest_result.getErrorMessage() << std::endl;
-                return 1;
-            }
-            result = backtest_result.getValue();
-        } else {
-            auto multi_backtest_result = engine.runBacktestMultiSymbol(config.symbols, config.start_date, config.end_date, config.capital);
-            if (multi_backtest_result.isError()) {
-                std::cout << "[ERROR] Multi-symbol backtest failed: " << multi_backtest_result.getErrorMessage() << std::endl;
-                return 1;
-            }
-            result = multi_backtest_result.getValue();
-        }
-        
-        auto json_result = engine.getBacktestResultsAsJson(result);
-        if (json_result.isError()) {
-            std::cout << "[ERROR] Failed to generate backtest results: " << json_result.getErrorMessage() << std::endl;
             return 1;
         }
-        std::cout << json_result.getValue().dump(2) << std::endl;
         
+        std::cout << result.getValue() << std::endl;
     } catch (const std::exception& e) {
-        std::cout << "[ERROR] Backtest failed: " << e.what() << std::endl;
+        std::cerr << "Unexpected error: " << e.what() << std::endl;
         return 1;
     }
+    
     return 0;
 }
 
-int CommandDispatcher::runSimulationFromConfig(const std::string& config_file) {
-    try {
-        std::ifstream file(config_file);
-        if (!file.is_open()) {
-            std::cerr << "Error: Cannot open config file: " << config_file << std::endl;
-            return 1;
-        }
-        
-        json config;
-        file >> config;
-        file.close();
-        
-        std::vector<std::string> symbols;
-        if (config.contains("symbols") && config["symbols"].is_array()) {
-            for (const auto& s : config["symbols"]) {
-                symbols.push_back(s.get<std::string>());
-            }
-        } else if (config.contains("symbol")) {
-            symbols.push_back(config.value("symbol", "AAPL"));
-        } else {
-            symbols.push_back("AAPL");
-        }
-        
-        std::string start_date = config.value("start_date", "2023-01-01");
-        std::string end_date = config.value("end_date", "2023-12-31");
-        double capital = config.value("starting_capital", 10000.0);
-        std::string strategy = config.value("strategy", "ma_crossover");
-        
-        int short_ma = config.value("short_ma", 20);
-        int long_ma = config.value("long_ma", 50);
-        int rsi_period = config.value("rsi_period", 14);
-        double rsi_oversold = config.value("rsi_oversold", 30.0);
-        double rsi_overbought = config.value("rsi_overbought", 70.0);
-        
-        std::cerr << "[DEBUG] Config loaded successfully:" << std::endl;
-        std::cerr << "[DEBUG]   symbols = { ";
-        for (size_t i = 0; i < symbols.size(); ++i) {
-            std::cerr << "'" << symbols[i] << "'";
-            if (i < symbols.size() - 1) std::cerr << ", ";
-        }
-        std::cerr << " }" << std::endl;
-        std::cerr << "[DEBUG]   start_date = '" << start_date << "'" << std::endl;
-        std::cerr << "[DEBUG]   end_date = '" << end_date << "'" << std::endl;
-        std::cerr << "[DEBUG]   capital = " << capital << std::endl;
-        std::cerr << "[DEBUG]   strategy = '" << strategy << "'" << std::endl;
-        
-        TradingEngine engine(capital);
-        
-        if (strategy == "ma_crossover") {
-            engine.setMovingAverageStrategy(short_ma, long_ma);
-            std::cerr << "[DEBUG]   short_ma = " << short_ma << std::endl;
-            std::cerr << "[DEBUG]   long_ma = " << long_ma << std::endl;
-        } else if (strategy == "rsi") {
-            engine.setRSIStrategy(rsi_period, rsi_oversold, rsi_overbought);
-            std::cerr << "[DEBUG]   rsi_period = " << rsi_period << std::endl;
-            std::cerr << "[DEBUG]   rsi_oversold = " << rsi_oversold << std::endl;
-            std::cerr << "[DEBUG]   rsi_overbought = " << rsi_overbought << std::endl;
-        }
-        
-        if (symbols.size() == 1) {
-            auto result = engine.runSimulationWithParams(symbols[0], start_date, end_date, capital);
-            if (result.isError()) {
-                std::cerr << "Error: " << result.getErrorMessage() << std::endl;
-                return 1;
-            }
-            std::cout << result.getValue() << std::endl;
-        } else {
-            auto backtest_result = engine.runBacktestMultiSymbol(symbols, start_date, end_date, capital);
-            if (backtest_result.isError()) {
-                std::cerr << "Error: " << backtest_result.getErrorMessage() << std::endl;
-                return 1;
-            }
-            
-            auto json_result = engine.getBacktestResultsAsJson(backtest_result.getValue());
-            if (json_result.isError()) {
-                std::cerr << "Error generating results: " << json_result.getErrorMessage() << std::endl;
-                return 1;
-            }
-            std::cout << json_result.getValue().dump(2) << std::endl;
-        }
-        
-        if (config.value("cleanup", true)) {
-            std::remove(config_file.c_str());
-            std::cerr << "[DEBUG] Config file cleaned up" << std::endl;
-        }
-        
-        return 0;
-        
-    } catch (const std::exception& e) {
-        std::cerr << "Error parsing config file: " << e.what() << std::endl;
-        return 1;
+TradingConfig CommandDispatcher::loadConfigFromFile(const std::string& config_file) {
+    std::ifstream file(config_file);
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open config file: " + config_file);
     }
+    
+    json config;
+    file >> config;
+    file.close();
+    
+    TradingConfig sim_config;
+    
+    // Clear default symbols from constructor and load from config
+    sim_config.symbols.clear();
+    if (config.contains("symbols") && config["symbols"].is_array()) {
+        for (const auto& s : config["symbols"]) {
+            sim_config.symbols.push_back(s.get<std::string>());
+        }
+    } else if (config.contains("symbol")) {
+        sim_config.symbols.push_back(config.value("symbol", "AAPL"));
+    } else {
+        sim_config.symbols.push_back("AAPL");
+    }
+    
+    // Load basic configuration
+    sim_config.start_date = config.value("start_date", "2023-01-01");
+    sim_config.end_date = config.value("end_date", "2023-12-31");
+    sim_config.starting_capital = config.value("starting_capital", 10000.0);
+    sim_config.strategy_name = config.value("strategy", "ma_crossover");
+    
+    // Load strategy parameters
+    if (config.contains("strategy_parameters") && config["strategy_parameters"].is_object()) {
+        for (const auto& param : config["strategy_parameters"].items()) {
+            sim_config.strategy_parameters[param.key()] = param.value().get<double>();
+        }
+    } else {
+        // Fallback to individual parameter keys for backward compatibility
+        if (config.contains("short_ma")) {
+            sim_config.strategy_parameters["short_ma"] = config["short_ma"].get<double>();
+        }
+        if (config.contains("long_ma")) {
+            sim_config.strategy_parameters["long_ma"] = config["long_ma"].get<double>();
+        }
+        if (config.contains("rsi_period")) {
+            sim_config.strategy_parameters["rsi_period"] = config["rsi_period"].get<double>();
+        }
+        if (config.contains("rsi_oversold")) {
+            sim_config.strategy_parameters["rsi_oversold"] = config["rsi_oversold"].get<double>();
+        }
+        if (config.contains("rsi_overbought")) {
+            sim_config.strategy_parameters["rsi_overbought"] = config["rsi_overbought"].get<double>();
+        }
+    }
+    
+    return sim_config;
 }

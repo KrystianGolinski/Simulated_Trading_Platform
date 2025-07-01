@@ -3,6 +3,9 @@
 #include "argument_parser.h"
 #include <string>
 
+// Forward declarations
+class TradingEngine;
+
 class CommandDispatcher {
 public:
     CommandDispatcher();
@@ -10,17 +13,20 @@ public:
     int execute(int argc, char* argv[]);
     
 private:
-    int executeTest(const SimulationConfig& config);
-    int executeBacktest(const SimulationConfig& config);
-    int executeSimulation(const SimulationConfig& config);
+    int executeTest(const TradingConfig& config);
+    int executeBacktest(const TradingConfig& config);
+    int executeSimulation(const TradingConfig& config);
     int executeSimulationFromConfig(const std::string& config_file);
     int executeStatus();
     int showHelp(const char* program_name);
     
     void printHeader();
     void testDatabase(const std::string& symbol, const std::string& start_date, const std::string& end_date);
-    int runBacktest(const SimulationConfig& config);
-    int runSimulationFromConfig(const std::string& config_file);
+    
+    // Common execution methods to eliminate duplication
+    void setupStrategy(TradingEngine& engine, const TradingConfig& config, bool verbose = false);
+    int executeCommonSimulation(const TradingConfig& config, bool verbose = false);
+    TradingConfig loadConfigFromFile(const std::string& config_file);
     
     ArgumentParser arg_parser;
 };

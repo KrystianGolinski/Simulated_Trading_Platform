@@ -10,6 +10,7 @@
 #include <iostream>
 #include <chrono>
 #include <thread>
+#include <set>
 
 // Constructors
 TradingEngine::TradingEngine() : portfolio_(10000.0), cache_enabled_(false) {
@@ -23,11 +24,11 @@ TradingEngine::TradingEngine(double initial_capital) : portfolio_(initial_capita
 }
 
 TradingEngine::TradingEngine(double initial_capital,
-                           std::unique_ptr<DatabaseService> db_service,
+                           std::unique_ptr<MarketData> market_data,
                            std::unique_ptr<ExecutionService> exec_service,
                            std::unique_ptr<ProgressService> progress_service)
     : portfolio_(initial_capital), cache_enabled_(false),
-      database_service_(std::move(db_service)),
+      market_data_(std::move(market_data)),
       execution_service_(std::move(exec_service)),
       progress_service_(std::move(progress_service)) {
     setMovingAverageStrategy();
@@ -37,9 +38,10 @@ TradingEngine::TradingEngine(double initial_capital,
 TradingEngine::TradingEngine(TradingEngine&& other) noexcept
     : portfolio_(std::move(other.portfolio_)),
       strategy_(std::move(other.strategy_)),
-      database_service_(std::move(other.database_service_)),
+      market_data_(std::move(other.market_data_)),
       execution_service_(std::move(other.execution_service_)),
       progress_service_(std::move(other.progress_service_)),
+      portfolio_allocator_(std::move(other.portfolio_allocator_)),
       price_data_cache_(std::move(other.price_data_cache_)),
       cache_enabled_(other.cache_enabled_) {}
 
@@ -48,9 +50,10 @@ TradingEngine& TradingEngine::operator=(TradingEngine&& other) noexcept {
     if (this != &other) {
         portfolio_ = std::move(other.portfolio_);
         strategy_ = std::move(other.strategy_);
-        database_service_ = std::move(other.database_service_);
+        market_data_ = std::move(other.market_data_);
         execution_service_ = std::move(other.execution_service_);
         progress_service_ = std::move(other.progress_service_);
+        portfolio_allocator_ = std::move(other.portfolio_allocator_);
         price_data_cache_ = std::move(other.price_data_cache_);
         cache_enabled_ = other.cache_enabled_;
     }
@@ -70,36 +73,45 @@ void TradingEngine::setRSIStrategy(int period, double oversold, double overbough
     strategy_ = std::make_unique<RSIStrategy>(period, oversold, overbought);
 }
 
-// Simulation method with parameters - now using Result<T> patterns
-Result<std::string> TradingEngine::runSimulationWithParams(const std::string& symbol, const std::string& start_date, const std::string& end_date, double capital) {
-    Logger::debug("TradingEngine::runSimulationWithParams called with: symbol='", symbol, 
-                 "', start_date='", start_date, "', end_date='", end_date, "', capital=", capital);
-    
-    // Validate input parameters first
-    if (symbol.empty()) {
-        return Result<std::string>(ErrorCode::ENGINE_INVALID_SYMBOL, "Symbol cannot be empty");
+// Helper function to validate simulation parameters
+// Unified validation method using TradingConfig
+Result<void> TradingEngine::validateSimulationParameters(const TradingConfig& config) {
+    if (config.symbols.empty()) {
+        return Result<void>(ErrorCode::ENGINE_INVALID_SYMBOL, "Symbols list cannot be empty");
     }
-    if (capital <= 0) {
-        return Result<std::string>(ErrorCode::ENGINE_INVALID_CAPITAL, "Starting capital must be positive");
+    // Check for empty symbols in the list
+    for (const auto& symbol : config.symbols) {
+        if (symbol.empty()) {
+            return Result<void>(ErrorCode::ENGINE_INVALID_SYMBOL, "Symbol cannot be empty");
+        }
     }
-    if (start_date.empty() || end_date.empty()) {
-        return Result<std::string>(ErrorCode::ENGINE_INVALID_DATE_RANGE, "Start date and end date cannot be empty");
+    if (config.starting_capital <= 0) {
+        return Result<void>(ErrorCode::ENGINE_INVALID_CAPITAL, "Starting capital must be positive");
     }
+    if (config.start_date.empty() || config.end_date.empty()) {
+        return Result<void>(ErrorCode::ENGINE_INVALID_DATE_RANGE, "Start date and end date cannot be empty");
+    }
+    return Result<void>(); // Success
+}
+
+// Helper function to validate simulation parameters for multiple symbols
+
+// Unified simulation method that returns JSON string
+Result<std::string> TradingEngine::runSimulation(const TradingConfig& config) {
+    Logger::debug("TradingEngine::runSimulation called with: symbols=[", config.symbols.size(), " symbols], "
+                 "start_date='", config.start_date, "', end_date='", config.end_date, "', capital=", config.starting_capital);
     
-    BacktestConfig config;
-    config.symbol = symbol;
-    config.start_date = start_date;
-    config.end_date = end_date;
-    config.starting_capital = capital;
-    
-    Logger::debug("BacktestConfig created: symbol='", config.symbol, "', start_date='", 
-                 config.start_date, "', end_date='", config.end_date, "', capital=", config.starting_capital);
+    // Use common validation
+    auto validation_result = validateSimulationParameters(config);
+    if (validation_result.isError()) {
+        return Result<std::string>(validation_result.getError());
+    }
     
     // Reset portfolio with new capital
-    portfolio_ = Portfolio(capital);
-    Logger::debug("Portfolio initialized with capital: ", capital, ", initial capital: ", portfolio_.getInitialCapital());
+    portfolio_ = Portfolio(config.starting_capital);
+    Logger::debug("Portfolio initialized with capital: ", config.starting_capital, ", initial capital: ", portfolio_.getInitialCapital());
     
-    // Use ErrorUtils::chain for error handling pipeline
+    // Run backtest and convert to JSON
     auto backtest_result = runBacktest(config);
     if (backtest_result.isError()) {
         return Result<std::string>(backtest_result.getError());
@@ -110,6 +122,7 @@ Result<std::string> TradingEngine::runSimulationWithParams(const std::string& sy
                  ", ending_value=", result.ending_value, ", total_return_pct=", result.total_return_pct,
                  ", total_trades=", result.total_trades);
     
+    // Convert to JSON for API response
     auto json_result = getBacktestResultsAsJson(result);
     if (json_result.isError()) {
         return Result<std::string>(json_result.getError());
@@ -119,15 +132,15 @@ Result<std::string> TradingEngine::runSimulationWithParams(const std::string& sy
 }
 
 // Main backtesting implementation - now using Result<T> patterns
-Result<BacktestResult> TradingEngine::runBacktest(const BacktestConfig& config) {
-    Logger::debug("TradingEngine::runBacktest called with: symbol='", config.symbol,
+Result<BacktestResult> TradingEngine::runBacktest(const TradingConfig& config) {
+    Logger::debug("TradingEngine::runBacktest called with: symbol='", config.getPrimarySymbol(),
                  "', start_date='", config.start_date, "', end_date='", config.end_date,
                  "', starting_capital=", config.starting_capital);
     
     BacktestResult result;
     
     // Sequential error handling with proper Result<T> patterns
-    auto validation_result = validateBacktestConfig(config);
+    auto validation_result = validateTradingConfig(config);
     if (validation_result.isError()) {
         return Result<BacktestResult>(validation_result.getError());
     }
@@ -155,122 +168,8 @@ Result<BacktestResult> TradingEngine::runBacktest(const BacktestConfig& config) 
     return Result<BacktestResult>(result);
 }
 
-Result<BacktestResult> TradingEngine::runBacktestMultiSymbol(const std::vector<std::string>& symbols,
-                                                                const std::string& start_date,
-                                                                const std::string& end_date,
-                                                                double starting_capital) {
-    // Validate input parameters
-    if (symbols.empty()) {
-        return Result<BacktestResult>(ErrorCode::ENGINE_INVALID_SYMBOL, "Symbol list cannot be empty");
-    }
-    if (starting_capital <= 0) {
-        return Result<BacktestResult>(ErrorCode::ENGINE_INVALID_CAPITAL, "Starting capital must be positive");
-    }
-    if (start_date.empty() || end_date.empty()) {
-        return Result<BacktestResult>(ErrorCode::ENGINE_INVALID_DATE_RANGE, "Start date and end date cannot be empty");
-    }
-    
-    BacktestResult combined_result;
-    combined_result.starting_capital = starting_capital;
-    combined_result.start_date = start_date;
-    combined_result.end_date = end_date;
-    
-    try {
-        // Reset portfolio and set up multi-symbol allocation
-        portfolio_ = Portfolio(starting_capital);
-        double capital_per_symbol = starting_capital / symbols.size();
-    
-    // Get historical data for all symbols and convert to PriceData format
-    std::map<std::string, std::vector<PriceData>> symbol_price_data;
-    for (const auto& symbol : symbols) {
-        auto raw_data_result = database_service_->getHistoricalPrices(symbol, start_date, end_date);
-        
-        if (raw_data_result.isError()) {
-            Logger::error("Error getting historical data for ", symbol, ": ", raw_data_result.getErrorMessage());
-            continue;
-        }
-        
-        const auto& raw_data = raw_data_result.getValue();
-        std::vector<PriceData> price_data;
-        
-        for (const auto& row : raw_data) {
-            try {
-                PriceData pd = DataConversion::convertRowToPriceData(row);
-                price_data.push_back(pd);
-            } catch (const std::exception& e) {
-                Logger::error("Error parsing data for ", symbol, ": ", e.what());
-                continue;
-            }
-        }
-        
-        if (!price_data.empty()) {
-            symbol_price_data[symbol] = price_data;
-        } else {
-            Logger::warning("No valid data found for symbol ", symbol);
-        }
-    }
-    
-    // Find the maximum number of trading days across all symbols
-    size_t max_days = 0;
-    for (const auto& [symbol, data] : symbol_price_data) {
-        max_days = std::max(max_days, data.size());
-    }
-    
-    // Process each symbol individually with allocated capital
-    for (const auto& symbol : symbols) {
-        if (symbol_price_data.find(symbol) == symbol_price_data.end()) {
-            continue; // Skip symbols with no data
-        }
-        
-        const auto& price_data = symbol_price_data[symbol];
-        
-        // Create a temporary portfolio for this symbol
-        Portfolio temp_portfolio(capital_per_symbol);
-        
-        // Generate signals using the strategy
-        if (strategy_) {
-            auto signals = strategy_->evaluateSignal(price_data, temp_portfolio, symbol);
-            
-            // For now, use simple buy-and-hold for each symbol as a placeholder
-            // This ensures the multi-symbol framework works before implementing complex signal coordination
-            if (!price_data.empty()) {
-                // Buy shares at the beginning
-                double first_price = price_data[0].close;
-                int shares = static_cast<int>(capital_per_symbol / first_price);
-                
-                if (shares > 0 && portfolio_.buyStock(symbol, shares, first_price)) {
-                    TradingSignal buy_signal(Signal::BUY, first_price, price_data[0].date, "Multi-symbol allocation");
-                    combined_result.signals_generated.push_back(buy_signal);
-                    combined_result.total_trades++;
-                }
-            }
-        }
-    }
-    
-    // Calculate final portfolio value
-    std::map<std::string, double> final_prices;
-    for (const auto& symbol : symbols) {
-        if (symbol_price_data.find(symbol) != symbol_price_data.end() && !symbol_price_data[symbol].empty()) {
-            final_prices[symbol] = symbol_price_data[symbol].back().close;
-        }
-    }
-    
-        combined_result.ending_value = portfolio_.getTotalValue(final_prices);
-        combined_result.total_return_pct = ((combined_result.ending_value - combined_result.starting_capital) / combined_result.starting_capital) * 100.0;
-        combined_result.win_rate = combined_result.total_trades > 0 ? 
-            (static_cast<double>(combined_result.winning_trades) / combined_result.total_trades) * 100.0 : 0.0;
-        
-        return Result<BacktestResult>(combined_result);
-        
-    } catch (const std::exception& e) {
-        Logger::error("Error in multi-symbol backtest: ", e.what());
-        return Result<BacktestResult>(ErrorCode::ENGINE_MULTI_SYMBOL_FAILED, 
-                                     "Multi-symbol backtest failed", e.what());
-    }
-}
-
 Result<std::string> TradingEngine::getPortfolioStatus() {
-    return ErrorUtils::chain(database_service_->getCurrentPrices(), [this](const std::map<std::string, double>& current_prices) {
+    return ErrorUtils::chain(market_data_->getCurrentPrices(), [this](const std::map<std::string, double>& current_prices) {
         try {
             std::string status = portfolio_.toDetailedString(current_prices);
             return Result<std::string>(status);
@@ -299,8 +198,11 @@ Result<nlohmann::json> TradingEngine::getBacktestResultsAsJson(const BacktestRes
     try {
         nlohmann::json json_result = JsonHelpers::backTestResultToJson(result);
         
+        // For multi-symbol backtests, use the first symbol as reference for equity curve dates
+        const std::string& reference_symbol = result.symbols.empty() ? "AAPL" : result.symbols[0];
+        
         // Add equity curve with actual dates from market data using Result<T> patterns
-        return ErrorUtils::chain(database_service_->getHistoricalPrices(result.symbol, result.start_date, result.end_date), 
+        return ErrorUtils::chain(market_data_->getHistoricalPrices(reference_symbol, result.start_date, result.end_date), 
             [this, &json_result, &result](const std::vector<std::map<std::string, std::string>>& price_data_raw) {
                 auto price_data = convertToTechnicalData(price_data_raw);
                 json_result["equity_curve"] = JsonHelpers::createEquityCurveJson(result.equity_curve, price_data, result.start_date);
@@ -315,14 +217,23 @@ Result<nlohmann::json> TradingEngine::getBacktestResultsAsJson(const BacktestRes
 
 // Service initialization
 void TradingEngine::initializeServices() {
-    database_service_ = std::make_unique<DatabaseService>();
+    market_data_ = std::make_unique<MarketData>();
     execution_service_ = std::make_unique<ExecutionService>();
     progress_service_ = std::make_unique<ProgressService>();
+    
+    // Initialize portfolio allocator with default equal weight strategy
+    AllocationConfig default_config;
+    default_config.strategy = AllocationStrategy::EQUAL_WEIGHT;
+    default_config.max_position_weight = 0.08; // Max 8% per position for better diversification (was 25%)
+    default_config.min_position_weight = 0.02; // Min 2% per position
+    default_config.enable_rebalancing = true;
+    default_config.cash_reserve_pct = 0.05; // Keep 5% cash
+    portfolio_allocator_ = std::make_unique<PortfolioAllocator>(default_config);
 }
 
 // Service accessors
-DatabaseService* TradingEngine::getDatabaseService() const {
-    return database_service_.get();
+MarketData* TradingEngine::getMarketData() const {
+    return market_data_.get();
 }
 
 ExecutionService* TradingEngine::getExecutionService() const {
@@ -388,15 +299,23 @@ std::vector<double> TradingEngine::calculateDailyReturns(const std::vector<doubl
 }
 
 // Decomposed backtest methods - now using Result<T> patterns
-Result<void> TradingEngine::validateBacktestConfig(const BacktestConfig& config) const {
+Result<void> TradingEngine::validateTradingConfig(const TradingConfig& config) const {
     if (!strategy_) {
         Logger::error("No strategy configured for backtesting");
         return Result<void>(ErrorCode::ENGINE_NO_STRATEGY_CONFIGURED, "No strategy configured for backtesting");
     }
     
-    if (config.symbol.empty()) {
-        Logger::error("Symbol cannot be empty");
-        return Result<void>(ErrorCode::ENGINE_INVALID_SYMBOL, "Symbol cannot be empty");
+    if (config.symbols.empty()) {
+        Logger::error("Symbols list cannot be empty");
+        return Result<void>(ErrorCode::ENGINE_INVALID_SYMBOL, "Symbols list cannot be empty");
+    }
+    
+    // Validate each symbol in the list
+    for (const auto& symbol : config.symbols) {
+        if (symbol.empty()) {
+            Logger::error("Symbol cannot be empty");
+            return Result<void>(ErrorCode::ENGINE_INVALID_SYMBOL, "Symbol cannot be empty");
+        }
     }
     
     if (config.starting_capital <= 0) {
@@ -408,17 +327,24 @@ Result<void> TradingEngine::validateBacktestConfig(const BacktestConfig& config)
     return Result<void>(); // Success
 }
 
-Result<void> TradingEngine::initializeBacktest(const BacktestConfig& config, BacktestResult& result) {
+Result<void> TradingEngine::initializeBacktest(const TradingConfig& config, BacktestResult& result) {
     try {
-        result.symbol = config.symbol;
+        // Initialize multi-symbol backtest result
+        result.symbols = config.symbols;
         result.starting_capital = config.starting_capital;
         result.start_date = config.start_date;
         result.end_date = config.end_date;
+        result.strategy_name = config.strategy_name;
+        
+        // Initialize per-symbol performance tracking
+        for (const auto& symbol : config.symbols) {
+            result.addSymbol(symbol);
+        }
         
         portfolio_ = Portfolio(config.starting_capital);
         execution_service_->clearExecutedSignals();
         
-        Logger::debug("Backtest initialized with capital: ", config.starting_capital);
+        Logger::debug("Multi-symbol backtest initialized with ", config.symbols.size(), " symbols and capital: ", config.starting_capital);
         return Result<void>(); // Success
     } catch (const std::exception& e) {
         Logger::error("Error initializing backtest: ", e.what());
@@ -426,116 +352,379 @@ Result<void> TradingEngine::initializeBacktest(const BacktestConfig& config, Bac
     }
 }
 
-Result<std::vector<PriceData>> TradingEngine::prepareMarketData(const BacktestConfig& config) {
-    Logger::debug("Getting historical price data...");
-    
-    return ErrorUtils::chain(database_service_->getHistoricalPrices(config.symbol, config.start_date, config.end_date),
-        [this, &config](const std::vector<std::map<std::string, std::string>>& price_data_raw) {
-            Logger::debug("Retrieved ", price_data_raw.size(), " price records");
-            
-            if (price_data_raw.empty()) {
-                return Result<std::vector<PriceData>>(ErrorCode::ENGINE_NO_DATA_AVAILABLE, 
-                    "No historical price data available for symbol " + config.symbol + 
-                    " in date range " + config.start_date + " to " + config.end_date);
-            }
-            
-            try {
-                auto price_data = convertToTechnicalData(price_data_raw);
-                Logger::debug("Converted to ", price_data.size(), " technical data points");
-                
-                if (price_data.empty()) {
-                    return Result<std::vector<PriceData>>(ErrorCode::ENGINE_NO_DATA_AVAILABLE, 
-                        "Failed to convert price data for symbol " + config.symbol);
-                }
-                
-                return Result<std::vector<PriceData>>(price_data);
-            } catch (const std::exception& e) {
-                Logger::error("Error converting price data: ", e.what());
-                return Result<std::vector<PriceData>>(ErrorCode::DATA_PARSING_FAILED, 
-                    "Failed to convert price data", e.what());
-            }
-        });
+// Helper function to create standardised error messages for market data
+std::string TradingEngine::createDataErrorMessage(const std::string& symbol, const std::string& start_date, const std::string& end_date, const std::string& error_type) {
+    if (error_type == "no_data") {
+        return "No historical price data available for symbol " + symbol + " in date range " + start_date + " to " + end_date;
+    } else if (error_type == "conversion_failed") {
+        return "Failed to convert price data for symbol " + symbol;
+    }
+    return "Data error for symbol " + symbol;
 }
 
-Result<void> TradingEngine::runSimulationLoop(const std::vector<PriceData>& price_data, const BacktestConfig& config, BacktestResult& result) {
-    result.equity_curve.reserve(price_data.size());
+Result<std::map<std::string, std::vector<PriceData>>> TradingEngine::prepareMarketData(const TradingConfig& config) {
+    Logger::debug("Getting historical price data for ", config.symbols.size(), " symbols...");
+    
+    std::map<std::string, std::vector<PriceData>> multi_symbol_data;
+    std::vector<std::string> failed_symbols;
+    
+    // Fetch data for each symbol
+    for (const auto& symbol : config.symbols) {
+        Logger::debug("Fetching data for symbol: ", symbol);
+        
+        auto symbol_result = market_data_->getHistoricalPrices(symbol, config.start_date, config.end_date);
+        
+        if (symbol_result.isError()) {
+            Logger::debug("Failed to fetch data for symbol ", symbol, ": ", symbol_result.getErrorMessage());
+            failed_symbols.push_back(symbol);
+            continue;
+        }
+        
+        const auto& price_data_raw = symbol_result.getValue();
+        if (price_data_raw.empty()) {
+            Logger::debug("No data available for symbol ", symbol, " in date range ", config.start_date, " to ", config.end_date);
+            failed_symbols.push_back(symbol);
+            continue;
+        }
+        
+        try {
+            auto price_data = convertToTechnicalData(price_data_raw);
+            if (price_data.empty()) {
+                Logger::debug("Failed to convert data for symbol ", symbol);
+                failed_symbols.push_back(symbol);
+                continue;
+            }
+            
+            multi_symbol_data[symbol] = std::move(price_data);
+            Logger::debug("Successfully loaded ", multi_symbol_data[symbol].size(), " data points for ", symbol);
+            
+        } catch (const std::exception& e) {
+            Logger::error("Error converting price data for ", symbol, ": ", e.what());
+            failed_symbols.push_back(symbol);
+            continue;
+        }
+    }
+    
+    // Check if we have data for at least one symbol
+    if (multi_symbol_data.empty()) {
+        std::string error_msg = "No data available for any of the requested symbols: ";
+        for (size_t i = 0; i < config.symbols.size(); ++i) {
+            error_msg += config.symbols[i];
+            if (i < config.symbols.size() - 1) error_msg += ", ";
+        }
+        
+        return Result<std::map<std::string, std::vector<PriceData>>>(
+            ErrorCode::ENGINE_NO_DATA_AVAILABLE, error_msg);
+    }
+    
+    // Log summary of data retrieval
+    Logger::debug("Successfully loaded data for ", multi_symbol_data.size(), " out of ", config.symbols.size(), " symbols");
+    if (!failed_symbols.empty()) {
+        Logger::debug("Failed to load data for symbols: ");
+        for (size_t i = 0; i < failed_symbols.size(); ++i) {
+            Logger::debug("  - ", failed_symbols[i]);
+        }
+    }
+    
+    // Validate that all symbols have data for the same date range
+    std::string earliest_date, latest_date;
+    size_t min_data_points = SIZE_MAX;
+    size_t max_data_points = 0;
+    
+    for (const auto& [symbol, data] : multi_symbol_data) {
+        if (!data.empty()) {
+            if (earliest_date.empty() || data.front().date < earliest_date) {
+                earliest_date = data.front().date;
+            }
+            if (latest_date.empty() || data.back().date > latest_date) {
+                latest_date = data.back().date;
+            }
+            min_data_points = std::min(min_data_points, data.size());
+            max_data_points = std::max(max_data_points, data.size());
+        }
+    }
+    
+    Logger::debug("Data range validation:");
+    Logger::debug("  Earliest date: ", earliest_date);
+    Logger::debug("  Latest date: ", latest_date);
+    Logger::debug("  Min data points: ", min_data_points);
+    Logger::debug("  Max data points: ", max_data_points);
+    
+    // Warn if there are significant differences in data availability between symbols
+    if (max_data_points > min_data_points * 1.1) {
+        Logger::debug("Significant variation in data availability between symbols");
+        Logger::debug("This may cause issues during multi-symbol simulation");
+    }
+    
+    return Result<std::map<std::string, std::vector<PriceData>>>(std::move(multi_symbol_data));
+}
+
+Result<void> TradingEngine::runSimulationLoop(const std::map<std::string, std::vector<PriceData>>& multi_symbol_data, const TradingConfig& config, BacktestResult& result) {
+    Logger::debug("Starting multi-symbol simulation loop with ", multi_symbol_data.size(), " symbols");
+    
+    // Multi-Symbol Simulation Architecture:
+    // 1. Create unified timeline across all symbols (handles different trading calendars)
+    // 2. Build efficient date-to-index mappings for fast data lookups
+    // 3. Process each trading day chronologically across all symbols
+    // 4. Evaluate strategy for each symbol individually
+    // 5. Execute signals with portfolio-wide risk management
+    // 6. Track portfolio value using current prices from all symbols
+    
+    if (multi_symbol_data.empty()) {
+        return Result<void>(ErrorCode::ENGINE_NO_DATA_AVAILABLE, "No market data available");
+    }
+    
+    // Step 1: Create unified timeline by merging all symbol dates
+    std::set<std::string> all_dates;
+    for (const auto& [symbol, data] : multi_symbol_data) {
+        for (const auto& price_point : data) {
+            all_dates.insert(price_point.date);
+        }
+    }
+    
+    if (all_dates.empty()) {
+        return Result<void>(ErrorCode::ENGINE_NO_DATA_AVAILABLE, "No price data available for any symbol");
+    }
+    
+    // Convert to sorted vector for chronological processing
+    std::vector<std::string> timeline(all_dates.begin(), all_dates.end());
+    Logger::debug("Created unified timeline with ", timeline.size(), " trading days");
+    Logger::debug("Date range: ", timeline.front(), " to ", timeline.back());
+    
+    // Step 2: Create symbol-to-data-index mappings for efficient lookups
+    std::map<std::string, std::map<std::string, size_t>> symbol_date_indices;
+    for (const auto& [symbol, data] : multi_symbol_data) {
+        for (size_t i = 0; i < data.size(); ++i) {
+            symbol_date_indices[symbol][data[i].date] = i;
+        }
+        Logger::debug("Indexed ", data.size(), " data points for ", symbol);
+    }
+    
+    // Step 3: Initialize sophisticated portfolio allocation
+    std::vector<std::string> available_symbols;
+    std::map<std::string, double> initial_prices;
+    
+    for (const auto& [symbol, data] : multi_symbol_data) {
+        if (!data.empty()) {
+            available_symbols.push_back(symbol);
+            initial_prices[symbol] = data[0].close; // Use first available price
+        }
+    }
+    
+    // Calculate initial portfolio allocation using sophisticated allocation strategy
+    auto allocation_result = portfolio_allocator_->calculateAllocation(
+        available_symbols, config.starting_capital, portfolio_, initial_prices, config.start_date);
+    
+    if (allocation_result.isError()) {
+        Logger::error("Failed to calculate portfolio allocation: ", allocation_result.getErrorMessage());
+        // Fallback to simple equal allocation
+        double capital_per_symbol = config.starting_capital / multi_symbol_data.size();
+        double weight_per_symbol = 1.0 / multi_symbol_data.size();
+        Logger::debug("Falling back to equal allocation: $", capital_per_symbol, " per symbol");
+        
+        // Create fallback allocation and set it in the portfolio allocator
+        std::map<std::string, double> fallback_weights;
+        for (const auto& symbol : available_symbols) {
+            fallback_weights[symbol] = weight_per_symbol;
+        }
+        portfolio_allocator_->setTargetAllocation(fallback_weights, config.starting_capital);
+    } else {
+        const auto& allocation = allocation_result.getValue();
+        Logger::debug("Sophisticated allocation calculated:");
+        Logger::debug("  Total allocated: $", allocation.total_allocated_capital);
+        Logger::debug("  Cash reserved: $", allocation.cash_reserved);
+        Logger::debug("  Strategy: ", allocation.allocation_reason);
+        
+        for (const auto& [symbol, weight] : allocation.target_weights) {
+            Logger::debug("  ", symbol, ": ", weight * 100, "% ($", allocation.target_values.at(symbol), ")");
+        }
+        
+        // Set target allocation in portfolio allocator for proper position sizing
+        portfolio_allocator_->setTargetAllocation(allocation.target_weights, config.starting_capital);
+    }
+    
+    // Step 4: Initialize tracking structures
+    result.equity_curve.reserve(timeline.size());
     result.equity_curve.push_back(config.starting_capital);
     
-    // Pre-allocate containers to avoid repeated allocations
-    std::vector<PriceData> historical_window;
-    historical_window.reserve(price_data.size());
-    // Initialize with first data point
-    historical_window.push_back(price_data[0]);
-    
+    std::map<std::string, std::vector<PriceData>> historical_windows;
     std::map<std::string, double> current_prices;
-    current_prices[config.symbol] = 0.0; // Pre-initialize map entry
     
-    Logger::info("Starting backtest loop with ", price_data.size(), " data points");
-    Logger::debug("Initial portfolio value: ", portfolio_.getTotalValue({}));
+    // Initialize historical windows for each symbol
+    for (const auto& [symbol, data] : multi_symbol_data) {
+        historical_windows[symbol].reserve(timeline.size());
+        current_prices[symbol] = 0.0;
+    }
     
-    for (size_t i = 1; i < price_data.size(); ++i) {
-        const auto& data_point = price_data[i];
+    Logger::info("Starting multi-symbol backtest loop with ", timeline.size(), " trading days");
+    Logger::debug("Initial portfolio value: $", config.starting_capital);
+    
+    // Report simulation start using first symbol for reference
+    const auto& first_symbol = config.symbols[0];
+    auto simulation_start_result = progress_service_->reportSimulationStart(
+        first_symbol, config.start_date, config.end_date, config.starting_capital);
+    if (simulation_start_result.isError()) {
+        Logger::debug("Failed to report simulation start: ", simulation_start_result.getErrorMessage());
+    }
+    
+    // Step 5: Main simulation loop - process each trading day chronologically
+    for (size_t day_idx = 0; day_idx < timeline.size(); ++day_idx) {
+        const std::string& current_date = timeline[day_idx];
         
-        auto progress_result = progress_service_->reportProgress(i, price_data.size(), data_point, config.symbol, portfolio_);
-        if (progress_result.isError()) {
-            Logger::warning("Progress reporting failed: ", progress_result.getErrorMessage());
-        }
-        
-        if (i % 50 == 0) {
-            Logger::debug("Day ", i, ": Price = ", data_point.close, 
-                         ", Portfolio = ", portfolio_.getTotalValue({{config.symbol, data_point.close}}));
-        }
-        
-        // Efficiently build historical window by appending only new data point
-        historical_window.push_back(data_point);
-        
-        TradingSignal signal = strategy_->evaluateSignal(historical_window, portfolio_, config.symbol);
-        
-        if (signal.signal != Signal::HOLD) {
-            Logger::debug("Generated signal: ", (signal.signal == Signal::BUY ? "BUY" : "SELL"), 
-                         " confidence=", signal.confidence, " at price=", signal.price);
-            
-            auto execution_result = execution_service_->executeSignal(signal, config.symbol, portfolio_, strategy_.get());
-            if (execution_result.isSuccess()) {
-                result.signals_generated.push_back(signal);
-                result.total_trades++;
-                Logger::debug("Signal EXECUTED");
-            } else {
-                Logger::debug("Signal REJECTED: ", execution_result.getErrorMessage());
+        // Progress reporting using ProgressService's internal logic (use first symbol for reference)
+        const auto& first_symbol = multi_symbol_data.begin()->first;
+        auto first_symbol_it = symbol_date_indices[first_symbol].find(current_date);
+        if (first_symbol_it != symbol_date_indices[first_symbol].end()) {
+            const auto& reference_data = multi_symbol_data.at(first_symbol)[first_symbol_it->second];
+            auto progress_result = progress_service_->reportProgress(day_idx, timeline.size(), reference_data, first_symbol, portfolio_);
+            if (progress_result.isError()) {
+                Logger::debug("Progress reporting failed: ", progress_result.getErrorMessage());
             }
         }
         
-        // Reuse existing map entry instead of clearing
-        current_prices[config.symbol] = data_point.close;
+        // Step 6: Update current prices and historical data for each symbol
+        bool has_data_today = false;
+        for (const auto& [symbol, data] : multi_symbol_data) {
+            auto date_it = symbol_date_indices[symbol].find(current_date);
+            if (date_it != symbol_date_indices[symbol].end()) {
+                // This symbol has data for current date
+                const auto& price_point = data[date_it->second];
+                current_prices[symbol] = price_point.close;
+                historical_windows[symbol].push_back(price_point);
+                has_data_today = true;
+            }
+            // If symbol doesn't have data for this date, keep previous price
+        }
+        
+        // Skip days with no data (holidays, weekends)
+        if (!has_data_today) {
+            continue;
+        }
+        
+        // Step 7: Evaluate trading strategy for each symbol
+        std::map<std::string, TradingSignal> daily_signals;
+        
+        for (const auto& [symbol, data] : multi_symbol_data) {
+            if (historical_windows[symbol].empty()) {
+                continue; // No data yet for this symbol
+            }
+            
+            // Evaluate strategy for this specific symbol
+            TradingSignal signal = strategy_->evaluateSignal(historical_windows[symbol], portfolio_, symbol);
+            
+            if (signal.signal != Signal::HOLD) {
+                daily_signals[symbol] = signal;
+                Logger::debug("Day ", day_idx, " (", current_date, "): ", symbol, " signal: ", 
+                            (signal.signal == Signal::BUY ? "BUY" : "SELL"), 
+                            " at $", signal.price, " (confidence: ", signal.confidence, ")");
+            }
+        }
+        
+        // Step 8: Execute signals with sophisticated portfolio allocation and risk management
+        double current_portfolio_value = portfolio_.getTotalValue(current_prices);
+        
+        for (const auto& [symbol, signal] : daily_signals) {
+            // Use portfolio allocator for intelligent position sizing
+            auto position_size_result = portfolio_allocator_->calculatePositionSize(
+                symbol, portfolio_, signal.price, current_portfolio_value, signal.signal);
+            
+            if (position_size_result.isError()) {
+                Logger::debug("Position sizing failed for ", symbol, ": ", position_size_result.getErrorMessage());
+                continue;
+            }
+            
+            double suggested_shares = position_size_result.getValue();
+            
+            if (suggested_shares <= 0) {
+                Logger::debug("Position sizing suggests no action for ", symbol, " (shares: ", suggested_shares, ")");
+                continue;
+            }
+            
+            // Execute the signal with portfolio allocator guidance
+            bool execution_success = false;
+            
+            if (signal.signal == Signal::BUY) {
+                execution_success = portfolio_.buyStock(symbol, static_cast<int>(suggested_shares), signal.price);
+                if (execution_success) {
+                    Logger::debug("BUY executed for ", symbol, ": ", suggested_shares, " shares at $", signal.price);
+                }
+            } else if (signal.signal == Signal::SELL) {
+                execution_success = portfolio_.sellStock(symbol, static_cast<int>(suggested_shares), signal.price);
+                if (execution_success) {
+                    Logger::debug("SELL executed for ", symbol, ": ", suggested_shares, " shares at $", signal.price);
+                }
+            }
+            
+            if (execution_success) {
+                result.signals_generated.push_back(signal);
+                result.total_trades++;
+                
+                // Update per-symbol metrics
+                auto& symbol_perf = result.symbol_performance[symbol];
+                symbol_perf.trades_count++;
+                symbol_perf.symbol_signals.push_back(signal);
+                
+                Logger::debug("Signal EXECUTED for ", symbol, " with allocation-aware position sizing");
+            } else {
+                Logger::debug("Signal REJECTED for ", symbol, " during execution");
+            }
+        }
+        
+        // Step 8b: Check for rebalancing opportunities
+        if (day_idx % 50 == 0 && portfolio_allocator_->shouldRebalance(portfolio_, current_prices, current_date)) {
+            Logger::debug("Portfolio rebalancing triggered on day ", day_idx);
+            
+            auto rebalance_result = portfolio_allocator_->calculateRebalancing(
+                portfolio_, current_prices, current_portfolio_value);
+            
+            if (rebalance_result.isSuccess()) {
+                const auto& rebalance_allocation = rebalance_result.getValue();
+                Logger::debug("Rebalancing recommendation generated:");
+                for (const auto& [symbol, target_weight] : rebalance_allocation.target_weights) {
+                    Logger::debug("  ", symbol, " target weight: ", target_weight * 100, "%");
+                }
+                // Note: Actual rebalancing execution would go here
+                // For now, we log the recommendation but don't execute
+            }
+        }
+        
+        // Step 9: Calculate and record portfolio value
         double portfolio_value = portfolio_.getTotalValue(current_prices);
         result.equity_curve.push_back(portfolio_value);
+        
+        // Log progress periodically
+        if (day_idx % 50 == 0) {
+            Logger::debug("Day ", day_idx, " (", current_date, "): Portfolio value = $", portfolio_value);
+            Logger::debug("  Active positions: ", portfolio_.getPositionCount());
+            Logger::debug("  Cash balance: $", portfolio_.getCashBalance());
+        }
     }
     
-    Logger::info("Backtest loop completed");
-    Logger::info("Total signals generated: ", execution_service_->getTotalExecutions());
+    Logger::info("Multi-symbol backtest loop completed");
+    Logger::info("Total trading days processed: ", timeline.size());
+    Logger::info("Total signals generated: ", result.signals_generated.size());
     Logger::info("Total trades executed: ", result.total_trades);
+    Logger::info("Final portfolio positions: ", portfolio_.getPositionCount());
+    Logger::info("Final cash balance: $", portfolio_.getCashBalance());
+    
+    // Report simulation end
+    if (!result.equity_curve.empty()) {
+        double final_value = result.equity_curve.back();
+        double return_pct = ((final_value - config.starting_capital) / config.starting_capital) * 100.0;
+        auto simulation_end_result = progress_service_->reportSimulationEnd(
+            first_symbol, final_value, return_pct, result.total_trades);
+        if (simulation_end_result.isError()) {
+            Logger::debug("Failed to report simulation end: ", simulation_end_result.getErrorMessage());
+        }
+    }
     
     return Result<void>(); // Success
 }
 
-Result<void> TradingEngine::finalizeBacktestResults(BacktestResult& result) {
-    if (!result.equity_curve.empty()) {
-        result.ending_value = result.equity_curve.back();
-        result.total_return_pct = ((result.ending_value - result.starting_capital) / result.starting_capital) * 100.0;
-        
-        Logger::debug("Final calculations: Portfolio cash=", portfolio_.getCashBalance(),
-                     ", ending value=", result.ending_value, ", return=", result.total_return_pct, "%");
-    } else {
-        result.ending_value = result.starting_capital;
-        result.total_return_pct = 0.0;
-        Logger::warning("Empty equity curve, using starting capital as ending value");
-    }
-    
-    auto daily_returns = calculateDailyReturns(result.equity_curve);
-    result.sharpe_ratio = calculateSharpeRatio(daily_returns);
-    result.max_drawdown = calculateMaxDrawdown(result.equity_curve);
-    
+// Helper function to calculate trade performance metrics
+void TradingEngine::calculateTradeMetrics(BacktestResult& result) {
     std::vector<double> buy_prices;
+    
     for (const auto& signal : result.signals_generated) {
         if (signal.signal == Signal::BUY) {
             buy_prices.push_back(signal.price);
@@ -550,9 +739,204 @@ Result<void> TradingEngine::finalizeBacktestResults(BacktestResult& result) {
             }
         }
     }
+}
+
+// Helper function to calculate portfolio performance metrics
+void TradingEngine::calculatePortfolioMetrics(BacktestResult& result) {
+    if (!result.equity_curve.empty()) {
+        result.ending_value = result.equity_curve.back();
+        result.cash_remaining = portfolio_.getCashBalance();
+        result.total_return_pct = ((result.ending_value - result.starting_capital) / result.starting_capital) * 100.0;
+        
+        Logger::debug("Final calculations: Portfolio cash=", result.cash_remaining,
+                     ", ending value=", result.ending_value, ", return=", result.total_return_pct, "%");
+    } else {
+        result.ending_value = result.starting_capital;
+        result.cash_remaining = result.starting_capital;
+        result.total_return_pct = 0.0;
+        Logger::debug("Empty equity curve, using starting capital as ending value");
+    }
     
+    auto daily_returns = calculateDailyReturns(result.equity_curve);
+    result.sharpe_ratio = calculateSharpeRatio(daily_returns);
+    result.max_drawdown = calculateMaxDrawdown(result.equity_curve);
+}
+
+// Helper function to calculate per-symbol performance metrics
+void TradingEngine::calculatePerSymbolMetrics(BacktestResult& result) {
+    Logger::debug("Calculating per-symbol performance metrics for ", result.symbols.size(), " symbols");
+    
+    // Map to track trades per symbol
+    std::map<std::string, std::vector<double>> symbol_trade_returns;
+    std::map<std::string, double> symbol_buy_values;
+    std::map<std::string, double> symbol_sell_values;
+    
+    // Process all signals to calculate per-symbol metrics
+    for (const auto& signal : result.signals_generated) {
+        const std::string& symbol = signal.date; // TODO: Need to add symbol field to TradingSignal
+        auto& symbol_perf = result.symbol_performance[symbol];
+        
+        // Add signal to symbol-specific list
+        symbol_perf.symbol_signals.push_back(signal);
+        
+        if (signal.signal == Signal::BUY) {
+            symbol_buy_values[symbol] += signal.price;
+        } else if (signal.signal == Signal::SELL) {
+            symbol_sell_values[symbol] += signal.price;
+            
+            // Calculate trade return if we have a previous buy
+            if (symbol_buy_values[symbol] > 0) {
+                double trade_return = (signal.price - symbol_buy_values[symbol]) / symbol_buy_values[symbol];
+                symbol_trade_returns[symbol].push_back(trade_return);
+                
+                if (trade_return > 0) {
+                    symbol_perf.winning_trades++;
+                } else {
+                    symbol_perf.losing_trades++;
+                }
+                symbol_perf.trades_count++;
+            }
+        }
+    }
+    
+    // Calculate final metrics for each symbol
+    for (auto& [symbol, symbol_perf] : result.symbol_performance) {
+        // Calculate win rate for this symbol
+        if (symbol_perf.trades_count > 0) {
+            symbol_perf.win_rate = (static_cast<double>(symbol_perf.winning_trades) / symbol_perf.trades_count) * 100.0;
+        }
+        
+        // Calculate allocation percentage
+        if (portfolio_.hasPosition(symbol)) {
+            auto position = portfolio_.getPosition(symbol);
+            symbol_perf.final_position_value = position.getShares() * position.getAveragePrice();
+            symbol_perf.symbol_allocation_pct = (symbol_perf.final_position_value / result.ending_value) * 100.0;
+        }
+        
+        // Calculate symbol return if we have trade data
+        if (!symbol_trade_returns[symbol].empty()) {
+            double total_return = 0.0;
+            for (double ret : symbol_trade_returns[symbol]) {
+                total_return += ret;
+            }
+            symbol_perf.total_return_pct = (total_return / symbol_trade_returns[symbol].size()) * 100.0;
+        }
+        
+        Logger::debug("Symbol ", symbol, " metrics: trades=", symbol_perf.trades_count, 
+                     ", win_rate=", symbol_perf.win_rate, "%, allocation=", symbol_perf.symbol_allocation_pct, "%");
+    }
+}
+
+// Helper function to calculate comprehensive performance metrics
+void TradingEngine::calculateComprehensiveMetrics(BacktestResult& result) {
+    // Calculate signals generated count
+    result.signals_generated_count = result.signals_generated.size();
+    
+    // Calculate annualized return
+    if (!result.start_date.empty() && !result.end_date.empty()) {
+        // Simple approximation: assume 252 trading days per year
+        int trading_days = result.equity_curve.size();
+        double years = trading_days / 252.0;
+        
+        if (years > 0) {
+            result.annualized_return = (std::pow((result.ending_value / result.starting_capital), (1.0 / years)) - 1.0) * 100.0;
+        }
+    }
+    
+    // Calculate profit factor and average win/loss
+    double total_wins = 0.0;
+    double total_losses = 0.0;
+    int win_count = 0;
+    int loss_count = 0;
+    
+    // Simple calculation based on equity curve changes
+    auto daily_returns = calculateDailyReturns(result.equity_curve);
+    for (double daily_return : daily_returns) {
+        if (daily_return > 0) {
+            total_wins += daily_return;
+            win_count++;
+        } else if (daily_return < 0) {
+            total_losses += std::abs(daily_return);
+            loss_count++;
+        }
+    }
+    
+    result.average_win = win_count > 0 ? (total_wins / win_count) * result.starting_capital : 0.0;
+    result.average_loss = loss_count > 0 ? (total_losses / loss_count) * result.starting_capital : 0.0;
+    result.profit_factor = total_losses > 0 ? total_wins / total_losses : 0.0;
+    
+    // Calculate volatility (standard deviation of returns)
+    if (!daily_returns.empty()) {
+        double mean_return = std::accumulate(daily_returns.begin(), daily_returns.end(), 0.0) / daily_returns.size();
+        double variance = 0.0;
+        
+        for (double ret : daily_returns) {
+            variance += (ret - mean_return) * (ret - mean_return);
+        }
+        variance /= daily_returns.size();
+        result.volatility = std::sqrt(variance) * std::sqrt(252) * 100.0; // Annualized volatility as percentage
+    }
+    
+    Logger::debug("Comprehensive metrics calculated: annualized_return=", result.annualized_return, 
+                 "%, volatility=", result.volatility, "%, profit_factor=", result.profit_factor);
+}
+
+// Helper function to calculate diversification metrics
+void TradingEngine::calculateDiversificationMetrics(BacktestResult& result) {
+    // Calculate portfolio diversification ratio
+    // Simple diversification measure: how evenly capital is distributed across symbols
+    
+    if (result.symbols.size() <= 1) {
+        result.portfolio_diversification_ratio = 0.0; // No diversification with single symbol
+        return;
+    }
+    
+    std::vector<double> allocations;
+    double total_allocation = 0.0;
+    
+    for (const auto& [symbol, symbol_perf] : result.symbol_performance) {
+        double allocation = symbol_perf.symbol_allocation_pct / 100.0;
+        allocations.push_back(allocation);
+        total_allocation += allocation;
+    }
+    
+    // Calculate Herfindahl-Hirschman Index (HHI) for diversification
+    // Lower HHI indicates better diversification
+    double hhi = 0.0;
+    for (double allocation : allocations) {
+        hhi += allocation * allocation;
+    }
+    
+    // Convert to diversification ratio (1 = perfectly diversified, 0 = concentrated)
+    double max_diversification = 1.0 / result.symbols.size(); // Equal allocation across all symbols
+    result.portfolio_diversification_ratio = (max_diversification - hhi) / max_diversification;
+    
+    Logger::debug("Diversification metrics: HHI=", hhi, ", diversification_ratio=", result.portfolio_diversification_ratio);
+}
+
+Result<void> TradingEngine::finalizeBacktestResults(BacktestResult& result) {
+    // Calculate portfolio performance metrics
+    calculatePortfolioMetrics(result);
+    
+    // Calculate trade performance metrics
+    calculateTradeMetrics(result);
+    
+    // Calculate per-symbol performance metrics
+    calculatePerSymbolMetrics(result);
+    
+    // Calculate overall win rate
     result.win_rate = result.total_trades > 0 ? 
         (static_cast<double>(result.winning_trades) / result.total_trades) * 100.0 : 0.0;
+    
+    // Calculate additional comprehensive metrics
+    calculateComprehensiveMetrics(result);
+    
+    // Calculate portfolio diversification ratio
+    calculateDiversificationMetrics(result);
+    
+    Logger::debug("Finalized backtest results for ", result.symbols.size(), " symbols");
+    Logger::debug("Total trades: ", result.total_trades, ", Win rate: ", result.win_rate, "%");
+    Logger::debug("Total return: ", result.total_return_pct, "%, Sharpe ratio: ", result.sharpe_ratio);
     
     return Result<void>(); // Success
 }

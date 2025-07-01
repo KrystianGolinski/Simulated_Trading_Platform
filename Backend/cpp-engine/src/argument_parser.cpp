@@ -1,4 +1,5 @@
 #include "argument_parser.h"
+#include "trading_engine.h"  // Include for TradingConfig definition
 #include "logger.h"
 #include <sstream>
 #include <algorithm>
@@ -6,8 +7,8 @@
 
 ArgumentParser::ArgumentParser() {}
 
-SimulationConfig ArgumentParser::parseArguments(int argc, char* argv[]) {
-    SimulationConfig config;
+TradingConfig ArgumentParser::parseArguments(int argc, char* argv[]) {
+    TradingConfig config;
     
     Logger::debug("Parsing ", argc, " arguments:");
     for (int i = 0; i < argc; ++i) {
@@ -44,7 +45,7 @@ void ArgumentParser::parseSymbols(const std::string& symbol_list, std::vector<st
     }
 }
 
-void ArgumentParser::parseKeyValueFormat(const std::string& arg, SimulationConfig& config) {
+void ArgumentParser::parseKeyValueFormat(const std::string& arg, TradingConfig& config) {
     if (arg.find("--symbol=") == 0) {
         std::string symbol_list = arg.substr(9);
         parseSymbols(symbol_list, config.symbols);
@@ -56,11 +57,11 @@ void ArgumentParser::parseKeyValueFormat(const std::string& arg, SimulationConfi
         config.end_date = arg.substr(6);
         Logger::debug("Set end_date = '", config.end_date, "'");
     } else if (arg.find("--capital=") == 0) {
-        config.capital = std::stod(arg.substr(10));
-        Logger::debug("Set capital = ", config.capital);
+        config.starting_capital = std::stod(arg.substr(10));
+        Logger::debug("Set starting_capital = ", config.starting_capital);
     } else if (arg.find("--strategy=") == 0) {
-        config.strategy = arg.substr(11);
-        Logger::debug("Set strategy = '", config.strategy, "'");
+        config.strategy_name = arg.substr(11);
+        Logger::debug("Set strategy_name = '", config.strategy_name, "'");
     } else if (arg.find("--short-ma=") == 0) {
         config.setParameter("short_ma", std::stod(arg.substr(11)));
         Logger::debug("Set short_ma = ", config.getDoubleParameter("short_ma"));
@@ -79,7 +80,7 @@ void ArgumentParser::parseKeyValueFormat(const std::string& arg, SimulationConfi
     }
 }
 
-void ArgumentParser::parseKeyValuePairFormat(const std::string& key, const std::string& value, SimulationConfig& config) {
+void ArgumentParser::parseKeyValuePairFormat(const std::string& key, const std::string& value, TradingConfig& config) {
     if (key == "--symbol") {
         parseSymbols(value, config.symbols);
         Logger::debug("Set symbols from key value format");
@@ -90,11 +91,11 @@ void ArgumentParser::parseKeyValuePairFormat(const std::string& key, const std::
         config.end_date = value;
         Logger::debug("Set end_date = '", config.end_date, "'");
     } else if (key == "--capital") {
-        config.capital = std::stod(value);
-        Logger::debug("Set capital = ", config.capital);
+        config.starting_capital = std::stod(value);
+        Logger::debug("Set starting_capital = ", config.starting_capital);
     } else if (key == "--strategy") {
-        config.strategy = value;
-        Logger::debug("Set strategy = '", config.strategy, "'");
+        config.strategy_name = value;
+        Logger::debug("Set strategy_name = '", config.strategy_name, "'");
     } else if (key == "--short-ma") {
         config.setParameter("short_ma", std::stod(value));
         Logger::debug("Set short_ma = ", config.getDoubleParameter("short_ma"));
@@ -113,7 +114,7 @@ void ArgumentParser::parseKeyValuePairFormat(const std::string& key, const std::
     }
 }
 
-void ArgumentParser::setDefaults(SimulationConfig& config) {
+void ArgumentParser::setDefaults(TradingConfig& config) {
     if (config.symbols.empty()) {
         config.symbols.push_back("AAPL");
     }
@@ -125,7 +126,7 @@ void ArgumentParser::setDefaults(SimulationConfig& config) {
     }
 }
 
-void ArgumentParser::debugPrintConfig(const SimulationConfig& config) {
+void ArgumentParser::debugPrintConfig(const TradingConfig& config) {
     Logger::debug("Final parsed values:");
     
     std::ostringstream symbols_stream;
@@ -139,8 +140,8 @@ void ArgumentParser::debugPrintConfig(const SimulationConfig& config) {
     
     Logger::debug("  start_date = '", config.start_date, "'");
     Logger::debug("  end_date = '", config.end_date, "'");
-    Logger::debug("  capital = ", config.capital);
-    Logger::debug("  strategy = '", config.strategy, "'");
+    Logger::debug("  starting_capital = ", config.starting_capital);
+    Logger::debug("  strategy_name = '", config.strategy_name, "'");
     
     // Print all strategy parameters dynamically
     Logger::debug("  strategy_parameters = {");

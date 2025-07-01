@@ -1,5 +1,6 @@
 #include "market_data.h"
 #include "error_utils.h"
+#include "logger.h"
 #include <iostream>
 #include <sstream>
 #include <iomanip>
@@ -138,11 +139,19 @@ Result<double> MarketData::getLatestPrice(const std::string& symbol) const {
 }
 
 Result<std::map<std::string, double>> MarketData::getCurrentPrices() const {
+    Logger::debug("MarketData::getCurrentPrices called");
+    
     auto symbols_result = getAvailableSymbols();
     if (symbols_result.isError()) {
+        Logger::error("Error in MarketData::getCurrentPrices: ", symbols_result.getErrorMessage());
         return Result<std::map<std::string, double>>(symbols_result.getError());
     }
-    return getCurrentPrices(symbols_result.getValue());
+    
+    auto result = getCurrentPrices(symbols_result.getValue());
+    if (result.isError()) {
+        Logger::error("Error in MarketData::getCurrentPrices: ", result.getErrorMessage());
+    }
+    return result;
 }
 
 Result<std::map<std::string, double>> MarketData::getCurrentPrices(const std::vector<std::string>& symbols) const {
@@ -173,12 +182,20 @@ Result<std::vector<std::map<std::string, std::string>>> MarketData::getHistorica
     const std::string& start_date,
     const std::string& end_date) const {
     
+    Logger::debug("MarketData::getHistoricalPrices called for symbol=", symbol, 
+                 " from ", start_date, " to ", end_date);
+    
     auto conn_result = ensureConnection();
     if (conn_result.isError()) {
+        Logger::error("Error in MarketData::getHistoricalPrices: ", conn_result.getErrorMessage());
         return Result<std::vector<std::map<std::string, std::string>>>(conn_result.getError());
     }
     
-    return db_connection_->getStockPrices(symbol, start_date, end_date);
+    auto result = db_connection_->getStockPrices(symbol, start_date, end_date);
+    if (result.isError()) {
+        Logger::error("Error in MarketData::getHistoricalPrices: ", result.getErrorMessage());
+    }
+    return result;
 }
 
 Result<std::map<std::string, std::vector<std::map<std::string, std::string>>>> MarketData::getHistoricalPrices(

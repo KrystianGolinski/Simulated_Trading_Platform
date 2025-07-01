@@ -63,7 +63,7 @@ class ExecutionService:
             
             # Base configuration
             config_data = {
-                "symbol": config.symbols[0] if config.symbols else "AAPL",
+                "symbols": config.symbols if config.symbols else ["AAPL"],
                 "start_date": config.start_date.isoformat(),
                 "end_date": config.end_date.isoformat(),
                 "starting_capital": config.starting_capital,
