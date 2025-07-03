@@ -49,7 +49,7 @@ function App() {
           <SimulationProgress
             isRunning={simulation.isLoading}
             progress={simulation.status?.progress_pct || 0}
-            currentStep={simulation.status?.status === 'running' ? 'Running simulation...' : 'Initializing...'}
+            currentStep={simulation.status?.status === 'running' ? 'Running simulation:' : 'Initializing:'}
             simulationId={simulation.currentSimulation?.simulation_id}
             onCancel={simulation.cancelSimulation}
             estimatedRemaining={simulation.status?.estimated_remaining}

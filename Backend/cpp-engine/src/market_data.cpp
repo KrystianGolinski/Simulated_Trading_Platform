@@ -432,3 +432,8 @@ std::string MarketData::formatDate(const std::string& date) {
     }
     return getCurrentDate();
 }
+
+// Database access for temporal validation
+DatabaseConnection* MarketData::getDatabaseConnection() const {
+    return db_connection_.get();
+}

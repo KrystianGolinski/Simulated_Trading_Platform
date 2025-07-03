@@ -12,7 +12,7 @@ class RSIStrategy(StrategyInterface):
     # RSI strategy with dynamic parameter configuration for oversold/overbought conditions
     
     def get_metadata(self) -> StrategyMetadata:
-        # Return comprehensive metadata for RSI strategy
+        # Return metadata for RSI strategy
         return StrategyMetadata(
             strategy_id="rsi",
             display_name="RSI Momentum Strategy",

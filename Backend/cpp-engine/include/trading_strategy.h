@@ -88,7 +88,7 @@ struct BacktestResult {
     // Per-symbol performance breakdown
     std::map<std::string, SymbolPerformance> symbol_performance; // Individual symbol metrics
     
-    // Additional metrics for comprehensive analysis
+    // Additional metrics for analysis
     double annualized_return;                    // Annualized return percentage
     int signals_generated_count;                 // Total signals generated (including HOLD)
     double portfolio_diversification_ratio;     // Measure of diversification effectiveness

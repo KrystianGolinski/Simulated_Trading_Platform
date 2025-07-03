@@ -79,6 +79,22 @@ public:
     
     Result<bool> checkSymbolExists(const std::string& symbol);
     
+    // Temporal validation methods
+    Result<bool> checkStockTradeable(const std::string& symbol, const std::string& check_date);
+    
+    Result<std::vector<std::string>> getEligibleStocksForPeriod(
+        const std::string& start_date, 
+        const std::string& end_date
+    );
+    
+    Result<std::map<std::string, std::string>> getStockTemporalInfo(const std::string& symbol);
+    
+    Result<std::vector<std::string>> validateSymbolsForPeriod(
+        const std::vector<std::string>& symbols,
+        const std::string& start_date,
+        const std::string& end_date
+    );
+    
     // Utility methods
     std::string getLastError() const;
     nlohmann::json getConnectionInfo() const;

@@ -36,7 +36,7 @@ set(CORE_SOURCES
 # Main executable
 add_executable(trading_engine src/main.cpp ${CORE_SOURCES})
 
-# Comprehensive test executable (replaces all individual tests)
+# Test executable
 add_executable(test_comprehensive tests/test_comprehensive.cpp ${CORE_SOURCES})
 
 # Find required packages

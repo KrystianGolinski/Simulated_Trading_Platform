@@ -1,4 +1,4 @@
-# Comprehensive validation system
+# Validation system
 # Handles input validation, error messaging, and data availability checks
 
 import logging
@@ -11,15 +11,16 @@ from services.error_handler import ErrorHandler, ErrorCode, ErrorSeverity
 logger = logging.getLogger(__name__)
 
 class SimulationValidator:
-    # Comprehensive validator for simulation configurations
+    # Validator for simulation configurations
     
     def __init__(self, db: DatabaseManager):
         self.db = db
         self.error_handler = ErrorHandler()
     
     async def validate_simulation_config(self, config: SimulationConfig) -> ValidationResult:
-        # Comprehensive validation of simulation configuration
-        # Returns ValidationResult with detailed error information
+        # Validation of simulation configuration
+        # Returns: 
+        # ValidationResult with detailed error information
 
         errors = []
         warnings = []
@@ -29,7 +30,7 @@ class SimulationValidator:
             symbol_validation = await self._validate_symbols(config.symbols)
             errors.extend(symbol_validation)
             
-            # Early exit if symbols are invalid - no point checking other validations
+            # Early exit if symbols are invalid
             if errors:
                 logger.debug(f"Early exit due to symbol validation errors: {len(errors)} errors found")
                 return ValidationResult(is_valid=False, errors=errors, warnings=[])
@@ -57,13 +58,18 @@ class SimulationValidator:
             errors.extend(date_validation['errors'])
             warnings.extend(date_validation['warnings'])
             
+            # Dynamic temporal validation info (Engine handles temporal trading restrictions)
+            if not errors:  # Only if previous validations passed
+                temporal_info = await self._get_temporal_info_for_logging(config.symbols, config.start_date, config.end_date)
+                warnings.extend(temporal_info['warnings'])
+            
             # Check for potential issues (warnings) - only if no critical errors
             if not errors:
                 config_warnings = self._check_configuration_warnings(config)
                 warnings.extend(config_warnings)
             
         except Exception as e:
-            # Use structured error handling with detailed context
+            # Use structured error handling with context
             error = self.error_handler.create_generic_error(
                 message=f"Validation system error: {str(e)}",
                 context={
@@ -200,11 +206,82 @@ class SimulationValidator:
         
         return {"errors": errors, "warnings": warnings}
     
+    async def _get_temporal_info_for_logging(self, symbols: List[str], start_date: date, end_date: date) -> Dict[str, List]:
+        # Get temporal information for logging and user awareness
+        warnings = []
+        
+        try:
+            # Get basic temporal statistics for user information
+            stocks_with_delayed_ipo = []
+            stocks_with_early_delisting = []
+            
+            for symbol in symbols[:10]:  # Limit to first 10 for performance
+                try:
+                    temporal_info = await self.db.get_stock_temporal_info(symbol)
+                    if temporal_info:
+                        ipo_date_str = temporal_info.get('ipo_date')
+                        delisting_date_str = temporal_info.get('delisting_date')
+                        
+                        if ipo_date_str:
+                            from datetime import datetime
+                            ipo_date_obj = datetime.fromisoformat(ipo_date_str).date()
+                            
+                            # Check if IPO is after simulation start
+                            if ipo_date_obj > start_date:
+                                stocks_with_delayed_ipo.append({
+                                    'symbol': symbol,
+                                    'ipo_date': ipo_date_str
+                                })
+                        
+                        if delisting_date_str:
+                            from datetime import datetime
+                            delisting_date_obj = datetime.fromisoformat(delisting_date_str).date()
+                            
+                            # Check if delisting is before simulation end
+                            if delisting_date_obj < end_date:
+                                stocks_with_early_delisting.append({
+                                    'symbol': symbol,
+                                    'delisting_date': delisting_date_str
+                                })
+                                
+                except (ValueError, TypeError, Exception):
+                    # Ignore individual symbol issues
+                    continue
+            
+            # Create informational warnings about dynamic trading
+            if stocks_with_delayed_ipo:
+                ipo_symbols = [s['symbol'] for s in stocks_with_delayed_ipo[:3]]
+                warnings.append(
+                    f"Dynamic trading: {len(stocks_with_delayed_ipo)} stocks will start trading after simulation begins "
+                    f"(e.g., {', '.join(ipo_symbols)}). These will be traded only when available."
+                )
+            
+            if stocks_with_early_delisting:
+                delisted_symbols = [s['symbol'] for s in stocks_with_early_delisting[:3]]
+                warnings.append(
+                    f"Dynamic trading: {len(stocks_with_early_delisting)} stocks may be delisted during simulation "
+                    f"(e.g., {', '.join(delisted_symbols)}). Positions will be automatically closed upon delisting."
+                )
+            
+            if not stocks_with_delayed_ipo and not stocks_with_early_delisting:
+                warnings.append(
+                    "Dynamic trading: All sampled stocks appear to be tradeable throughout the simulation period."
+                )
+                
+        except Exception as e:
+            # Log error but don't fail validation
+            logger.warning(f"Could not retrieve temporal information: {e}")
+            warnings.append(
+                "Dynamic trading enabled: Stocks will be traded only when actually available (IPO to delisting)."
+            )
+        
+        return {"warnings": warnings}
+    
     def _validate_capital(self, capital: float) -> List[ValidationError]:
         # Validate starting capital amount
         errors = []
         
-        # Basic range validation (already handled by Pydantic, but double-check)
+        # Basic range validation
         if capital <= 0:
             errors.append(ValidationError(
                 field="starting_capital",
@@ -212,7 +289,7 @@ class SimulationValidator:
                 error_code="CAPITAL_INVALID"
             ))
         
-        # Practical minimum for meaningful trading - adjusted for comprehensive backtesting scenarios
+        # Practical minimum (>1000) for meaningful trading
         if capital < 1000:
             errors.append(ValidationError(
                 field="starting_capital",
@@ -220,7 +297,7 @@ class SimulationValidator:
                 error_code="CAPITAL_TOO_LOW"
             ))
         
-        # Maximum reasonable amount for simulation platform
+        # Maximum reasonable amount (10M) for simulation platform
         if capital > 10_000_000:  # 10 million
             errors.append(ValidationError(
                 field="starting_capital",
@@ -268,13 +345,16 @@ class SimulationValidator:
                     error_code="STRATEGY_PARAMETER_INVALID"
                 ))
                 
-        except ImportError:
-            # Fallback to basic validation if strategy registry not available
-            errors.append(ValidationError(
-                field="strategy",
-                message="Strategy validation system not available",
-                error_code="STRATEGY_SYSTEM_UNAVAILABLE"
-            ))
+        except ImportError as e:
+            # Log the import error but don't fail validation completely
+            logger.warning(f"Strategy registry import failed: {e}")
+            # Provide basic strategy validation as fallback
+            if config.strategy not in ["ma_crossover", "rsi"]:
+                errors.append(ValidationError(
+                    field="strategy",
+                    message=f"Unknown strategy '{config.strategy}'. Available strategies: ma_crossover, rsi",
+                    error_code="UNKNOWN_STRATEGY"
+                ))
         except Exception as e:
             errors.append(ValidationError(
                 field="strategy",
@@ -297,7 +377,7 @@ class SimulationValidator:
             )
         
         
-        # Strategy-specific warnings using dynamic strategy system
+        # Strategy-specific warnings
         if config.strategy == "ma_crossover":
             # Get MA crossover parameters from strategy_parameters
             short_ma = config.strategy_parameters.get("short_ma")
@@ -318,8 +398,97 @@ class SimulationValidator:
         
         return warnings
     
+    async def _validate_temporal_eligibility(self, symbol: str, start_date: date, end_date: date) -> Dict[str, List]:
+        # Validate symbol temporal eligibility
+        errors = []
+        warnings = []
+        
+        try:
+            # Check if stock was tradeable at start date (IPO validation)
+            start_tradeable = await self.db.validate_stock_tradeable(symbol, start_date)
+            if not start_tradeable:
+                # Get temporal info for detailed error
+                temporal_info = await self.db.get_stock_temporal_info(symbol)
+                error_msg = f"Stock {symbol} was not tradeable on {start_date}"
+                
+                if temporal_info:
+                    ipo_date = temporal_info.get('ipo_date')
+                    listing_date = temporal_info.get('listing_date')
+                    if ipo_date:
+                        error_msg += f" - IPO date: {ipo_date}"
+                    elif listing_date:
+                        error_msg += f" - Listing date: {listing_date}"
+                
+                errors.append(ValidationError(
+                    field="temporal_validation",
+                    message=error_msg,
+                    error_code="STOCK_NOT_YET_PUBLIC"
+                ))
+                return {"errors": errors, "warnings": warnings}
+            
+            # Check if stock was still tradeable at end date (delisting validation)
+            end_tradeable = await self.db.validate_stock_tradeable(symbol, end_date)
+            if not end_tradeable:
+                # Get temporal info for detailed error
+                temporal_info = await self.db.get_stock_temporal_info(symbol)
+                error_msg = f"Stock {symbol} was not tradeable on {end_date}"
+                
+                if temporal_info:
+                    delisting_date = temporal_info.get('delisting_date')
+                    if delisting_date:
+                        error_msg += f" - Delisted on: {delisting_date}"
+                
+                errors.append(ValidationError(
+                    field="temporal_validation",
+                    message=error_msg,
+                    error_code="STOCK_DELISTED"
+                ))
+                return {"errors": errors, "warnings": warnings}
+            
+            # Check for potential temporal issues that could affect results
+            temporal_info = await self.db.get_stock_temporal_info(symbol)
+            if temporal_info:
+                ipo_date_str = temporal_info.get('ipo_date')
+                if ipo_date_str:
+                    try:
+                        from datetime import datetime
+                        ipo_date_obj = datetime.fromisoformat(ipo_date_str).date()
+                        
+                        # Warn if simulation starts very close to IPO
+                        days_since_ipo = (start_date - ipo_date_obj).days
+                        if 0 <= days_since_ipo <= 90:
+                            warnings.append(
+                                f"Simulation for {symbol} starts only {days_since_ipo} days after IPO "
+                                f"({ipo_date_str}). Early trading data may be volatile."
+                            )
+                    except (ValueError, TypeError):
+                        # Ignore date parsing errors
+                        pass
+        
+        except Exception as e:
+            # Handle temporal validation errors gracefully
+            error = self.error_handler.create_generic_error(
+                message=f"Temporal validation failed for {symbol}: {str(e)}",
+                context={
+                    "symbol": symbol,
+                    "start_date": str(start_date),
+                    "end_date": str(end_date),
+                    "exception_type": type(e).__name__,
+                    "validation_step": "temporal_eligibility_check"
+                },
+                severity=ErrorSeverity.MEDIUM
+            )
+            
+            logger.error(f"Temporal validation error: {error.message} | Context: {error.context}")
+            warnings.append(
+                f"Could not verify temporal eligibility for {symbol}. "
+                f"Proceeding with caution - results may include survivorship bias."
+            )
+        
+        return {"errors": errors, "warnings": warnings}
+    
     def run_comprehensive_validation_tests(self) -> Dict[str, Any]:
-        # Comprehensive test suite for the validation system
+        # Test suite for the validation system
         # Tests all validation components systematically
         
         test_results = {
@@ -330,8 +499,8 @@ class SimulationValidator:
             'overall_status': 'UNKNOWN'
         }
         
-        print("\nRunning Comprehensive Validation System Tests")
-        print("Testing all validation components systematically...\n")
+        print("\nRunning Validation System Tests")
+        print("Testing all validation components systematically:\n")
         
         # Test categories to run
         test_categories = [
@@ -345,7 +514,7 @@ class SimulationValidator:
         ]
         
         for category_name, test_function in test_categories:
-            print(f"Running {category_name}...")
+            print(f"Running {category_name}:")
             category_results = test_function()
             
             test_results['total_tests'] += category_results['total']
@@ -370,7 +539,7 @@ class SimulationValidator:
         return test_results
     
     def _test_symbol_validation(self) -> Dict[str, int]:
-        # Test symbol validation logic comprehensively
+        # Test symbol validation logic
         results = {'total': 0, 'passed': 0, 'failed': 0, 'details': []}
         
         test_cases = [
@@ -410,7 +579,7 @@ class SimulationValidator:
         return results
     
     def _test_capital_validation(self) -> Dict[str, int]:
-        # Test capital validation logic comprehensively
+        # Test capital validation logic
         results = {'total': 0, 'passed': 0, 'failed': 0, 'details': []}
         
         test_cases = [

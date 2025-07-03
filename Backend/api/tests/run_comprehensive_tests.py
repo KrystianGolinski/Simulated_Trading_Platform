@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-# Comprehensive API Test Runner Script
-# Similar to the C++ engine comprehensive testing script
+# API Test Runner Script
+# Similar to the C++ engine testing script
 # Runs all API tests with detailed reporting and metrics
 
 import sys
@@ -17,11 +17,11 @@ import argparse
 api_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(api_dir))
 
-# Import our comprehensive test suite
+# Import our test suite
 from tests.comprehensive_API_testing import ComprehensiveAPITestSuite
 
 class APITestRunner:
-    # Comprehensive test runner for the Trading Platform API
+    # Test runner for the API
     # Provides detailed test execution, reporting, and metrics collection
     
     def __init__(self, verbose: bool = False, include_integration: bool = True):
@@ -39,10 +39,9 @@ class APITestRunner:
         }
         
     def run_comprehensive_tests(self) -> bool:
-        # Run the comprehensive test suite and return success status
+        # Run the test suite and return success status
         if self.verbose:
-            print("TRADING PLATFORM API - COMPREHENSIVE TEST EXECUTION")
-            print("Running comprehensive API test suite with detailed reporting")
+            print("Running API test suite with detailed reporting:")
             print(f"Verbose mode: {'ON' if self.verbose else 'OFF'}")
             print(f"Integration tests: {'INCLUDED' if self.include_integration else 'EXCLUDED'}")
             print()
@@ -50,11 +49,11 @@ class APITestRunner:
         start_time = time.time()
         
         try:
-            # Initialize and run the comprehensive test suite
+            # Initialize and run the test suite
             test_suite = ComprehensiveAPITestSuite()
             
             if self.verbose:
-                print("Initializing comprehensive test suite...")
+                print("Initializing test suite:")
             test_suite.run_all_tests()
             
             # Collect results from the test suite
@@ -70,7 +69,7 @@ class APITestRunner:
             success = test_suite.test_results['failed_tests'] == 0
             
         except Exception as e:
-            print(f"CRITICAL ERROR: Failed to run comprehensive test suite: {str(e)}")
+            print(f"CRITICAL ERROR: Failed to run test suite: {str(e)}")
             self.test_results['error_summary'].append({
                 'category': 'Test Suite Execution',
                 'error': str(e)
@@ -86,7 +85,7 @@ class APITestRunner:
             print("\nRunning Individual PyTest Tests")
         
         try:
-            # Run pytest on the comprehensive test file
+            # Run pytest on the test file
             test_file = Path(__file__).parent / "comprehensive_API_testing.py"
             
             cmd = [
@@ -228,11 +227,11 @@ class APITestRunner:
         return True
     
     def generate_test_report(self) -> None:
-        # Generate comprehensive test report
+        # Generate test report
         if not self.verbose:
             return
         
-        print("\nCOMPREHENSIVE API TEST REPORT")
+        print("\n API Test Report:")
         
         execution_time = self.test_results['total_execution_time']
         total_tests = self.test_results['individual_tests_run']
@@ -275,14 +274,11 @@ class APITestRunner:
         # Final status
         print("\nFINAL RESULTS:")
         if failed_tests == 0 and not self.test_results['error_summary']:
-            print("SUCCESS: ALL TESTS PASSED! API is functioning correctly.")
-            print("The API has comprehensive test coverage similar to the C++ engine.")
+            print("SUCCESS: API is functioning correctly.")
         elif failed_tests == 0 and self.test_results['error_summary']:
             print("WARNING: Tests passed but some issues were encountered.")
-            print("Review the error summary above.")
         else:
             print(f"FAILURE: {failed_tests} tests failed. API needs attention.")
-            print("Review failed tests and fix issues before deployment.")
     
     def save_test_results(self, output_file: str = None) -> None:
         # Save test results to JSON file
@@ -297,8 +293,8 @@ class APITestRunner:
             print(f"Failed to save test results: {str(e)}")
 
 def main():
-    # Main function for running comprehensive API tests
-    parser = argparse.ArgumentParser(description="Comprehensive API Test Runner")
+    # Main function for running API tests
+    parser = argparse.ArgumentParser(description="API Test Runner")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
     parser.add_argument("--no-integration", action="store_true", help="Skip integration tests")
     parser.add_argument("--save-results", type=str, help="Save results to specified file")
@@ -318,20 +314,19 @@ def main():
     
     if args.check_only:
         if deps_ok and structure_ok:
-            print("\nPASS API is ready for testing")
+            print("\n[PASS] API is ready for testing")
             return 0
         else:
-            print("\nFAIL API setup issues found")
+            print("\n[FAIL] API setup issues found")
             return 1
     
     if not deps_ok:
         print("\nCannot run tests due to missing dependencies")
         return 1
-    
-    # Run comprehensive tests
+
     overall_success = True
     
-    # Run main comprehensive test suite
+    # Run main test suite
     comprehensive_success = runner.run_comprehensive_tests()
     overall_success = overall_success and comprehensive_success
     

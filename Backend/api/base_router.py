@@ -41,8 +41,7 @@ class CentralizedLogger:
 logger = CentralizedLogger(__name__)
 
 def standardized_endpoint(endpoint_name: str = None, requires_db: bool = True):
-    # Simplified decorator for logging and database dependency injection
-    # Exception handling is now managed by global handlers in main.py
+    # Decorator for logging and database dependency injection
     
     def decorator(func: Callable) -> Callable:
         name = endpoint_name or func.__name__
@@ -95,7 +94,17 @@ class ValidationMixin:
                 raise ValueError(f"Validator {validator_class} has no known validation method")
         except Exception as e:
             self.validation_logger.log_error("validation_service", e, "VALIDATION_SYSTEM_ERROR")
-            raise HTTPException(status_code=500, detail=f"Validation failed: {str(e)}")
+            # Provide more specific error context for debugging
+            error_context = {
+                "error_type": type(e).__name__,
+                "error_message": str(e),
+                "validator_class": validator_class.__name__ if validator_class else "unknown"
+            }
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Validation system error: {str(e)}",
+                headers={"X-Error-Context": str(error_context)}
+            )
     
     def process_validation_result(self, validation_result: ValidationResult, 
                                 success_message: str = "Validation successful",
@@ -120,7 +129,7 @@ class ValidationMixin:
         return create_success_response(validation_result, success_message)
 
 class BaseRouter(ABC, ValidationMixin):
-    # Simplified base router class focusing on core functionality
+    # Base router class focusing on core functionality
     
     def __init__(self):
         super().__init__()

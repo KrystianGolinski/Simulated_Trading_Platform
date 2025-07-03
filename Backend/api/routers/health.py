@@ -130,7 +130,7 @@ async def liveness_check() -> StandardResponse[Dict[str, Any]]:
 
 @router.get("/health")
 async def health_check(db: DatabaseManager = Depends(get_database)) -> StandardResponse[Dict[str, Any]]:
-    # Comprehensive health check with all system components
+    # Health check with all system components
     try:
         start_time = time.time()
         
@@ -205,7 +205,7 @@ async def health_check(db: DatabaseManager = Depends(get_database)) -> StandardR
 
 @router.get("/health/dashboard")
 async def health_dashboard(db: DatabaseManager = Depends(get_database)) -> StandardResponse[Dict[str, Any]]:
-    # Comprehensive health dashboard with metrics and status
+    # Health dashboard with metrics and status
     try:
         dashboard_data = {
             "service_info": {
@@ -227,7 +227,7 @@ async def health_dashboard(db: DatabaseManager = Depends(get_database)) -> Stand
             }
         }
         
-        # Get comprehensive health data
+        # Get health data
         health_result = await health_check(db)
         if health_result.data:
             dashboard_data["current_health"] = health_result.data

@@ -12,7 +12,7 @@ class BollingerBandsStrategy(StrategyInterface):
     # Bollinger Bands strategy - example of adding new strategy via plugin system
     
     def get_metadata(self) -> StrategyMetadata:
-        # Return comprehensive metadata for Bollinger Bands strategy
+        # Return metadata for Bollinger Bands strategy
         return StrategyMetadata(
             strategy_id="bollinger_bands",
             display_name="Bollinger Bands Strategy",

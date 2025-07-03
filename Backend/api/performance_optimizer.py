@@ -118,7 +118,7 @@ class PerformanceOptimizer:
         }
     
     def get_performance_summary(self) -> Dict[str, Any]:
-        # Get comprehensive performance summary
+        # Get performance summary
         avg_times = {}
         for operation, times in self.operation_times.items():
             avg_times[operation] = {

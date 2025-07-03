@@ -452,12 +452,12 @@ wait_for_database() {
     exit 1
 }
 
-# Function to run comprehensive tests
+# Function to run tests
 run_cpp_tests() {
-    print_status "Running C++ comprehensive test suite:"
+    print_status "Running C++ test suite:"
     
     if [ ! -f "Backend/cpp-engine/build/test_comprehensive" ]; then
-        print_error "C++ comprehensive test suite not found. Build the C++ engine first."
+        print_error "C++ test suite not found. Build the C++ engine first."
         exit 1
     fi
     
@@ -509,24 +509,24 @@ run_cpp_tests() {
     test_result=$?
     
     if [ $test_result -eq 0 ]; then
-        print_success "[PASS] C++ comprehensive tests"
+        print_success "[PASS] C++ tests"
     elif [ $test_result -eq 124 ]; then
-        print_error "[TIMEOUT] C++ comprehensive tests timed out after 5 minutes"
+        print_error "[TIMEOUT] C++ tests timed out after 5 minutes"
         exit 1
     else
-        print_error "[FAIL] C++ comprehensive tests (exit code: $test_result)"
+        print_error "[FAIL] C++ tests (exit code: $test_result)"
         exit 1
     fi
     
     cd ../..
 }
 
-# Function to run comprehensive API tests
+# Function to run API tests
 run_api_tests() {
-    print_status "Running comprehensive API test suite:"
+    print_status "Running API test suite:"
     
     if [ ! -f "Backend/api/tests/run_comprehensive_tests.py" ]; then
-        print_error "API comprehensive test suite not found"
+        print_error "API test suite not found"
         exit 1
     fi
     
@@ -569,7 +569,7 @@ run_api_tests() {
         exit 1
     fi
     
-    # Run the comprehensive API test suite with timeout
+    # Run the API test suite with timeout
     print_status "Running API tests with timeout (10 minutes):"
     timeout 600 python tests/run_comprehensive_tests.py
     test_result=$?
@@ -581,12 +581,12 @@ run_api_tests() {
     deactivate
     
     if [ $test_result -eq 0 ]; then
-        print_success "[PASS] API comprehensive tests"
+        print_success "[PASS] API tests"
     elif [ $test_result -eq 124 ]; then
-        print_error "[TIMEOUT] API comprehensive tests timed out after 10 minutes"
+        print_error "[TIMEOUT] API tests timed out after 10 minutes"
         exit 1
     else
-        print_error "[FAIL] API comprehensive tests (exit code: $test_result)"
+        print_error "[FAIL] API tests (exit code: $test_result)"
         exit 1
     fi
     
@@ -767,7 +767,7 @@ case "${1:-}" in
         setup_api_dependencies
         ;;
     --tests-only)
-        print_status "Running comprehensive test suites only:"
+        print_status "Running test suites only:"
         check_docker_permissions
         setup_api_dependencies
         wait_for_database
@@ -783,7 +783,7 @@ case "${1:-}" in
         echo "  --frontend-only Setup frontend only"
         echo "  --api-only      Setup API dependencies only"
         echo "  --docker-only   Setup Docker services only"
-        echo "  --tests-only    Run comprehensive test suites only"
+        echo "  --tests-only    Run test suites only"
         echo "  --help          Show this help"
         ;;
     *)

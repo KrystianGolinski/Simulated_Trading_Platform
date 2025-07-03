@@ -14,7 +14,7 @@ DatabaseConnection::DatabaseConnection()
       username_(getenv("DB_USER") ? getenv("DB_USER") : "trading_user"),
       password_(getenv("DB_PASSWORD") ? getenv("DB_PASSWORD") : "trading_password") {
     
-    // Log connection configuration (without password for security)
+    // Log connection configuration (without password)
     std::cerr << "[CONFIG] Database connection: " << username_ << "@" << host_ << ":" << port_ << "/" << database_ << std::endl;
     if (getenv("DB_HOST")) {
         std::cerr << "[CONFIG] Using environment variables for database configuration" << std::endl;
@@ -152,7 +152,9 @@ void DatabaseConnection::setConnectionParams(const std::string& host, const std:
     buildConnectionString();
 }
 
-// Query execution helper - returns PGresult* wrapped in Result<T>
+// Query execution helper
+// returns: 
+// PGresult* wrapped in Result<T>
 Result<PGresult*> DatabaseConnection::executeQueryInternal(const std::string& query) {
     // Ensure connection
     if (!isConnected()) {
@@ -347,6 +349,174 @@ Result<bool> DatabaseConnection::checkSymbolExists(const std::string& symbol) {
     return Result<bool>(ErrorCode::DATA_SYMBOL_NOT_FOUND, "No count result returned for symbol: " + symbol);
 }
 
+// Temporal validation methods
+Result<bool> DatabaseConnection::checkStockTradeable(const std::string& symbol, const std::string& check_date) {
+    // Use the database function to check if a stock was tradeable on a specific date
+    std::string query = "SELECT is_stock_tradeable($1, $2) as is_tradeable;";
+    
+    std::vector<std::string> params = {symbol, check_date};
+    auto results = executePreparedQuery(query, params);
+    
+    if (results.isError()) {
+        return Result<bool>(results.getError());
+    }
+    
+    const auto& result_data = results.getValue();
+    if (!result_data.empty()) {
+        auto it = result_data[0].find("is_tradeable");
+        if (it != result_data[0].end()) {
+            try {
+                // PostgreSQL returns 't' or 'f' for boolean values
+                bool is_tradeable = (it->second == "t" || it->second == "true");
+                return Result<bool>(is_tradeable);
+            } catch (const std::exception& e) {
+                return Result<bool>(ErrorCode::DATA_PARSING_FAILED, 
+                                  "Failed to parse tradeable result: " + std::string(e.what()));
+            }
+        }
+    }
+    
+    return Result<bool>(ErrorCode::VALIDATION_INVALID_INPUT, "No tradeable result returned for symbol: " + symbol);
+}
+
+Result<std::vector<std::string>> DatabaseConnection::getEligibleStocksForPeriod(
+    const std::string& start_date, 
+    const std::string& end_date) {
+    
+    // Use the database function to get stocks eligible for a period
+    std::string query = "SELECT symbol FROM get_eligible_stocks_for_period($1, $2) ORDER BY symbol;";
+    
+    std::vector<std::string> params = {start_date, end_date};
+    auto results = executePreparedQuery(query, params);
+    
+    if (results.isError()) {
+        return Result<std::vector<std::string>>(results.getError());
+    }
+    
+    std::vector<std::string> eligible_symbols;
+    for (const auto& row : results.getValue()) {
+        auto it = row.find("symbol");
+        if (it != row.end()) {
+            eligible_symbols.push_back(it->second);
+        }
+    }
+    
+    return Result<std::vector<std::string>>(std::move(eligible_symbols));
+}
+
+Result<std::map<std::string, std::string>> DatabaseConnection::getStockTemporalInfo(const std::string& symbol) {
+    // Get temporal information for a stock
+    std::string query = "SELECT symbol, ipo_date, listing_date, delisting_date, "
+                       "trading_status, exchange_status, first_trading_date, last_trading_date "
+                       "FROM stocks WHERE symbol = $1;";
+    
+    std::vector<std::string> params = {symbol};
+    auto results = executePreparedQuery(query, params);
+    
+    if (results.isError()) {
+        return Result<std::map<std::string, std::string>>(results.getError());
+    }
+    
+    const auto& result_data = results.getValue();
+    if (result_data.empty()) {
+        return Result<std::map<std::string, std::string>>(
+            ErrorCode::DATA_SYMBOL_NOT_FOUND, "No temporal info found for symbol: " + symbol);
+    }
+    
+    // Return the first (should be only) result
+    return Result<std::map<std::string, std::string>>(result_data[0]);
+}
+
+Result<std::vector<std::string>> DatabaseConnection::validateSymbolsForPeriod(
+    const std::vector<std::string>& symbols,
+    const std::string& start_date,
+    const std::string& end_date) {
+    
+    std::vector<std::string> valid_symbols;
+    std::vector<std::string> validation_errors;
+    
+    for (const auto& symbol : symbols) {
+        // Check if symbol exists in database
+        auto exists_result = checkSymbolExists(symbol);
+        if (exists_result.isError()) {
+            validation_errors.push_back("Error checking symbol " + symbol + ": " + exists_result.getErrorMessage());
+            continue;
+        }
+        
+        if (!exists_result.getValue()) {
+            validation_errors.push_back("Symbol not found in database: " + symbol);
+            continue;
+        }
+        
+        // Check if stock was tradeable during the start date (IPO validation)
+        auto start_tradeable = checkStockTradeable(symbol, start_date);
+        if (start_tradeable.isError()) {
+            validation_errors.push_back("Error checking start date tradeability for " + symbol + ": " + start_tradeable.getErrorMessage());
+            continue;
+        }
+        
+        if (!start_tradeable.getValue()) {
+            // Get temporal info to provide detailed error
+            auto temporal_info = getStockTemporalInfo(symbol);
+            if (temporal_info.isSuccess()) {
+                const auto& info = temporal_info.getValue();
+                auto ipo_it = info.find("ipo_date");
+                auto listing_it = info.find("listing_date");
+                
+                std::string error_msg = "Stock " + symbol + " was not tradeable on " + start_date;
+                if (ipo_it != info.end() && !ipo_it->second.empty()) {
+                    error_msg += " (IPO date: " + ipo_it->second + ")";
+                } else if (listing_it != info.end() && !listing_it->second.empty()) {
+                    error_msg += " (Listing date: " + listing_it->second + ")";
+                }
+                validation_errors.push_back(error_msg);
+            } else {
+                validation_errors.push_back("Stock " + symbol + " was not tradeable on " + start_date);
+            }
+            continue;
+        }
+        
+        // Check if stock was still tradeable during the end date (delisting validation)
+        auto end_tradeable = checkStockTradeable(symbol, end_date);
+        if (end_tradeable.isError()) {
+            validation_errors.push_back("Error checking end date tradeability for " + symbol + ": " + end_tradeable.getErrorMessage());
+            continue;
+        }
+        
+        if (!end_tradeable.getValue()) {
+            // Get temporal info for detailed error
+            auto temporal_info = getStockTemporalInfo(symbol);
+            if (temporal_info.isSuccess()) {
+                const auto& info = temporal_info.getValue();
+                auto delisting_it = info.find("delisting_date");
+                
+                std::string error_msg = "Stock " + symbol + " was not tradeable on " + end_date;
+                if (delisting_it != info.end() && !delisting_it->second.empty()) {
+                    error_msg += " (Delisted on: " + delisting_it->second + ")";
+                }
+                validation_errors.push_back(error_msg);
+            } else {
+                validation_errors.push_back("Stock " + symbol + " was not tradeable on " + end_date);
+            }
+            continue;
+        }
+        
+        // Validation passed, valid
+        valid_symbols.push_back(symbol);
+    }
+    
+    // If there were validation errors, return them as error
+    if (!validation_errors.empty()) {
+        std::string combined_errors = "Temporal validation failures:\n";
+        for (const auto& error : validation_errors) {
+            combined_errors += "- " + error + "\n";
+        }
+        return Result<std::vector<std::string>>(ErrorCode::VALIDATION_INVALID_INPUT, combined_errors);
+    }
+    
+    return Result<std::vector<std::string>>(std::move(valid_symbols));
+}
+
 // Utility methods
 std::string DatabaseConnection::getLastError() const {
     if (connection_) {
@@ -371,10 +541,10 @@ nlohmann::json DatabaseConnection::getConnectionInfo() const {
     return info;
 }
 
-// Static methods - Simplified for Docker environment
+// Static methods
 Result<DatabaseConnection> DatabaseConnection::createFromEnvironment() {
     try {
-        // Always assume Docker environment with known container names and credentials
+        // Assume Docker environment with known container names and credentials
         const char* host = std::getenv("DB_HOST");
         const char* port = std::getenv("DB_PORT");
         const char* database = std::getenv("DB_NAME");

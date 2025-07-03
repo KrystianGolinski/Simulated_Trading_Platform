@@ -2,7 +2,7 @@
 
 ## Overview
 
-Using TimescaleDB (PostgreSQL extension) as its primary database technology, specifically designed for time-series data handling. The database is deployed via Docker containers with comprehensive health monitoring and connection pooling.
+Using TimescaleDB (PostgreSQL extension) as its primary database technology, specifically designed for time-series data handling. The database is deployed via Docker containers with health monitoring and connection pooling.
 
 ### Database Technology Stack
 - **Database Engine**: TimescaleDB (latest-pg15) - PostgreSQL 15 with TimescaleDB extension
@@ -59,8 +59,8 @@ DATABASE_URL=postgresql://trading_user:trading_password@postgres:5432/simulated_
 
 ### Core Tables
 
-#### 1. stocks (Metadata Table)
-**Purpose**: Stores metadata about available stock symbols
+#### 1. stocks (Metadata Table with Temporal Tracking)
+**Purpose**: Stores metadata about available stock symbols with temporal tracking for survivorship bias mitigation
 
 ```sql
 CREATE TABLE IF NOT EXISTS stocks (
@@ -69,7 +69,15 @@ CREATE TABLE IF NOT EXISTS stocks (
     sector VARCHAR(100),
     exchange VARCHAR(50),
     active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    listing_date DATE,                    -- Date stock was first listed on exchange
+    delisting_date DATE,                  -- Date stock was delisted (NULL if still active)
+    ipo_date DATE,                        -- Initial Public Offering date
+    trading_status VARCHAR(20) DEFAULT 'active',  -- Current trading status: active, suspended, delisted
+    exchange_status VARCHAR(20) DEFAULT 'listed', -- Exchange status: listed, delisted, transferred
+    first_trading_date DATE,              -- First date of actual trading data available
+    last_trading_date DATE,               -- Last date of trading data (NULL if still trading)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
@@ -79,9 +87,17 @@ CREATE TABLE IF NOT EXISTS stocks (
 - `sector` (VARCHAR(100)): Business sector classification
 - `exchange` (VARCHAR(50)): Stock exchange (NYSE, NASDAQ, etc.)
 - `active` (BOOLEAN): Whether symbol is actively traded
+- `listing_date` (DATE): Date stock was first listed on exchange
+- `delisting_date` (DATE): Date stock was delisted (NULL if still active)
+- `ipo_date` (DATE): Initial Public Offering date
+- `trading_status` (VARCHAR(20)): Current trading status (active, suspended, delisted)
+- `exchange_status` (VARCHAR(20)): Exchange status (listed, delisted, transferred)
+- `first_trading_date` (DATE): First date of actual trading data available
+- `last_trading_date` (DATE): Last date of trading data (NULL if still trading)
 - `created_at` (TIMESTAMP): Record creation timestamp
+- `updated_at` (TIMESTAMP): Record last update timestamp
 
-**Usage**: Referenced for symbol validation and metadata display
+**Usage**: Referenced for symbol validation, metadata display, and temporal eligibility checking
 
 #### 2. stock_prices_daily (TimescaleDB Hypertable)
 **Purpose**: Primary time-series table for historical daily OHLCV data
@@ -121,7 +137,42 @@ SELECT create_hypertable('stock_prices_daily', 'time',
 
 **Usage**: Primary data source for backtesting and analysis
 
-#### 3. trading_sessions (Backtesting Sessions)
+#### 3. stock_trading_periods (Detailed Trading Period Tracking)
+**Purpose**: Stores detailed trading period tracking for temporal validation
+
+```sql
+CREATE TABLE IF NOT EXISTS stock_trading_periods (
+    id SERIAL PRIMARY KEY,
+    symbol VARCHAR(10) REFERENCES stocks(symbol) ON DELETE CASCADE,
+    start_date DATE NOT NULL,             -- Start of trading period
+    end_date DATE,                        -- End of trading period (NULL if ongoing)
+    status VARCHAR(20) NOT NULL,          -- Trading status: active, suspended, delisted, halted
+    reason VARCHAR(100),                  -- Reason for status change
+    exchange VARCHAR(50),                 -- Exchange during this period
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Simple unique constraint to prevent basic overlaps
+    UNIQUE(symbol, start_date)
+);
+```
+
+**Columns**:
+- `id` (SERIAL, PRIMARY KEY): Auto-incrementing period identifier
+- `symbol` (VARCHAR(10), FOREIGN KEY): References stocks(symbol)
+- `start_date` (DATE, NOT NULL): Start of trading period
+- `end_date` (DATE): End of trading period (NULL if ongoing)
+- `status` (VARCHAR(20), NOT NULL): Trading status (active, suspended, delisted, halted)
+- `reason` (VARCHAR(100)): Reason for status change
+- `exchange` (VARCHAR(50)): Exchange during this period
+- `created_at` (TIMESTAMP): Record creation timestamp
+- `updated_at` (TIMESTAMP): Record last update timestamp
+
+**Relationships**:
+- **Foreign Key**: `symbol` → `stocks(symbol)` with CASCADE DELETE
+
+**Usage**: Detailed temporal tracking for complex trading period analysis and survivorship bias mitigation
+
+#### 4. trading_sessions (Backtesting Sessions)
 **Purpose**: Stores backtesting session configurations and metadata
 
 ```sql
@@ -147,7 +198,7 @@ CREATE TABLE IF NOT EXISTS trading_sessions (
 
 **Usage**: Tracks simulation configurations for result correlation
 
-#### 4. trades_log (Trade Execution Records)
+#### 5. trades_log (Trade Execution Records)
 **Purpose**: Stores individual trade execution records from backtesting
 
 ```sql
@@ -207,6 +258,89 @@ ON trades_log (symbol, trade_time);
 ```
 **Purpose**: Time-series analysis of trades per symbol
 **Usage**: Trade pattern analysis
+
+### Temporal Validation Indexes
+
+#### 4. Stocks Listing Date Index
+```sql
+CREATE INDEX IF NOT EXISTS idx_stocks_listing_date 
+ON stocks (listing_date) WHERE listing_date IS NOT NULL;
+```
+**Purpose**: Fast queries for stocks by listing date
+**Usage**: IPO date validation and temporal eligibility checking
+
+#### 5. Stocks Delisting Date Index
+```sql
+CREATE INDEX IF NOT EXISTS idx_stocks_delisting_date 
+ON stocks (delisting_date) WHERE delisting_date IS NOT NULL;
+```
+**Purpose**: Fast queries for stocks by delisting date
+**Usage**: Delisting date validation and temporal eligibility checking
+
+#### 6. Stocks IPO Date Index
+```sql
+CREATE INDEX IF NOT EXISTS idx_stocks_ipo_date 
+ON stocks (ipo_date) WHERE ipo_date IS NOT NULL;
+```
+**Purpose**: Fast queries for stocks by IPO date
+**Usage**: IPO date validation for survivorship bias mitigation
+
+#### 7. Stocks Trading Status Index
+```sql
+CREATE INDEX IF NOT EXISTS idx_stocks_trading_status 
+ON stocks (trading_status);
+```
+**Purpose**: Fast filtering by trading status
+**Usage**: Active/inactive stock filtering
+
+#### 8. Stocks Temporal Range Index
+```sql
+CREATE INDEX IF NOT EXISTS idx_stocks_temporal_range 
+ON stocks (symbol, listing_date, delisting_date);
+```
+**Purpose**: Optimised temporal range queries for multiple stocks
+**Usage**: Batch temporal validation operations
+
+#### 9. Stocks First/Last Trading Date Index
+```sql
+CREATE INDEX IF NOT EXISTS idx_stocks_first_last_trading 
+ON stocks (symbol, first_trading_date, last_trading_date);
+```
+**Purpose**: Fast data availability checking
+**Usage**: Validate actual trading data availability
+
+#### 10. Trading Periods Symbol-Dates Index
+```sql
+CREATE INDEX IF NOT EXISTS idx_trading_periods_symbol_dates 
+ON stock_trading_periods (symbol, start_date, end_date);
+```
+**Purpose**: Fast period-based queries
+**Usage**: Detailed trading period analysis
+
+#### 11. Trading Periods Status Index
+```sql
+CREATE INDEX IF NOT EXISTS idx_trading_periods_status 
+ON stock_trading_periods (status);
+```
+**Purpose**: Filter trading periods by status
+**Usage**: Status-based period analysis
+
+#### 12. Trading Periods Date Range Index
+```sql
+CREATE INDEX IF NOT EXISTS idx_trading_periods_date_range 
+ON stock_trading_periods USING gist (daterange(start_date, COALESCE(end_date, 'infinity'::date), '[]'));
+```
+**Purpose**: Advanced date range overlap queries
+**Usage**: Complex temporal period analysis
+
+#### 13. Stocks Temporal Validation Composite Index
+```sql
+CREATE INDEX IF NOT EXISTS idx_stocks_temporal_validation 
+ON stocks (symbol, trading_status, listing_date, delisting_date) 
+WHERE trading_status IN ('active', 'delisted');
+```
+**Purpose**: Optimised composite queries for temporal validation
+**Usage**: High-performance survivorship bias checking
 
 ## Connection Management
 
@@ -463,6 +597,118 @@ Logger::error("Error in DatabaseService::getHistoricalPrices: ", result.getError
 - **Network Isolation**: Docker network container isolation
 - **Port Mapping**: External access only through mapped ports
 
+## Database Helper Functions
+
+### Temporal Validation Functions
+
+#### 1. is_stock_tradeable() Function
+```sql
+CREATE OR REPLACE FUNCTION is_stock_tradeable(
+    stock_symbol VARCHAR(10),
+    check_date DATE
+) RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM stocks 
+        WHERE symbol = stock_symbol
+        AND trading_status = 'active'
+        AND (listing_date IS NULL OR listing_date <= check_date)
+        AND (delisting_date IS NULL OR delisting_date >= check_date)
+    );
+END;
+$$ LANGUAGE plpgsql;
+```
+**Purpose**: Check if a stock was tradeable on a specific date
+**Usage**: Real-time temporal validation during backtesting
+**Parameters**: 
+- `stock_symbol`: Stock ticker symbol
+- `check_date`: Date to validate
+**Returns**: Boolean indicating if stock was tradeable
+
+#### 2. get_eligible_stocks_for_period() Function
+```sql
+CREATE OR REPLACE FUNCTION get_eligible_stocks_for_period(
+    start_date_param DATE,
+    end_date_param DATE
+) RETURNS TABLE(symbol VARCHAR(10), listing_date DATE, delisting_date DATE) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        s.symbol,
+        s.listing_date,
+        s.delisting_date
+    FROM stocks s
+    WHERE s.trading_status = 'active'
+    AND (s.listing_date IS NULL OR s.listing_date <= end_date_param)
+    AND (s.delisting_date IS NULL OR s.delisting_date >= start_date_param);
+END;
+$$ LANGUAGE plpgsql;
+```
+**Purpose**: Get all stocks eligible for trading during a specific period
+**Usage**: Batch temporal validation for large simulations
+**Parameters**:
+- `start_date_param`: Period start date
+- `end_date_param`: Period end date
+**Returns**: Table with eligible symbols and their temporal info
+
+#### 3. update_stock_trading_dates() Function
+```sql
+CREATE OR REPLACE FUNCTION update_stock_trading_dates()
+RETURNS VOID AS $$
+BEGIN
+    UPDATE stocks 
+    SET 
+        first_trading_date = subquery.min_date,
+        last_trading_date = subquery.max_date
+    FROM (
+        SELECT 
+            symbol,
+            MIN(time::date) as min_date,
+            MAX(time::date) as max_date
+        FROM stock_prices_daily
+        GROUP BY symbol
+    ) as subquery
+    WHERE stocks.symbol = subquery.symbol;
+    
+    RAISE NOTICE 'Updated trading dates for % stocks', (SELECT COUNT(*) FROM stocks WHERE first_trading_date IS NOT NULL);
+END;
+$$ LANGUAGE plpgsql;
+```
+**Purpose**: Automatically populate first/last trading dates from actual data
+**Usage**: Data maintenance and validation
+**Returns**: Void (logs count of updated stocks)
+
+### Database Triggers
+
+#### 1. Update Timestamp Trigger Function
+```sql
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+```
+**Purpose**: Automatically update updated_at timestamps
+**Usage**: Maintain audit trail for data changes
+
+#### 2. Stocks Table Trigger
+```sql
+CREATE TRIGGER update_stocks_updated_at 
+    BEFORE UPDATE ON stocks 
+    FOR EACH ROW 
+    EXECUTE FUNCTION update_updated_at_column();
+```
+
+#### 3. Trading Periods Table Trigger
+```sql
+CREATE TRIGGER update_trading_periods_updated_at 
+    BEFORE UPDATE ON stock_trading_periods 
+    FOR EACH ROW 
+    EXECUTE FUNCTION update_updated_at_column();
+```
+
 ## Backup and Recovery
 
 ### Data Persistence
@@ -483,10 +729,22 @@ Logger::error("Error in DatabaseService::getHistoricalPrices: ", result.getError
 - **POST /simulation/validate**: Symbol and date validation
 - **GET /simulation/{id}/results**: Trade and session data
 
+#### Temporal Validation Endpoints
+- **POST /stocks/validate-temporal**: Batch temporal validation for multiple stocks
+- **GET /stocks/{symbol}/temporal-info**: Temporal information for a stock
+- **POST /stocks/check-tradeable**: Check if a stock was tradeable on a specific date
+- **GET /stocks/eligible-for-period**: Get stocks eligible for trading during a period
+
 ### C++ Engine Integration
 - **Data Retrieval**: Historical price queries for backtesting
 - **Symbol Validation**: Pre-execution symbol verification
 - **Result Storage**: Trade logging and session tracking
+
+#### Dynamic Temporal Validation
+- **Real-time Validation**: `checkStockTradeable()` calls during daily trading loop
+- **Batch Validation**: `validateSymbolsForPeriod()` for initial validation
+- **Temporal Info**: `getStockTemporalInfo()` for detailed stock information
+- **Dynamic Trading**: Stocks only traded when actually available (IPO to delisting)
 
 ### Frontend Integration
 - **Real-time Queries**: Stock data for chart display

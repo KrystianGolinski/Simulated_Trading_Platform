@@ -1,4 +1,4 @@
-// Comprehensive pagination interface for improved type safety and scalability
+// Pagination interface for improved type safety and scalability
 
 export interface PaginationInfo {
   page: number;

@@ -73,30 +73,90 @@ void TradingEngine::setRSIStrategy(int period, double oversold, double overbough
     strategy_ = std::make_unique<RSIStrategy>(period, oversold, overbought);
 }
 
-// Helper function to validate simulation parameters
-// Unified validation method using TradingConfig
+// Helper function to validate simulation parameters with temporal validation
 Result<void> TradingEngine::validateSimulationParameters(const TradingConfig& config) {
+    // Basic parameter validation
     if (config.symbols.empty()) {
         return Result<void>(ErrorCode::ENGINE_INVALID_SYMBOL, "Symbols list cannot be empty");
     }
+    
     // Check for empty symbols in the list
     for (const auto& symbol : config.symbols) {
         if (symbol.empty()) {
             return Result<void>(ErrorCode::ENGINE_INVALID_SYMBOL, "Symbol cannot be empty");
         }
     }
+    
     if (config.starting_capital <= 0) {
         return Result<void>(ErrorCode::ENGINE_INVALID_CAPITAL, "Starting capital must be positive");
     }
+    
     if (config.start_date.empty() || config.end_date.empty()) {
         return Result<void>(ErrorCode::ENGINE_INVALID_DATE_RANGE, "Start date and end date cannot be empty");
     }
+    
+    // Temporal validation
+    if (market_data_) {
+        Logger::info("Performing temporal validation");
+        
+        // Get database connection from market data service
+        auto db_connection = market_data_->getDatabaseConnection();
+        if (!db_connection) {
+            Logger::warning("No database connection available for temporal validation");
+            return Result<void>(); // Continue without temporal validation
+        }
+        
+        // Dynamic temporal validation - allow all symbols but track their availability
+        // This enables backtesting where stocks are traded only when actually available to trade
+        
+        // Check which symbols exist in the database
+        std::vector<std::string> missing_symbols;
+        for (const auto& symbol : config.symbols) {
+            auto exists_result = db_connection->checkSymbolExists(symbol);
+            if (exists_result.isError() || !exists_result.getValue()) {
+                missing_symbols.push_back(symbol);
+            }
+        }
+        
+        if (!missing_symbols.empty()) {
+            std::string error_msg = "Symbols not found in database: ";
+            for (size_t i = 0; i < missing_symbols.size(); ++i) {
+                error_msg += missing_symbols[i];
+                if (i < missing_symbols.size() - 1) {
+                    error_msg += ", ";
+                }
+            }
+            Logger::error("Database validation failed: " + error_msg);
+            return Result<void>(ErrorCode::DATA_SYMBOL_NOT_FOUND, error_msg);
+        }
+        
+        // Log temporal validation approach
+        Logger::info("Using dynamic temporal validation - symbols will be traded only when available during " + 
+                    config.start_date + " to " + config.end_date);
+        
+        // Get temporal info for each symbol for informational logging
+        for (const auto& symbol : config.symbols) {
+            auto temporal_info = db_connection->getStockTemporalInfo(symbol);
+            if (temporal_info.isSuccess()) {
+                const auto& info = temporal_info.getValue();
+                auto ipo_it = info.find("ipo_date");
+                auto delisting_it = info.find("delisting_date");
+                
+                if (ipo_it != info.end() && !ipo_it->second.empty()) {
+                    Logger::debug("Symbol " + symbol + " temporal info: IPO " + ipo_it->second + 
+                                 (delisting_it != info.end() && !delisting_it->second.empty() ? 
+                                  ", Delisted " + delisting_it->second : ", Currently active"));
+                }
+            }
+        }
+    } else {
+        Logger::warning("No market data service available for temporal validation");
+    }
+    
     return Result<void>(); // Success
 }
 
-// Helper function to validate simulation parameters for multiple symbols
-
-// Unified simulation method that returns JSON string
+// Simulation method that returns JSON string
 Result<std::string> TradingEngine::runSimulation(const TradingConfig& config) {
     Logger::debug("TradingEngine::runSimulation called with: symbols=[", config.symbols.size(), " symbols], "
                  "start_date='", config.start_date, "', end_date='", config.end_date, "', capital=", config.starting_capital);
@@ -131,7 +191,7 @@ Result<std::string> TradingEngine::runSimulation(const TradingConfig& config) {
     return Result<std::string>(json_result.getValue().dump(2));
 }
 
-// Main backtesting implementation - now using Result<T> patterns
+// Main backtesting implementation - using Result<T> patterns
 Result<BacktestResult> TradingEngine::runBacktest(const TradingConfig& config) {
     Logger::debug("TradingEngine::runBacktest called with: symbol='", config.getPrimarySymbol(),
                  "', start_date='", config.start_date, "', end_date='", config.end_date,
@@ -139,7 +199,7 @@ Result<BacktestResult> TradingEngine::runBacktest(const TradingConfig& config) {
     
     BacktestResult result;
     
-    // Sequential error handling with proper Result<T> patterns
+    // Sequential error handling
     auto validation_result = validateTradingConfig(config);
     if (validation_result.isError()) {
         return Result<BacktestResult>(validation_result.getError());
@@ -201,7 +261,7 @@ Result<nlohmann::json> TradingEngine::getBacktestResultsAsJson(const BacktestRes
         // For multi-symbol backtests, use the first symbol as reference for equity curve dates
         const std::string& reference_symbol = result.symbols.empty() ? "AAPL" : result.symbols[0];
         
-        // Add equity curve with actual dates from market data using Result<T> patterns
+        // Add equity curve with actual dates from market data
         return ErrorUtils::chain(market_data_->getHistoricalPrices(reference_symbol, result.start_date, result.end_date), 
             [this, &json_result, &result](const std::vector<std::map<std::string, std::string>>& price_data_raw) {
                 auto price_data = convertToTechnicalData(price_data_raw);
@@ -224,7 +284,7 @@ void TradingEngine::initializeServices() {
     // Initialize portfolio allocator with default equal weight strategy
     AllocationConfig default_config;
     default_config.strategy = AllocationStrategy::EQUAL_WEIGHT;
-    default_config.max_position_weight = 0.08; // Max 8% per position for better diversification (was 25%)
+    default_config.max_position_weight = 0.08; // Max 8% per position for better diversification
     default_config.min_position_weight = 0.02; // Min 2% per position
     default_config.enable_rebalancing = true;
     default_config.cash_reserve_pct = 0.05; // Keep 5% cash
@@ -262,7 +322,7 @@ double TradingEngine::calculateSharpeRatio(const std::vector<double>& returns, d
     double std_dev = std::sqrt(variance);
     if (std_dev == 0.0) return 0.0;
     
-    double annualized_return = mean_return * 252; // 252 trading days
+    double annualized_return = mean_return * 252; // 252 trading days per year
     double annualized_std = std_dev * std::sqrt(252);
     
     return (annualized_return - risk_free_rate) / annualized_std;
@@ -298,7 +358,7 @@ std::vector<double> TradingEngine::calculateDailyReturns(const std::vector<doubl
     return returns;
 }
 
-// Decomposed backtest methods - now using Result<T> patterns
+// Decomposed backtest methods
 Result<void> TradingEngine::validateTradingConfig(const TradingConfig& config) const {
     if (!strategy_) {
         Logger::error("No strategy configured for backtesting");
@@ -363,7 +423,7 @@ std::string TradingEngine::createDataErrorMessage(const std::string& symbol, con
 }
 
 Result<std::map<std::string, std::vector<PriceData>>> TradingEngine::prepareMarketData(const TradingConfig& config) {
-    Logger::debug("Getting historical price data for ", config.symbols.size(), " symbols...");
+    Logger::debug("Getting historical price data for ", config.symbols.size(), " symbols:");
     
     std::map<std::string, std::vector<PriceData>> multi_symbol_data;
     std::vector<std::string> failed_symbols;
@@ -474,7 +534,7 @@ Result<void> TradingEngine::runSimulationLoop(const std::map<std::string, std::v
         return Result<void>(ErrorCode::ENGINE_NO_DATA_AVAILABLE, "No market data available");
     }
     
-    // Step 1: Create unified timeline by merging all symbol dates
+    // Create unified timeline by merging all symbol dates
     std::set<std::string> all_dates;
     for (const auto& [symbol, data] : multi_symbol_data) {
         for (const auto& price_point : data) {
@@ -491,7 +551,7 @@ Result<void> TradingEngine::runSimulationLoop(const std::map<std::string, std::v
     Logger::debug("Created unified timeline with ", timeline.size(), " trading days");
     Logger::debug("Date range: ", timeline.front(), " to ", timeline.back());
     
-    // Step 2: Create symbol-to-data-index mappings for efficient lookups
+    // Create symbol-to-data-index mappings for efficient lookups
     std::map<std::string, std::map<std::string, size_t>> symbol_date_indices;
     for (const auto& [symbol, data] : multi_symbol_data) {
         for (size_t i = 0; i < data.size(); ++i) {
@@ -500,7 +560,7 @@ Result<void> TradingEngine::runSimulationLoop(const std::map<std::string, std::v
         Logger::debug("Indexed ", data.size(), " data points for ", symbol);
     }
     
-    // Step 3: Initialize sophisticated portfolio allocation
+    // Initialize portfolio allocation
     std::vector<std::string> available_symbols;
     std::map<std::string, double> initial_prices;
     
@@ -511,13 +571,13 @@ Result<void> TradingEngine::runSimulationLoop(const std::map<std::string, std::v
         }
     }
     
-    // Calculate initial portfolio allocation using sophisticated allocation strategy
+    // Calculate initial portfolio allocation
     auto allocation_result = portfolio_allocator_->calculateAllocation(
         available_symbols, config.starting_capital, portfolio_, initial_prices, config.start_date);
     
     if (allocation_result.isError()) {
         Logger::error("Failed to calculate portfolio allocation: ", allocation_result.getErrorMessage());
-        // Fallback to simple equal allocation
+        // Fallback to equal allocation
         double capital_per_symbol = config.starting_capital / multi_symbol_data.size();
         double weight_per_symbol = 1.0 / multi_symbol_data.size();
         Logger::debug("Falling back to equal allocation: $", capital_per_symbol, " per symbol");
@@ -530,10 +590,10 @@ Result<void> TradingEngine::runSimulationLoop(const std::map<std::string, std::v
         portfolio_allocator_->setTargetAllocation(fallback_weights, config.starting_capital);
     } else {
         const auto& allocation = allocation_result.getValue();
-        Logger::debug("Sophisticated allocation calculated:");
-        Logger::debug("  Total allocated: $", allocation.total_allocated_capital);
-        Logger::debug("  Cash reserved: $", allocation.cash_reserved);
-        Logger::debug("  Strategy: ", allocation.allocation_reason);
+        Logger::debug("Allocation calculated:");
+        Logger::debug("Total allocated: $", allocation.total_allocated_capital);
+        Logger::debug("Cash reserved: $", allocation.cash_reserved);
+        Logger::debug("Strategy: ", allocation.allocation_reason);
         
         for (const auto& [symbol, weight] : allocation.target_weights) {
             Logger::debug("  ", symbol, ": ", weight * 100, "% ($", allocation.target_values.at(symbol), ")");
@@ -543,7 +603,7 @@ Result<void> TradingEngine::runSimulationLoop(const std::map<std::string, std::v
         portfolio_allocator_->setTargetAllocation(allocation.target_weights, config.starting_capital);
     }
     
-    // Step 4: Initialize tracking structures
+    // Initialize tracking structures
     result.equity_curve.reserve(timeline.size());
     result.equity_curve.push_back(config.starting_capital);
     
@@ -567,7 +627,7 @@ Result<void> TradingEngine::runSimulationLoop(const std::map<std::string, std::v
         Logger::debug("Failed to report simulation start: ", simulation_start_result.getErrorMessage());
     }
     
-    // Step 5: Main simulation loop - process each trading day chronologically
+    // Main simulation loop - process each trading day chronologically
     for (size_t day_idx = 0; day_idx < timeline.size(); ++day_idx) {
         const std::string& current_date = timeline[day_idx];
         
@@ -582,7 +642,7 @@ Result<void> TradingEngine::runSimulationLoop(const std::map<std::string, std::v
             }
         }
         
-        // Step 6: Update current prices and historical data for each symbol
+        // Update current prices and historical data for each symbol
         bool has_data_today = false;
         for (const auto& [symbol, data] : multi_symbol_data) {
             auto date_it = symbol_date_indices[symbol].find(current_date);
@@ -601,12 +661,38 @@ Result<void> TradingEngine::runSimulationLoop(const std::map<std::string, std::v
             continue;
         }
         
-        // Step 7: Evaluate trading strategy for each symbol
+        // Evaluate trading strategy for each symbol
         std::map<std::string, TradingSignal> daily_signals;
         
         for (const auto& [symbol, data] : multi_symbol_data) {
             if (historical_windows[symbol].empty()) {
                 continue; // No data yet for this symbol
+            }
+            
+            // Dynamic temporal validation - check if stock is tradeable on current date
+            bool is_tradeable_today = true;
+            if (market_data_) {
+                auto db_connection = market_data_->getDatabaseConnection();
+                if (db_connection) {
+                    auto tradeable_result = db_connection->checkStockTradeable(symbol, current_date);
+                    if (tradeable_result.isSuccess()) {
+                        is_tradeable_today = tradeable_result.getValue();
+                    }
+                }
+            }
+            
+            // Handle stocks that are not tradeable today
+            if (!is_tradeable_today) {
+                // If we have a position in a delisted stock, force sell it
+                if (portfolio_.hasPosition(symbol)) {
+                    Logger::info("Force selling position in ", symbol, " on ", current_date, " - stock no longer tradeable (delisting)");
+                    // Use current market price if available, otherwise use a reasonable default
+                    double sell_price = current_prices.count(symbol) ? current_prices[symbol] : 0.01;
+                    portfolio_.sellAllStock(symbol, sell_price);
+                }
+                // Skip strategy evaluation for non-tradeable stocks
+                Logger::debug("Skipping ", symbol, " on ", current_date, " - not tradeable (before IPO or after delisting)");
+                continue;
             }
             
             // Evaluate strategy for this specific symbol
@@ -620,11 +706,11 @@ Result<void> TradingEngine::runSimulationLoop(const std::map<std::string, std::v
             }
         }
         
-        // Step 8: Execute signals with sophisticated portfolio allocation and risk management
+        // Execute signals with portfolio allocation and risk management
         double current_portfolio_value = portfolio_.getTotalValue(current_prices);
         
         for (const auto& [symbol, signal] : daily_signals) {
-            // Use portfolio allocator for intelligent position sizing
+            // Use portfolio allocator for position sizing
             auto position_size_result = portfolio_allocator_->calculatePositionSize(
                 symbol, portfolio_, signal.price, current_portfolio_value, signal.signal);
             
@@ -670,7 +756,7 @@ Result<void> TradingEngine::runSimulationLoop(const std::map<std::string, std::v
             }
         }
         
-        // Step 8b: Check for rebalancing opportunities
+        // Check for rebalancing opportunities
         if (day_idx % 50 == 0 && portfolio_allocator_->shouldRebalance(portfolio_, current_prices, current_date)) {
             Logger::debug("Portfolio rebalancing triggered on day ", day_idx);
             
@@ -683,16 +769,15 @@ Result<void> TradingEngine::runSimulationLoop(const std::map<std::string, std::v
                 for (const auto& [symbol, target_weight] : rebalance_allocation.target_weights) {
                     Logger::debug("  ", symbol, " target weight: ", target_weight * 100, "%");
                 }
-                // Note: Actual rebalancing execution would go here
-                // For now, we log the recommendation but don't execute
+                // TODO: Actual rebalancing execution would go here
             }
         }
         
-        // Step 9: Calculate and record portfolio value
+        // Calculate and record portfolio value
         double portfolio_value = portfolio_.getTotalValue(current_prices);
         result.equity_curve.push_back(portfolio_value);
         
-        // Log progress periodically
+        // Log progress periodically (every 50 days)
         if (day_idx % 50 == 0) {
             Logger::debug("Day ", day_idx, " (", current_date, "): Portfolio value = $", portfolio_value);
             Logger::debug("  Active positions: ", portfolio_.getPositionCount());
@@ -827,7 +912,7 @@ void TradingEngine::calculatePerSymbolMetrics(BacktestResult& result) {
     }
 }
 
-// Helper function to calculate comprehensive performance metrics
+// Helper function to calculate performance metrics
 void TradingEngine::calculateComprehensiveMetrics(BacktestResult& result) {
     // Calculate signals generated count
     result.signals_generated_count = result.signals_generated.size();
@@ -877,7 +962,7 @@ void TradingEngine::calculateComprehensiveMetrics(BacktestResult& result) {
         result.volatility = std::sqrt(variance) * std::sqrt(252) * 100.0; // Annualized volatility as percentage
     }
     
-    Logger::debug("Comprehensive metrics calculated: annualized_return=", result.annualized_return, 
+    Logger::debug("Metrics calculated: annualized_return=", result.annualized_return, 
                  "%, volatility=", result.volatility, "%, profit_factor=", result.profit_factor);
 }
 
@@ -928,7 +1013,7 @@ Result<void> TradingEngine::finalizeBacktestResults(BacktestResult& result) {
     result.win_rate = result.total_trades > 0 ? 
         (static_cast<double>(result.winning_trades) / result.total_trades) * 100.0 : 0.0;
     
-    // Calculate additional comprehensive metrics
+    // Calculate additional metrics
     calculateComprehensiveMetrics(result);
     
     // Calculate portfolio diversification ratio

@@ -28,7 +28,7 @@ class StrategyParameter:
 
 @dataclass
 class StrategyMetadata:
-    # Comprehensive strategy metadata for dynamic registration
+    # Strategy metadata for dynamic registration
     strategy_id: str
     display_name: str
     description: str

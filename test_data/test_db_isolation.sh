@@ -37,7 +37,7 @@ MAIN_DB_PATH="$PROJECT_ROOT/Backend/api/trading_data.db"
 
 # Function to create isolated test database
 create_test_database() {
-    print_status "Creating isolated test database..."
+    print_status "Creating isolated test database:"
     
     # Remove existing test database
     if [ -f "$TEST_DB_PATH" ]; then
@@ -60,7 +60,7 @@ create_test_database() {
 # Function to backup production database
 backup_production_database() {
     if [ -f "$MAIN_DB_PATH" ]; then
-        print_status "Backing up production database..."
+        print_status "Backing up production database:"
         cp "$MAIN_DB_PATH" "$BACKUP_DB_PATH"
         print_success "Production database backed up to: $BACKUP_DB_PATH"
         return 0
@@ -73,7 +73,7 @@ backup_production_database() {
 # Function to restore production database
 restore_production_database() {
     if [ -f "$BACKUP_DB_PATH" ]; then
-        print_status "Restoring production database..."
+        print_status "Restoring production database:"
         cp "$BACKUP_DB_PATH" "$MAIN_DB_PATH"
         print_success "Production database restored from backup"
         return 0
@@ -85,7 +85,7 @@ restore_production_database() {
 
 # Function to switch to test database
 switch_to_test_database() {
-    print_status "Switching to test database environment..."
+    print_status "Switching to test database environment:"
     
     # Backup production database first
     backup_production_database
@@ -103,7 +103,7 @@ switch_to_test_database() {
 
 # Function to cleanup test environment
 cleanup_test_environment() {
-    print_status "Cleaning up test environment..."
+    print_status "Cleaning up test environment:"
     
     # Remove test database
     if [ -f "$TEST_DB_PATH" ]; then
@@ -125,7 +125,7 @@ cleanup_test_environment() {
 
 # Function to verify database isolation
 verify_database_isolation() {
-    print_status "Verifying database isolation..."
+    print_status "Verifying database isolation:"
     
     local issues_found=0
     
@@ -167,7 +167,7 @@ verify_database_isolation() {
 
 # Function to run isolated integration tests
 run_isolated_tests() {
-    print_status "Running integration tests in isolated environment..."
+    print_status "Running integration tests in isolated environment:"
     
     # Create and switch to test environment
     create_test_database
@@ -176,7 +176,7 @@ run_isolated_tests() {
     # Run integration tests
     local test_results=0
     
-    print_status "Running enhanced integration tests..."
+    print_status "Running enhanced integration tests:"
     
     # Run main integration test script
     if [ -f "$PROJECT_ROOT/test_integration.sh" ]; then

@@ -1,0 +1,8 @@
+
+engine cpp line ~730, add trade logging
+
+engine 772, 861 TODO
+perf optimizeer 62 , 91
+portfolio allocator 571 228
+
+sudo docker compose -f Docker/docker-compose.dev.yml down

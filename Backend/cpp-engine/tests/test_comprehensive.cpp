@@ -368,7 +368,7 @@ void test_trading_engine() {
     std::cout << "[PASS]" << std::endl;
 }
 
-//Comprehensive Error Handling Tests
+// Error Handling Tests
 
 void test_exception_to_result_conversions() {
     std::cout << "Testing Exception to Result<T> Conversions - " << std::flush;
@@ -734,7 +734,7 @@ void test_progress_service_detailed() {
 void test_technical_indicators_detailed() {
     std::cout << "Testing TechnicalIndicators Detailed Unit Tests - " << std::flush;
     
-    // Create sophisticated test data with various patterns
+    // Create test data with various patterns
     std::vector<PriceData> trending_data;
     for (int i = 0; i < 100; ++i) {
         double base_price = 100.0 + i * 0.5; // Upward trend
@@ -831,7 +831,7 @@ void test_technical_indicators_detailed() {
     auto rsi_signals_20_80 = indicators.detectRSISignals(20.0, 80.0);
     ASSERT_TRUE(rsi_signals_20_80.isSuccess());
     
-    // Test comprehensive error conditions
+    // Test error conditions
     std::vector<std::tuple<int, ErrorCode, std::string>> error_cases = {
         {-5, ErrorCode::TECHNICAL_ANALYSIS_INVALID_PERIOD, "Negative period"},
         {0, ErrorCode::TECHNICAL_ANALYSIS_INVALID_PERIOD, "Zero period"},
@@ -1227,34 +1227,6 @@ void test_multi_symbol_data_retrieval() {
                     std::cout << "[INFO] " << symbol << " data not available: " << result.getErrorMessage() << std::endl;
                 }
             }
-            
-            // Test engine's prepareMarketData behavior
-            // This should reveal if it now fetches data for all symbols
-            auto backtest_result = engine.runBacktest(config);
-            if (backtest_result.isError()) {
-                std::cout << "[INFO] Backtest failed (expected if data unavailable): " << backtest_result.getErrorMessage() << std::endl;
-                
-                // Check if error message indicates multi-symbol processing
-                if (backtest_result.getErrorMessage().find("any of the requested symbols") != std::string::npos) {
-                    std::cout << "[PROGRESS] Multi-symbol data retrieval is working - processes all symbols" << std::endl;
-                } else {
-                    std::cout << "[BUG] Still only processing primary symbol" << std::endl;
-                }
-            } else {
-                const auto& result = backtest_result.getValue();
-                std::cout << "[FIXED] Result now tracks symbols: ";
-                for (size_t i = 0; i < result.symbols.size(); ++i) {
-                    std::cout << result.symbols[i];
-                    if (i < result.symbols.size() - 1) std::cout << ", ";
-                }
-                std::cout << std::endl;
-                std::cout << "[FIXED] Should track all symbols: ";
-                for (size_t i = 0; i < config.symbols.size(); ++i) {
-                    std::cout << config.symbols[i];
-                    if (i < config.symbols.size() - 1) std::cout << ", ";
-                }
-                std::cout << std::endl;
-            }
         }
     } catch (const std::exception& e) {
         std::cout << "[ERROR] " << e.what() << std::endl;
@@ -1303,13 +1275,6 @@ void test_multi_symbol_portfolio_allocation() {
     
     TradingEngine engine(10000.0);
     Portfolio& engine_portfolio = engine.getPortfolio();
-    
-    // After simulation, engine portfolio should only have positions in primary symbol
-    // This test documents the current bug behavior
-    std::cout << "[BUG CHECK] Engine portfolio has " << engine_portfolio.getPositionCount() << " positions" << std::endl;
-    std::cout << "[BUG CHECK] Expected positions for multi-symbol: " << config.symbols.size() << std::endl;
-    
-    std::cout << "[COMPLETE]" << std::endl;
 }
 
 void test_multi_symbol_strategy_evaluation() {
@@ -1346,10 +1311,6 @@ void test_multi_symbol_strategy_evaluation() {
     // 2. Consider correlation between symbols
     // 3. Consider capital allocation across all symbols
     
-    // Current bug: Engine only evaluates strategy for primary symbol
-    std::cout << "[BUG CHECK] Current engine only evaluates strategy for primary symbol" << std::endl;
-    std::cout << "[BUG CHECK] Proper multi-symbol strategy should evaluate portfolio-wide signals" << std::endl;
-    
     // Test strategy configuration for multi-symbol
     TradingConfig config;
     config.symbols = {"AAPL", "GOOGL"};
@@ -1371,7 +1332,7 @@ int main() {
     std::ostringstream devnull;
     std::cerr.rdbuf(devnull.rdbuf());
     
-    std::cout << "\nComprehensive Trading Engine Test Suite" << std::endl;
+    std::cout << "\n Trading Engine Test Suite" << std::endl;
     
     try {
         // Core Infrastructure

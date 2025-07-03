@@ -12,9 +12,10 @@
 #include "trading_exceptions.h"
 
 /**
- * MarketData class handles historical price data access from PostgreSQL/TimescaleDB.
+ * MarketData class handles historical price data access from DB.
  * Provides methods to fetch stock prices for specific date ranges and symbols.
  */
+
 class MarketData {
 private:
     std::unique_ptr<DatabaseConnection> db_connection_;
@@ -95,6 +96,9 @@ public:
     // Test methods
     Result<void> testDatabaseConnection() const;
     Result<nlohmann::json> getDatabaseInfo() const;
+    
+    // Database access for temporal validation
+    DatabaseConnection* getDatabaseConnection() const;
     
     // Static helper methods
     static std::string getCurrentDate();

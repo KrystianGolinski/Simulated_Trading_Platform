@@ -6,5 +6,5 @@
   "strategy": "ma_crossover",
   "short_ma": 10,
   "long_ma": 30,
-  "description": "Multi-stock portfolio test configuration for comprehensive testing"
+  "description": "Multi-stock portfolio test configuration for testing"
 }

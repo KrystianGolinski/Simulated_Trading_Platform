@@ -5,7 +5,7 @@
 
 set -e  # Exit on error
 
-echo "Trading Platform Comprehensive Test Suite"
+echo "Trading Platform Test Suite"
 echo "Testing all parts: Core functionality, Progress tracking, Performance optimizations"
 echo
 
@@ -30,7 +30,7 @@ run_test() {
 }
 
 check_api_availability() {
-    echo "Checking API availability..."
+    echo "Checking API availability:"
     if ! curl -s "$API_BASE/health" > /dev/null; then
         echo "ERROR: API not available at $API_BASE"
         exit 1
@@ -44,7 +44,7 @@ check_api_availability() {
 echo "Core functionality tests"
 
 test_parameter_validation() {
-    echo "Testing parameter variations produce different results..."
+    echo "Testing parameter variations produce different results:"
     
     # Test different capital amounts
     RESULT1=$(curl -s -X POST "$API_BASE/simulation/start" \
@@ -67,7 +67,7 @@ test_parameter_validation() {
 }
 
 test_validation_system() {
-    echo "Testing input validation system..."
+    echo "Testing input validation system:"
     
     # Test invalid symbol
     RESPONSE=$(curl -s -X POST "$API_BASE/simulation/validate" \
@@ -84,7 +84,7 @@ test_validation_system() {
 }
 
 test_basic_simulation() {
-    echo "Testing basic simulation execution..."
+    echo "Testing basic simulation execution:"
     
     SIMULATION_ID=$(curl -s -X POST "$API_BASE/simulation/start" \
         -H "Content-Type: application/json" \
@@ -115,7 +115,7 @@ run_test "Basic Simulation Execution" test_basic_simulation
 echo "Progress tracking tests"
 
 test_progress_tracking() {
-    echo "Testing simulation progress tracking..."
+    echo "Testing simulation progress tracking:"
     
     SIMULATION_ID=$(curl -s -X POST "$API_BASE/simulation/start" \
         -H "Content-Type: application/json" \
@@ -159,7 +159,7 @@ run_test "Progress Tracking" test_progress_tracking
 echo "Validation and error handling tests"
 
 test_comprehensive_validation() {
-    echo "Testing comprehensive validation system..."
+    echo "Testing validation system:"
     
     # Test invalid inputs
     TESTS_PASSED=0
@@ -200,7 +200,7 @@ run_test "Comprehensive Validation" test_comprehensive_validation
 echo "Performance optimisation tests"
 
 test_performance_endpoints() {
-    echo "Testing performance monitoring endpoints..."
+    echo "Testing performance monitoring endpoints:"
     
     # Test performance stats
     STATS=$(curl -s "$API_BASE/performance/stats")
@@ -220,7 +220,7 @@ test_performance_endpoints() {
 }
 
 test_data_caching() {
-    echo "Testing data caching performance..."
+    echo "Testing data caching performance:"
     
     # First request (cache miss)
     START_TIME=$(date +%s%N)
@@ -248,7 +248,7 @@ test_data_caching() {
 }
 
 test_enhanced_health_check() {
-    echo "Testing enhanced health check..."
+    echo "Testing enhanced health check:"
     
     HEALTH=$(curl -s "$API_BASE/health")
     if echo "$HEALTH" | grep -q "database\|validation_system"; then
@@ -270,7 +270,7 @@ run_test "Enhanced Health Check" test_enhanced_health_check
 echo "Integration tests"
 
 test_end_to_end_simulation() {
-    echo "Testing complete end-to-end simulation flow..."
+    echo "Testing complete end-to-end simulation flow:"
     
     # Validate -> Start -> Monitor -> Results
     VALIDATION=$(curl -s -X POST "$API_BASE/simulation/validate" \
@@ -333,7 +333,7 @@ run_test "End-to-End Simulation Flow" test_end_to_end_simulation
 echo "Database failure and recovery tests"
 
 test_database_failure_scenarios() {
-    echo "Testing database failure scenarios and recovery..."
+    echo "Testing database failure scenarios and recovery:"
     
     # Test health endpoint for database status
     HEALTH_RESPONSE=$(curl -s "$API_BASE/health")
@@ -374,7 +374,7 @@ test_database_failure_scenarios() {
 }
 
 test_data_consistency_checks() {
-    echo "Testing data consistency and integrity checks..."
+    echo "Testing data consistency and integrity checks:"
     
     # Test stock data endpoint with various parameters
     CONSISTENCY_CHECKS=0
@@ -415,7 +415,7 @@ except:
 }
 
 test_comprehensive_error_scenarios() {
-    echo "Testing comprehensive error scenarios..."
+    echo "Testing error scenarios:"
     
     ERROR_SCENARIOS_PASSED=0
     
@@ -460,7 +460,7 @@ test_comprehensive_error_scenarios() {
     fi
     
     if [ $ERROR_SCENARIOS_PASSED -ge 3 ]; then
-        echo "Comprehensive error scenario testing: PASS"
+        echo "Error scenario testing: PASS"
         return 0
     else
         echo "Some error scenarios not handled properly"
@@ -469,10 +469,10 @@ test_comprehensive_error_scenarios() {
 }
 
 test_api_timeout_handling() {
-    echo "Testing API timeout and resilience..."
+    echo "Testing API timeout and resilience:"
     
     # Test multiple concurrent requests
-    echo "Testing concurrent request handling..."
+    echo "Testing concurrent request handling:"
     
     for i in {1..3}; do
         curl -s "$API_BASE/health" > /dev/null &

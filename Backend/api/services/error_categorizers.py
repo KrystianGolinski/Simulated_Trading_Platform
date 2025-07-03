@@ -147,7 +147,7 @@ class CppErrorExtractor:
             "suggestions": []
         }
         
-        # Combine stderr and stdout for comprehensive error analysis
+        # Combine stderr and stdout for error analysis
         combined_output = f"{stderr}\n{stdout}".strip()
         if not combined_output:
             return details

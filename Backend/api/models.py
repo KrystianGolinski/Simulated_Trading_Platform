@@ -47,7 +47,7 @@ class SimulationConfig(BaseModel):
     
     @model_validator(mode='after')
     def validate_model(self):
-        # Basic validation only - comprehensive validation handled by SimulationValidator in validation.py
+        # Basic validation only - extensive validation handled by validation.py
         
         # Critical validation: end_date after start_date
         if self.end_date <= self.start_date:

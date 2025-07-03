@@ -146,7 +146,7 @@ class DatabaseSeeder:
     
     def seed_test_price_data(self):
         # Seed test price data for all test stocks
-        # Generate data for 2023 (full year for comprehensive testing)
+        # Generate data for 2023 (full year for adequate testing)
         start_date = datetime(2023, 1, 1)
         end_date = datetime(2023, 12, 31)
         
@@ -277,7 +277,7 @@ class DatabaseSeeder:
     
     def seed_all(self):
         # Run complete database seeding process
-        print("Starting database seeding for test environment...")
+        print("Starting database seeding for test environment:")
         
         try:
             self.create_test_tables()

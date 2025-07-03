@@ -5,7 +5,7 @@
 ## Version 1.1 
 
 **Description:** 
-Platform is correctly set up using 'setup.sh' featuring extensive and comprehensive testing ensuring:
+Platform is correctly set up using 'setup.sh' featuring extensive testing ensuring:
 - C++ engine is fully operational across all components
 - API is fully operational and healthy across all endpoints
 - Platform components are correctly interacting between each other
@@ -20,7 +20,7 @@ The platform now is starting to take shape, with clear future expansions planned
 
 **API**
 
-The API is comprehensive, standardised and adequately documented at `Project_Documentation/APIstructure.md`
+The API is efficient, standardised and adequately documented at `Project_Documentation/APIstructure.md`
 
 **Engine**
 
@@ -36,7 +36,7 @@ Daily data for 25 stocks for about 40 years, sufficient for testing. Needs scali
 
 **Testing**
 
-Extensive testing structure throughout, comprehensive debug options, easy error tracing for causation, very solid foundation to begin development. Testing coverage covers all crucial aspects of the platform ensuring integrity is maintained. Error handling is structured and categorised in the API.
+Extensive testing structure throughout, adequate debug options, easy error tracing for causation, very solid foundation to begin development. Testing coverage covers all crucial aspects of the platform ensuring integrity is maintained. Error handling is structured and categorised in the API.
 
 **Multi-platformity**
 

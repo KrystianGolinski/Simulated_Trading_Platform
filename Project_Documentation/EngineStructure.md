@@ -2,7 +2,7 @@
 
 ## Overview
 
-The C++ Trading Engine is a high-performance backtesting system that executes trading strategies against historical market data. Built using modern C++17 with PostgreSQL integration, it follows service-oriented architecture principles with comprehensive error handling and modular design.
+The C++ Trading Engine is a high-performance backtesting system that executes trading strategies against historical market data. Built using modern C++17 with PostgreSQL integration, it follows service-oriented architecture principles with appropriate error handling and modular design.
 
 ## Architecture Components
 
@@ -15,7 +15,7 @@ Simple entry point that configures logging and delegates execution to CommandDis
 - **Output**: Process exit code
 
 #### `trading_engine.h/cpp`
-Central orchestrator managing the entire simulation/backtest process
+Central orchestrator managing the entire simulation/backtest process with dynamic temporal validation
 - **Key Methods**:
   - `runBacktest(BacktestConfig)`: Execute single symbol backtest
   - `runBacktestMultiSymbol(symbols, dates, capital)`: Execute multi-asset backtest
@@ -29,7 +29,15 @@ Central orchestrator managing the entire simulation/backtest process
   - Memory optimisation and caching
   - Result<T> pattern for error handling
   - Progress reporting integration
+  - Real-time IPO/delisting checking during trading loop
 - **Dependencies**: All core services (portfolio, market_data, execution_service, progress_service, strategies)
+
+##### Dynamic Survivorship Bias Mitigation
+- **Validation Approach**: Uses dynamic inclusion rather than static exclusion
+- **Real-time Checking**: Each trading day, validates if stocks are tradeable using `checkStockTradeable()`
+- **Automatic Delisting Handling**: Force-sells positions when stocks become non-tradeable
+- **IPO Integration**: Stocks only start trading after their actual IPO dates
+- **Performance Optimised**: Database functions used for efficient temporal queries
 
 ### Command Processing Layer
 
@@ -126,11 +134,36 @@ Interface to PostgreSQL/TimescaleDB for historical price data
   - Data caching
 
 #### `database_connection.h/cpp`
-Low-level PostgreSQL connectivity
+Low-level PostgreSQL connectivity with temporal validation
 - **Connection Management**: Connection pooling and retry logic
 - **Query Execution**: Prepared statements and result processing
 - **Error Handling**: Database-specific exception handling
 
+##### Core Database Methods
+- `getStockPrices(symbol, start_date, end_date)`: Retrieve historical price data
+- `getAvailableSymbols()`: Get list of all available stock symbols
+- `checkSymbolExists(symbol)`: Validate symbol existence in database
+
+##### Temporal Validation Methods
+- **`checkStockTradeable(symbol, check_date)`**: Check if stock was tradeable on specific date
+  - Uses database function `is_stock_tradeable()` for IPO/delisting validation
+  - Returns boolean indicating trading eligibility
+  - Essential for dynamic temporal validation during backtesting
+
+- **`getEligibleStocksForPeriod(start_date, end_date)`**: Get stocks eligible for entire period
+  - Uses database function `get_eligible_stocks_for_period()`
+  - Returns list of symbols that were tradeable throughout period
+  - Used for batch temporal validation
+
+- **`getStockTemporalInfo(symbol)`**: Get temporal information
+  - Returns IPO date, listing date, delisting date, trading status
+  - Provides context for temporal validation decisions
+  - Used for error reporting
+
+- **`validateSymbolsForPeriod(symbols, start_date, end_date)`**: Batch temporal validation
+  - Validates multiple symbols efficiently
+  - Returns detailed validation results with IPO/delisting context
+  - Optimised for large-scale simulations
 
 #### `data_conversion.h/cpp`
 Converts between database formats and internal structures
@@ -175,7 +208,7 @@ Progress reporting for long-running simulations
 ### Infrastructure and Utilities
 
 #### `result.h/cpp`
-Monadic Result<T> pattern for comprehensive error handling
+Monadic Result<T> pattern for adequate error handling
 - **Usage Pattern**:
   ```cpp
   Result<PortfolioValue> calculate_value() {
@@ -497,6 +530,43 @@ make -j$(nproc)
 sudo make install
 ```
 
+## Dynamic Temporal Validation
+
+### Overview
+The engine implements a dynamic temporal validation system that eliminates survivorship bias by ensuring stocks are only traded when they were actually available in the market. This approach provides backtesting results that accurately reflect historical market conditions.
+
+#### Real-time Temporal Validation
+```cpp
+// During daily trading loop in trading_engine.cpp
+for (const auto& [symbol, data] : multi_symbol_data) {
+    // Check if stock is tradeable on current date
+    auto is_tradeable = db_connection->checkStockTradeable(symbol, current_date);
+    if (!is_tradeable.getValue()) {
+        // Handle non-tradeable stocks appropriately
+        continue;
+    }
+    // Only evaluate strategy for tradeable stocks
+    TradingSignal signal = strategy_->evaluateSignal(historical_windows[symbol], portfolio_, symbol);
+}
+```
+
+#### Automatic Position Management
+- **IPO Handling**: Stocks ignored until their actual IPO date, then strategy evaluation begins
+- **Delisting Handling**: Positions automatically liquidated when stocks become non-tradeable
+- **Real-time Updates**: Database functions provide current trading status for each date
+
+### Database Integration
+
+#### Temporal Validation Functions
+- `is_stock_tradeable(symbol, date)`: Returns boolean for specific date tradeability
+- `get_eligible_stocks_for_period(start_date, end_date)`: Batch eligibility checking
+
+#### Data Requirements
+- **IPO Dates**: When stocks became publicly tradeable
+- **Delisting Dates**: When stocks stopped trading (if applicable)
+- **Trading Status**: Current status (active, delisted, suspended)
+- **Exchange Information**: Listing and delisting context
+
 ## Integration with API
 
 The C++ engine integrates with the Python API through:
@@ -522,3 +592,5 @@ The C++ engine integrates with the Python API through:
 - Logging configured for both development debugging and production monitoring
 - Thread-safe design enables concurrent simulation execution
 - Modular architecture supports easy testing and component replacement
+- Dynamic temporal validation eliminates survivorship bias through real-time IPO/delisting checking
+- Survivorship bias mitigation ensures realistic backtesting results

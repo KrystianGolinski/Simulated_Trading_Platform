@@ -84,6 +84,76 @@ Get historical stock data with pagination
   - `page` (1), `page_size` (1000, max 10000)
 - **Data**: Array of OHLCV data objects
 
+## Stock Temporal Validation Endpoints (Survivorship Bias Mitigation)
+
+### `POST /stocks/validate-temporal`
+Validate if stocks were trading during specified period (accounts for IPO dates, delisting dates)
+- **Body**: 
+```json
+{
+  "symbols": ["AAPL", "GOOGL", "UBER"],
+  "start_date": "2020-01-01",
+  "end_date": "2023-12-31"
+}
+```
+- **Data**: 
+```json
+{
+  "valid_symbols": ["AAPL", "GOOGL"],
+  "rejected_symbols": ["UBER"],
+  "errors": ["Stock UBER was not tradeable on 2020-01-01 (IPO date: 2019-05-10)"],
+  "total_requested": 3,
+  "total_valid": 2,
+  "total_rejected": 1
+}
+```
+
+### `GET /stocks/{symbol}/temporal-info`
+Get temporal information for a stock (IPO, delisting, trading periods)
+- **Parameters**: `symbol` (path)
+- **Data**: 
+```json
+{
+  "symbol": "AAPL",
+  "ipo_date": "1980-12-12",
+  "listing_date": "1980-12-12", 
+  "delisting_date": null,
+  "trading_status": "active",
+  "exchange_status": "listed",
+  "first_trading_date": "1980-12-12",
+  "last_trading_date": null
+}
+```
+
+### `POST /stocks/check-tradeable`
+Check if a stock was tradeable on a specific date
+- **Body**:
+```json
+{
+  "symbol": "UBER",
+  "check_date": "2018-01-01"
+}
+```
+- **Data**:
+```json
+{
+  "symbol": "UBER",
+  "check_date": "2018-01-01",
+  "is_tradeable": false,
+  "temporal_context": {
+    "ipo_date": "2019-05-10",
+    "listing_date": "2019-05-10",
+    "delisting_date": null,
+    "trading_status": "active"
+  }
+}
+```
+
+### `GET /stocks/eligible-for-period`
+Get stocks that were eligible for trading during a specific period
+- **Parameters**: `start_date`, `end_date` (query, YYYY-MM-DD)
+- **Data**: Array of eligible stock symbols that were tradeable during the entire period
+
 ## Simulation Endpoints
 
 ### `POST /simulation/validate`
@@ -219,6 +289,7 @@ Get engine status and path information
 
 ## Error Codes
 
+### General Error Codes
 - `VALIDATION_FAILED`: Input validation errors
 - `SIMULATION_NOT_FOUND`: Simulation ID not found
 - `ENGINE_NOT_FOUND`: C++ engine unavailable
@@ -226,10 +297,19 @@ Get engine status and path information
 - `STRATEGY_INVALID`: Invalid strategy configuration
 - `INTERNAL_ERROR`: General system errors
 
+### Temporal Validation Error Codes
+- `STOCK_NOT_YET_PUBLIC`: Stock was not tradeable on requested date (before IPO)
+- `STOCK_DELISTED`: Stock was not tradeable on requested date (after delisting)
+- `INVALID_DATE_RANGE`: Start date is after end date
+- `INVALID_DATE_FORMAT`: Date format is not YYYY-MM-DD
+- `TEMPORAL_VALIDATION_ERROR`: General temporal validation failure
+
 ## Notes
 
 - All endpoints use standardised response format with proper HTTP status codes
 - Comprehensive validation through Pydantic models and business logic validators
+- Temporal validation ensures stocks are only included when they were actually tradeable
 - Pagination available on data-heavy endpoints with configurable limits
 - Error responses include detailed field-level validation information
 - CORS headers configured for frontend integration
+- Enhanced simulation validation now includes IPO/delisting date checking

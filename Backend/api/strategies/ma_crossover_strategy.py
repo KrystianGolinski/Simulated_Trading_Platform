@@ -12,7 +12,7 @@ class MACrossoverStrategy(StrategyInterface):
     # Moving Average Crossover strategy with dynamic parameter configuration
     
     def get_metadata(self) -> StrategyMetadata:
-        # Return comprehensive metadata for MA Crossover strategy
+        # Return metadata for MA Crossover strategy
         return StrategyMetadata(
             strategy_id="ma_crossover",
             display_name="Moving Average Crossover",

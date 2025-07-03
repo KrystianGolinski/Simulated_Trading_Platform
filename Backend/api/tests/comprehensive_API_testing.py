@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
-# Comprehensive API Testing Suite for Simulated Trading Platform
-# This test suite provides comprehensive coverage of the entire FastAPI application
-# Similar to the C++ engine comprehensive test suite, this tests all API components
+# API Testing Suite for Simulated Trading Platform
+# This test suite provides coverage of the entire API
 
 import pytest
 import json
@@ -137,11 +136,11 @@ except ImportError as e:
     StandardResponse = dict
 
 class ComprehensiveAPITestSuite:
-    # Comprehensive test suite for the entire Trading Platform API
+    # Test suite for the API
     # Tests all components: routers, services, database, validation, error handling
     
     def __init__(self):
-        # Initialize client with proper error handling
+        # Initialize client with error handling
         if DEPENDENCIES_OK and app is not None:
             self.client = TestClient(app)
         else:
@@ -163,9 +162,9 @@ class ComprehensiveAPITestSuite:
         }
     
     def run_all_tests(self):
-        # Run the complete comprehensive test suite
+        # Run the complete test suite
         print("")
-        print("Comprehensive Trading Platform API Test Suite")
+        print("API Test Suite")
         print("")
         
         # Core API Components
@@ -203,7 +202,7 @@ class ComprehensiveAPITestSuite:
         
         print("")
         
-        # Print clean final results like C++ tests
+        # Print final results
         self._print_clean_results()
     
     def _check_client_available(self) -> bool:
@@ -213,7 +212,7 @@ class ComprehensiveAPITestSuite:
         return True
     
     def _run_test_group(self, test_name, test_function):
-        # Run a test group and display result in C++ engine format
+        # Run a test group and display result
         try:
             result = test_function()
             if result:
@@ -377,7 +376,7 @@ class ComprehensiveAPITestSuite:
             return False
     
     def test_router_endpoints(self):
-        # Test all router endpoints comprehensively
+        # Test all router endpoints
         self._test_increment('router_tests')
         
         if not self._check_client_available():
@@ -427,7 +426,7 @@ class ComprehensiveAPITestSuite:
     @patch('validation.SimulationValidator.check_database_connection')
     @patch('services.execution_service.ExecutionService.validate_cpp_engine')
     def test_health_endpoints(self, mock_engine, mock_validator, mock_db_health):
-        # Test comprehensive health monitoring endpoints
+        # Test health monitoring endpoints
         self._test_increment('router_tests')
         
         # Mock successful health responses
@@ -457,7 +456,7 @@ class ComprehensiveAPITestSuite:
         assert response.json()["alive"] is True
         self._test_pass()
         
-        # Test comprehensive health check
+        # Test health check
         response = self.client.get("/health/full")
         assert response.status_code == 200
         health_data = response.json()
@@ -716,7 +715,7 @@ class ComprehensiveAPITestSuite:
         self._test_pass()
     
     def test_validation_system(self):
-        # Test comprehensive validation system
+        # Test validation system
         self._test_increment('validation_tests')
         
         # Test simulation config validation with valid data
@@ -808,7 +807,7 @@ class ComprehensiveAPITestSuite:
         self._test_pass()
     
     def test_error_handling_system(self):
-        # Test comprehensive error handling system
+        # Test error handling system
         self._test_increment('error_handling_tests')
         
         # Test ErrorHandler initialization
@@ -955,7 +954,7 @@ class ComprehensiveAPITestSuite:
             "strategy": "MA_CROSSOVER"
         }
         response = self.client.post("/simulation/validate", json=large_config)
-        # Should handle gracefully, either accept or reject with proper error
+        # Should handle gracefully, either accept or reject with appropriate error
         assert response.status_code in [200, 400, 422, 413]
         self._test_pass()
         
@@ -1026,14 +1025,14 @@ class ComprehensiveAPITestSuite:
             "long_ma": 20
         }
         
-        # Step 1: Validate configuration
+        # Validate configuration
         response = self.client.post("/simulation/validate", json=config_data)
         assert response.status_code == 200
         validation_result = response.json()
         assert validation_result["is_valid"] is True
         self._test_pass()
         
-        # Step 2: Start simulation if validation passes
+        # Start simulation if validation passes
         if validation_result["is_valid"]:
             response = self.client.post("/api/simulation/start", json=config_data)
             assert response.status_code == 200
@@ -1041,21 +1040,21 @@ class ComprehensiveAPITestSuite:
             simulation_id = start_result["simulation_id"]
             self._test_pass()
             
-            # Step 3: Check simulation status
+            # Check simulation status
             response = self.client.get(f"/simulation/status/{simulation_id}")
             assert response.status_code == 200
             status_result = response.json()
             assert "status" in status_result
             self._test_pass()
             
-            # Step 4: List all simulations (should include our simulation)
+            # List all simulations (should include our simulation)
             response = self.client.get("/api/simulation/list")
             assert response.status_code == 200
             simulations_list = response.json()
             assert isinstance(simulations_list, list)
             self._test_pass()
             
-            # Step 5: Cancel simulation
+            # Cancel simulation
             response = self.client.post(f"/api/simulation/cancel/{simulation_id}")
             assert response.status_code == 200
             self._test_pass()
@@ -1087,7 +1086,7 @@ class ComprehensiveAPITestSuite:
     
     # Helper methods for test tracking
     def _test_increment(self, category: str):
-        # Increment test counter for category only (not total)
+        # Increment test counter for category only
         if category in self.test_results['test_categories']:
             self.test_results['test_categories'][category] += 1
     
@@ -1103,7 +1102,7 @@ class ComprehensiveAPITestSuite:
         self.test_results['failed_test_details'].append(error_message)
     
     def _print_clean_results(self):
-        # Print clean results like C++ tests
+        # Print results
         total = self.test_results['total_tests']
         passed = self.test_results['passed_tests']
         failed = self.test_results['failed_tests']
@@ -1116,13 +1115,13 @@ class ComprehensiveAPITestSuite:
         print("")
         
         if failed != 0:
-            print(f"[FAIL] API comprehensive test suite failed - {failed} of {total} tests failed")
+            print(f"[FAIL] API test suite failed - {failed} of {total} tests failed")
             
         return failed == 0
     
     def _print_final_results(self):
-        # Print comprehensive test results
-        print("\nCOMPREHENSIVE API TEST SUITE RESULTS")
+        # Print test results
+        print("\nAPI Test Results:")
         
         total = self.test_results['total_tests']
         passed = self.test_results['passed_tests']
@@ -1149,16 +1148,16 @@ class ComprehensiveAPITestSuite:
                 else:
                     print(f"  {i}. {failure}")
         
-        print("\nFINAL RESULTS:")
+        print("\nFinal Results:")
         if failed == 0:
-            print("SUCCESS: ALL TESTS PASSED! API is functioning correctly.")
+            print("[PASS]: All Tests Passed! API is functioning correctly.")
         else:
-            print(f"WARNING: {failed} tests failed. Review failures above.")
+            print(f"[FAIL]: {failed} tests failed. Review failures above.")
 
 
 # Additional individual test functions for pytest compatibility
 class TestAPIRouters:
-    # Individual router tests for pytest
+    # Individual router tests
     
     def setup_method(self):
         self.client = TestClient(app)
@@ -1184,7 +1183,7 @@ class TestAPIRouters:
         assert "openapi" in response.json()
 
 class TestAPIValidation:
-    # Individual validation tests for pytest
+    # Individual validation tests
     
     def test_simulation_config_model(self):
         config = SimulationConfig(
@@ -1200,7 +1199,7 @@ class TestAPIValidation:
         assert config.starting_capital == 10000.0
 
 class TestAPIServices:
-    # Individual service tests for pytest
+    # Individual service tests
     
     def test_result_processor_initialization(self):
         processor = ResultProcessor()
@@ -1213,7 +1212,7 @@ class TestAPIServices:
         assert hasattr(handler, 'create_generic_error')
 
 class TestAPIErrorHandling:
-    # Individual error handling tests for pytest
+    # Individual error handling tests
     
     def setup_method(self):
         self.client = TestClient(app)
@@ -1233,8 +1232,8 @@ class TestAPIErrorHandling:
 
 # Main execution function
 def main():
-    # Main function to run comprehensive test suite
-    print("Starting Comprehensive API Test Suite...")
+    # Main function to run test suite
+    print("Starting API Test Suite:")
     test_suite = ComprehensiveAPITestSuite()
     test_suite.run_all_tests()
 

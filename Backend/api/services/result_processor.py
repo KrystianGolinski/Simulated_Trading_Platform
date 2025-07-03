@@ -108,7 +108,7 @@ class ResultProcessor:
     
     
     def parse_json_result(self, json_text: str) -> Dict[str, Any]:
-        # Parse and validate JSON result from C++ engine with comprehensive error handling
+        # Parse and validate JSON result from C++ engine with error handling
         try:
             if not json_text.strip():
                 raise json.JSONDecodeError("Empty output", "", 0)
@@ -132,7 +132,7 @@ class ResultProcessor:
             raise json.JSONDecodeError(str(e), json_text, 0)
     
     def validate_result_data(self, result_data: Dict[str, Any]) -> bool:
-        # Comprehensive validation of C++ engine result data structure and content
+        # Validation of C++ engine result data structure and content
         try:
             # Check for basic required fields
             required_fields = ["ending_value", "starting_capital"]

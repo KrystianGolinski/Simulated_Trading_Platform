@@ -1,5 +1,5 @@
 
-// Comprehensive polyfills for MSW v2 compatibility
+// Polyfills for MSW v2 compatibility
 
 // Core web APIs needed by MSW 
 const { TextEncoder, TextDecoder } = require('util');
