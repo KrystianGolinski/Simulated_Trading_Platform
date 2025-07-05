@@ -1,8 +1,8 @@
 import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
-from database import DatabaseManager
 from services.error_handler import ErrorHandler
+from repositories.stock_data_repository import StockDataRepository
 from models import SimulationConfig, StrategyType
 from datetime import date
 
@@ -14,28 +14,25 @@ def event_loop():
     loop.close()
 
 @pytest.fixture
-def mock_db():
-    # Mock database manager for testing
-    db = AsyncMock(spec=DatabaseManager)
+def mock_stock_repo():
+    # Mock stock data repository for testing
+    repo = AsyncMock(spec=StockDataRepository)
     
-    # Mock common database responses
-    db.validate_multiple_symbols.return_value = {"AAPL": True, "GOOGL": True, "MSFT": True}
-    db.validate_date_range_has_data.return_value = {
+    # Mock common repository responses
+    repo.validate_multiple_symbols.return_value = {"AAPL": True, "GOOGL": True, "MSFT": True}
+    repo.validate_date_range_has_data.return_value = {
         "has_data": True,
         "sufficient_data": True,
         "coverage_percentage": 95.0,
         "record_count": 252,
         "expected_days": 265
     }
-    db.health_check.return_value = {
-        "status": "healthy",
-        "data_stats": {
-            "symbols_daily": 50,
-            "daily_records": 10000
-        }
-    }
+    repo.get_available_stocks.return_value = (["AAPL", "GOOGL", "MSFT"], 3)
+    repo.validate_symbol_exists.return_value = True
+    repo.validate_stock_tradeable.return_value = True
+    repo.get_eligible_stocks_for_period.return_value = ["AAPL", "GOOGL", "MSFT"]
     
-    return db
+    return repo
 
 @pytest.fixture
 def error_handler():

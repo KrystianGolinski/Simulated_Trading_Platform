@@ -4,18 +4,16 @@ import os
 import time
 from pathlib import Path
 
-from database import DatabaseManager, get_database
+from dependencies import get_simulation_validator
 from validation import SimulationValidator
-from response_models import StandardResponse, create_success_response, create_error_response, ApiError
-from base_router import BaseRouter
+from models import StandardResponse, ApiError
+from routing import get_router_service_factory
 
-router = APIRouter(tags=["health"])
-
-class HealthRouter(BaseRouter):
-    # Health monitoring router with standardized patterns
-    pass
-
-health_router = HealthRouter()
+# Create router using RouterBase pattern
+router_factory = get_router_service_factory()
+router_base = router_factory.create_router_base("health")
+router = router_base.get_router()
+router.tags = ["health"]
 
 async def check_cpp_engine_health() -> Dict[str, Any]:
     # Check if C++ engine is available and functional
@@ -24,6 +22,7 @@ async def check_cpp_engine_health() -> Dict[str, Any]:
         engine_paths = [
             Path("/shared/trading_engine"),  # Docker shared volume
             Path("/app/cpp-engine/build/trading_engine"),  # Local build
+            Path(__file__).parent.parent.parent / "cpp-engine" / "build" / "trading_engine",  # Development build
         ]
         
         for engine_path in engine_paths:
@@ -92,30 +91,40 @@ def get_system_health() -> Dict[str, Any]:
 @router.get("/")
 async def root() -> StandardResponse[Dict[str, str]]:
     # Root endpoint
-    return health_router.create_success_with_metadata(
+    router_base.router_logger.log_request("/", {})
+    
+    response = router_base.response_formatter.create_success_response(
         {"service": "Trading Platform API", "version": "1.0.0"},
         "Trading Platform API is running"
     )
+    
+    router_base.router_logger.log_success("/")
+    return response
 
 @router.get("/health/ready")
-async def readiness_check(db: DatabaseManager = Depends(get_database)) -> StandardResponse[Dict[str, Any]]:
+async def readiness_check(validator: SimulationValidator = Depends(get_simulation_validator)) -> StandardResponse[Dict[str, Any]]:
     # Kubernetes-style readiness probe - checks if service is ready to accept traffic
     try:
-        # Quick database connection check
-        db_health = await db.health_check()
+        # Quick database connection check through validator
+        validation_health = await validator.check_database_connection()
         
-        if db_health["status"] == "healthy":
-            return create_success_response(
+        if validation_health.is_valid:
+            response = router_base.response_formatter.create_success_response(
                 {"ready": True, "database": "connected"},
                 "Service ready to accept traffic"
             )
+            router_base.router_logger.log_success("/health/ready")
+            return response
         else:
-            return create_error_response(
+            response = router_base.response_formatter.create_error_response(
                 "Service not ready",
                 [ApiError(code="NOT_READY", message="Database connection failed")]
             )
+            router_base.router_logger.log_error("/health/ready", Exception("Database connection failed"), "NOT_READY")
+            return response
     except Exception as e:
-        return create_error_response(
+        router_base.router_logger.log_error("/health/ready", e, "READINESS_ERROR")
+        return router_base.response_formatter.create_error_response(
             "Readiness check failed",
             [ApiError(code="READINESS_ERROR", message=str(e))]
         )
@@ -123,23 +132,32 @@ async def readiness_check(db: DatabaseManager = Depends(get_database)) -> Standa
 @router.get("/health/live")
 async def liveness_check() -> StandardResponse[Dict[str, Any]]:
     # Kubernetes-style liveness probe - checks if service is alive
-    return create_success_response(
+    router_base.router_logger.log_request("/health/live", {})
+    
+    response = router_base.response_formatter.create_success_response(
         {"alive": True, "timestamp": time.time()},
         "Service is alive"
     )
+    
+    router_base.router_logger.log_success("/health/live")
+    return response
 
 @router.get("/health")
-async def health_check(db: DatabaseManager = Depends(get_database)) -> StandardResponse[Dict[str, Any]]:
+async def health_check(validator: SimulationValidator = Depends(get_simulation_validator)) -> StandardResponse[Dict[str, Any]]:
     # Health check with all system components
     try:
         start_time = time.time()
         
-        # Check database connection
-        db_health = await db.health_check()
-        
-        # Check validation system
-        validator = SimulationValidator(db)
+        # Check database connection through validation system
         validation_health = await validator.check_database_connection()
+        
+        # Create mock db_health structure for compatibility
+        db_health = {
+            "status": "healthy" if validation_health.is_valid else "unhealthy",
+            "data_stats": {"symbols_daily": 0, "daily_records": 0},
+            "error": validation_health.errors[0].message if validation_health.errors else None
+        }
+        
         
         # Check C++ engine availability
         cpp_engine_health = await check_cpp_engine_health()
@@ -191,20 +209,25 @@ async def health_check(db: DatabaseManager = Depends(get_database)) -> StandardR
         }
         
         if overall_status == "healthy":
-            return create_success_response(health_data, "All systems healthy")
+            response = router_base.response_formatter.create_success_response(health_data, "All systems healthy")
+            router_base.router_logger.log_success("/health")
+            return response
         else:
-            return create_error_response(
+            response = router_base.response_formatter.create_error_response(
                 f"System health check failed: {', '.join(health_issues)}",
                 [ApiError(code="HEALTH_CHECK_FAILED", message=f"System status: {overall_status}")]
             )
+            router_base.router_logger.log_error("/health", Exception(f"Health issues: {health_issues}"), "HEALTH_CHECK_FAILED")
+            return response
     except Exception as e:
-        return create_error_response(
+        router_base.router_logger.log_error("/health", e, "HEALTH_CHECK_ERROR")
+        return router_base.response_formatter.create_error_response(
             "Health check failed",
             [ApiError(code="HEALTH_CHECK_ERROR", message=str(e))]
         )
 
 @router.get("/health/dashboard")
-async def health_dashboard(db: DatabaseManager = Depends(get_database)) -> StandardResponse[Dict[str, Any]]:
+async def health_dashboard(validator: SimulationValidator = Depends(get_simulation_validator)) -> StandardResponse[Dict[str, Any]]:
     # Health dashboard with metrics and status
     try:
         dashboard_data = {
@@ -228,16 +251,19 @@ async def health_dashboard(db: DatabaseManager = Depends(get_database)) -> Stand
         }
         
         # Get health data
-        health_result = await health_check(db)
+        health_result = await health_check(validator)
         if health_result.data:
             dashboard_data["current_health"] = health_result.data
         
-        return create_success_response(
+        response = router_base.response_formatter.create_success_response(
             dashboard_data,
             "Health dashboard data retrieved successfully"
         )
+        router_base.router_logger.log_success("/health/dashboard")
+        return response
     except Exception as e:
-        return create_error_response(
+        router_base.router_logger.log_error("/health/dashboard", e, "DASHBOARD_ERROR")
+        return router_base.response_formatter.create_error_response(
             "Failed to generate health dashboard",
             [ApiError(code="DASHBOARD_ERROR", message=str(e))]
         )

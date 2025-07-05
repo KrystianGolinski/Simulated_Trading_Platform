@@ -699,8 +699,13 @@ verify_setup() {
     fi
     
     if [ -n "$COMPOSE_CMD" ] && [ -f "Docker/docker-compose.dev.yml" ]; then
-        if ! $COMPOSE_CMD -f Docker/docker-compose.dev.yml ps | grep -q "Up"; then
-            setup_issues+=("Docker services not running")
+        # Check if services are running
+        running_services=$($COMPOSE_CMD -f Docker/docker-compose.dev.yml ps --services --filter "status=running" 2>/dev/null | wc -l)
+        if [ "$running_services" -eq 0 ]; then
+            # Fallback check with original method
+            if ! $COMPOSE_CMD -f Docker/docker-compose.dev.yml ps 2>/dev/null | grep -q -E "(Up|running)"; then
+                setup_issues+=("Docker services not running")
+            fi
         fi
     fi
     

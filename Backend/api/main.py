@@ -6,8 +6,21 @@ from fastapi.responses import JSONResponse
 
 from database import get_database
 from routers import health, stocks, simulation, performance, engine, strategies
-from base_router import ValidationError, OperationError
-from response_models import create_error_response, ApiError
+from models import ApiError
+from routing import get_router_service_factory
+
+# Custom exception classes for API error handling
+class ValidationError(Exception):
+    def __init__(self, message: str, errors: list = None):
+        self.message = message
+        self.errors = errors or []
+        super().__init__(self.message)
+
+class OperationError(Exception):
+    def __init__(self, message: str, code: str = "OPERATION_ERROR"):
+        self.message = message
+        self.code = code
+        super().__init__(self.message)
 
 # Configure structured logging with correlation ID support
 class CorrelationFormatter(logging.Formatter):
@@ -35,11 +48,15 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Get global response formatter for exception handling
+_global_factory = get_router_service_factory()
+_global_response_formatter = _global_factory.get_response_formatter()
+
 # Global exception handlers
 @app.exception_handler(ValidationError)
 async def validation_exception_handler(request: Request, exc: ValidationError):
     logger.warning(f"Validation error: {exc.message}")
-    response = create_error_response(
+    response = _global_response_formatter.create_error_response(
         "Validation failed",
         exc.errors or [ApiError(code="VALIDATION_FAILED", message=exc.message)]
     )
@@ -48,7 +65,7 @@ async def validation_exception_handler(request: Request, exc: ValidationError):
 @app.exception_handler(OperationError)
 async def operation_exception_handler(request: Request, exc: OperationError):
     logger.error(f"Operation error: {exc.message}")
-    response = create_error_response(
+    response = _global_response_formatter.create_error_response(
         "Operation failed",
         [ApiError(code=exc.code, message=exc.message)]
     )
@@ -57,7 +74,7 @@ async def operation_exception_handler(request: Request, exc: OperationError):
 @app.exception_handler(ValueError)
 async def value_error_handler(request: Request, exc: ValueError):
     logger.warning(f"Value error: {str(exc)}")
-    response = create_error_response(
+    response = _global_response_formatter.create_error_response(
         "Invalid input provided",
         [ApiError(code="INVALID_INPUT", message=str(exc))]
     )
@@ -66,7 +83,7 @@ async def value_error_handler(request: Request, exc: ValueError):
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception: {str(exc)}")
-    response = create_error_response(
+    response = _global_response_formatter.create_error_response(
         "Internal server error",
         [ApiError(code="INTERNAL_ERROR", message="An unexpected error occurred")]
     )

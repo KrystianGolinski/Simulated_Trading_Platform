@@ -2,7 +2,11 @@
 engine cpp line ~730, add trade logging
 
 engine 772, 861 TODO
-perf optimizeer 62 , 91
+perf optimizer 62 , 91
 portfolio allocator 571 228
+result calc 110
+exec service 13
 
 sudo docker compose -f Docker/docker-compose.dev.yml down
+
+(cd Docker/ && sudo docker exec trading-engine cp /app/build/trading_engine /shared/trading_engine)

@@ -1028,7 +1028,7 @@ void test_multi_symbol_simulation_bugs() {
     TradingConfig multi_config;
     multi_config.symbols = {"AAPL", "GOOGL", "MSFT", "AMZN", "TSLA"};
     multi_config.start_date = "2023-01-01";
-    multi_config.end_date = "2023-01-31";
+    multi_config.end_date = "2023-06-30";
     multi_config.starting_capital = 10000.0;
     multi_config.strategy_name = "ma_crossover";
     multi_config.setParameter("short_ma", 10);
@@ -1038,7 +1038,7 @@ void test_multi_symbol_simulation_bugs() {
     TradingConfig single_config;
     single_config.symbols = {"AAPL"};
     single_config.start_date = "2023-01-01";
-    single_config.end_date = "2023-01-31";
+    single_config.end_date = "2023-06-30";
     single_config.starting_capital = 10000.0;
     single_config.strategy_name = "ma_crossover";
     single_config.setParameter("short_ma", 10);
@@ -1123,14 +1123,14 @@ void test_single_vs_multi_symbol_comparison() {
     TradingConfig many_config;
     many_config.symbols = many_symbols;
     many_config.start_date = "2023-01-01";
-    many_config.end_date = "2023-02-28";
+    many_config.end_date = "2023-06-30";
     many_config.starting_capital = 25000.0;
     many_config.strategy_name = "ma_crossover";
     
     TradingConfig single_config;
     single_config.symbols = {"AAPL"};
     single_config.start_date = "2023-01-01";
-    single_config.end_date = "2023-02-28";
+    single_config.end_date = "2023-06-30";
     single_config.starting_capital = 25000.0;
     single_config.strategy_name = "ma_crossover";
     
@@ -1138,14 +1138,14 @@ void test_single_vs_multi_symbol_comparison() {
     TradingConfig amzn_only;
     amzn_only.symbols = {"AMZN"};
     amzn_only.start_date = "2023-01-01";
-    amzn_only.end_date = "2023-02-28";
+    amzn_only.end_date = "2023-06-30";
     amzn_only.starting_capital = 10000.0;
     amzn_only.strategy_name = "ma_crossover";
     
     TradingConfig amzn_adbe;
     amzn_adbe.symbols = {"AMZN", "ADBE"};
     amzn_adbe.start_date = "2023-01-01";
-    amzn_adbe.end_date = "2023-02-28";
+    amzn_adbe.end_date = "2023-06-30";
     amzn_adbe.starting_capital = 10000.0;
     amzn_adbe.strategy_name = "ma_crossover";
     

@@ -4,7 +4,8 @@
 import logging
 from typing import List, Dict, Any, Optional
 from datetime import date
-from database import DatabaseManager
+from repositories.stock_data_repository import StockDataRepository
+from services.temporal_validation_service import TemporalValidationService
 from models import SimulationConfig, ValidationError, ValidationResult
 from services.error_handler import ErrorHandler, ErrorCode, ErrorSeverity
 
@@ -13,8 +14,9 @@ logger = logging.getLogger(__name__)
 class SimulationValidator:
     # Validator for simulation configurations
     
-    def __init__(self, db: DatabaseManager):
-        self.db = db
+    def __init__(self, stock_repo: StockDataRepository):
+        self.stock_repo = stock_repo  # Repository for all stock-related operations
+        self.temporal_service = TemporalValidationService(stock_repo)  # Temporal validation business logic
         self.error_handler = ErrorHandler()
     
     async def validate_simulation_config(self, config: SimulationConfig) -> ValidationResult:
@@ -60,7 +62,7 @@ class SimulationValidator:
             
             # Dynamic temporal validation info (Engine handles temporal trading restrictions)
             if not errors:  # Only if previous validations passed
-                temporal_info = await self._get_temporal_info_for_logging(config.symbols, config.start_date, config.end_date)
+                temporal_info = await self.temporal_service.get_temporal_info_for_logging(config.symbols, config.start_date, config.end_date)
                 warnings.extend(temporal_info['warnings'])
             
             # Check for potential issues (warnings) - only if no critical errors
@@ -117,7 +119,7 @@ class SimulationValidator:
         
         # Check if symbols exist in database
         try:
-            symbol_validation = await self.db.validate_multiple_symbols(symbols)
+            symbol_validation = await self.stock_repo.validate_multiple_symbols(symbols)
             
             for symbol in symbols:
                 symbol_upper = symbol.upper()
@@ -157,7 +159,7 @@ class SimulationValidator:
         for symbol in config.symbols:
             try:
                 # Check data availability for this symbol in the date range
-                data_check = await self.db.validate_date_range_has_data(
+                data_check = await self.stock_repo.validate_date_range_has_data(
                     symbol, config.start_date, config.end_date
                 )
                 
@@ -205,77 +207,6 @@ class SimulationValidator:
                 ))
         
         return {"errors": errors, "warnings": warnings}
-    
-    async def _get_temporal_info_for_logging(self, symbols: List[str], start_date: date, end_date: date) -> Dict[str, List]:
-        # Get temporal information for logging and user awareness
-        warnings = []
-        
-        try:
-            # Get basic temporal statistics for user information
-            stocks_with_delayed_ipo = []
-            stocks_with_early_delisting = []
-            
-            for symbol in symbols[:10]:  # Limit to first 10 for performance
-                try:
-                    temporal_info = await self.db.get_stock_temporal_info(symbol)
-                    if temporal_info:
-                        ipo_date_str = temporal_info.get('ipo_date')
-                        delisting_date_str = temporal_info.get('delisting_date')
-                        
-                        if ipo_date_str:
-                            from datetime import datetime
-                            ipo_date_obj = datetime.fromisoformat(ipo_date_str).date()
-                            
-                            # Check if IPO is after simulation start
-                            if ipo_date_obj > start_date:
-                                stocks_with_delayed_ipo.append({
-                                    'symbol': symbol,
-                                    'ipo_date': ipo_date_str
-                                })
-                        
-                        if delisting_date_str:
-                            from datetime import datetime
-                            delisting_date_obj = datetime.fromisoformat(delisting_date_str).date()
-                            
-                            # Check if delisting is before simulation end
-                            if delisting_date_obj < end_date:
-                                stocks_with_early_delisting.append({
-                                    'symbol': symbol,
-                                    'delisting_date': delisting_date_str
-                                })
-                                
-                except (ValueError, TypeError, Exception):
-                    # Ignore individual symbol issues
-                    continue
-            
-            # Create informational warnings about dynamic trading
-            if stocks_with_delayed_ipo:
-                ipo_symbols = [s['symbol'] for s in stocks_with_delayed_ipo[:3]]
-                warnings.append(
-                    f"Dynamic trading: {len(stocks_with_delayed_ipo)} stocks will start trading after simulation begins "
-                    f"(e.g., {', '.join(ipo_symbols)}). These will be traded only when available."
-                )
-            
-            if stocks_with_early_delisting:
-                delisted_symbols = [s['symbol'] for s in stocks_with_early_delisting[:3]]
-                warnings.append(
-                    f"Dynamic trading: {len(stocks_with_early_delisting)} stocks may be delisted during simulation "
-                    f"(e.g., {', '.join(delisted_symbols)}). Positions will be automatically closed upon delisting."
-                )
-            
-            if not stocks_with_delayed_ipo and not stocks_with_early_delisting:
-                warnings.append(
-                    "Dynamic trading: All sampled stocks appear to be tradeable throughout the simulation period."
-                )
-                
-        except Exception as e:
-            # Log error but don't fail validation
-            logger.warning(f"Could not retrieve temporal information: {e}")
-            warnings.append(
-                "Dynamic trading enabled: Stocks will be traded only when actually available (IPO to delisting)."
-            )
-        
-        return {"warnings": warnings}
     
     def _validate_capital(self, capital: float) -> List[ValidationError]:
         # Validate starting capital amount
@@ -397,95 +328,6 @@ class SimulationValidator:
             )
         
         return warnings
-    
-    async def _validate_temporal_eligibility(self, symbol: str, start_date: date, end_date: date) -> Dict[str, List]:
-        # Validate symbol temporal eligibility
-        errors = []
-        warnings = []
-        
-        try:
-            # Check if stock was tradeable at start date (IPO validation)
-            start_tradeable = await self.db.validate_stock_tradeable(symbol, start_date)
-            if not start_tradeable:
-                # Get temporal info for detailed error
-                temporal_info = await self.db.get_stock_temporal_info(symbol)
-                error_msg = f"Stock {symbol} was not tradeable on {start_date}"
-                
-                if temporal_info:
-                    ipo_date = temporal_info.get('ipo_date')
-                    listing_date = temporal_info.get('listing_date')
-                    if ipo_date:
-                        error_msg += f" - IPO date: {ipo_date}"
-                    elif listing_date:
-                        error_msg += f" - Listing date: {listing_date}"
-                
-                errors.append(ValidationError(
-                    field="temporal_validation",
-                    message=error_msg,
-                    error_code="STOCK_NOT_YET_PUBLIC"
-                ))
-                return {"errors": errors, "warnings": warnings}
-            
-            # Check if stock was still tradeable at end date (delisting validation)
-            end_tradeable = await self.db.validate_stock_tradeable(symbol, end_date)
-            if not end_tradeable:
-                # Get temporal info for detailed error
-                temporal_info = await self.db.get_stock_temporal_info(symbol)
-                error_msg = f"Stock {symbol} was not tradeable on {end_date}"
-                
-                if temporal_info:
-                    delisting_date = temporal_info.get('delisting_date')
-                    if delisting_date:
-                        error_msg += f" - Delisted on: {delisting_date}"
-                
-                errors.append(ValidationError(
-                    field="temporal_validation",
-                    message=error_msg,
-                    error_code="STOCK_DELISTED"
-                ))
-                return {"errors": errors, "warnings": warnings}
-            
-            # Check for potential temporal issues that could affect results
-            temporal_info = await self.db.get_stock_temporal_info(symbol)
-            if temporal_info:
-                ipo_date_str = temporal_info.get('ipo_date')
-                if ipo_date_str:
-                    try:
-                        from datetime import datetime
-                        ipo_date_obj = datetime.fromisoformat(ipo_date_str).date()
-                        
-                        # Warn if simulation starts very close to IPO
-                        days_since_ipo = (start_date - ipo_date_obj).days
-                        if 0 <= days_since_ipo <= 90:
-                            warnings.append(
-                                f"Simulation for {symbol} starts only {days_since_ipo} days after IPO "
-                                f"({ipo_date_str}). Early trading data may be volatile."
-                            )
-                    except (ValueError, TypeError):
-                        # Ignore date parsing errors
-                        pass
-        
-        except Exception as e:
-            # Handle temporal validation errors gracefully
-            error = self.error_handler.create_generic_error(
-                message=f"Temporal validation failed for {symbol}: {str(e)}",
-                context={
-                    "symbol": symbol,
-                    "start_date": str(start_date),
-                    "end_date": str(end_date),
-                    "exception_type": type(e).__name__,
-                    "validation_step": "temporal_eligibility_check"
-                },
-                severity=ErrorSeverity.MEDIUM
-            )
-            
-            logger.error(f"Temporal validation error: {error.message} | Context: {error.context}")
-            warnings.append(
-                f"Could not verify temporal eligibility for {symbol}. "
-                f"Proceeding with caution - results may include survivorship bias."
-            )
-        
-        return {"errors": errors, "warnings": warnings}
     
     def run_comprehensive_validation_tests(self) -> Dict[str, Any]:
         # Test suite for the validation system
@@ -813,30 +655,20 @@ class SimulationValidator:
         return results
     
     async def check_database_connection(self) -> ValidationResult:
-        # Check if database is accessible and contains required data
+        # Check if database is accessible through repository
         errors = []
         warnings = []
         
         try:
-            health = await self.db.health_check()
+            # Test database connectivity by attempting a simple query
+            available_stocks = await self.stock_repo.get_available_stocks(page=1, page_size=1)
+            stocks_list, total_count = available_stocks
             
-            if health.get('status') != 'healthy':
-                errors.append(ValidationError(
-                    field="database",
-                    message=f"Database is not healthy: {health.get('error', 'Unknown error')}",
-                    error_code="DATABASE_UNHEALTHY"
-                ))
-            else:
-                # Check if we have sufficient data
-                stats = health.get('data_stats', {})
-                symbols_count = stats.get('symbols_daily', 0)
-                records_count = stats.get('daily_records', 0)
-                
-                if symbols_count < 10:
-                    warnings.append(f"Limited symbol data available ({symbols_count} symbols)")
-                
-                if records_count < 1000:
-                    warnings.append(f"Limited historical data available ({records_count} records)")
+            if total_count < 10:
+                warnings.append(f"Limited symbol data available ({total_count} symbols)")
+            
+            if total_count < 1000:
+                warnings.append(f"Limited historical data available")
                     
         except Exception as e:
             # Structured error handling for database connection issues
@@ -844,7 +676,7 @@ class SimulationValidator:
                 message=f"Database connection check failed: {str(e)}",
                 context={
                     "exception_type": type(e).__name__,
-                    "database_operation": "connection_health_check",
+                    "database_operation": "repository_connectivity_check",
                     "error_details": str(e)
                 },
                 severity=ErrorSeverity.CRITICAL

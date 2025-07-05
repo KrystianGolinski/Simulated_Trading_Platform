@@ -1,0 +1,118 @@
+from typing import Any, List, Optional, Dict
+import logging
+
+from models import StandardResponse, PaginatedResponse, create_success_response, create_error_response, create_warning_response, create_paginated_response, ApiError
+from models import ValidationResult
+
+logger = logging.getLogger(__name__)
+
+class ResponseFormatter:
+    # Standardized response formatting service
+    # Single responsibility: Response formatting and standardization
+    
+    def __init__(self):
+        self.logger = logging.getLogger("api.response_formatter")
+    
+    def format_validation_response(self, validation_result: ValidationResult, 
+                                 success_message: str = "Validation successful",
+                                 endpoint_name: str = "unknown") -> StandardResponse:
+        # Process validation result and format appropriate response
+        if not validation_result.is_valid:
+            return self.create_validation_error_response(validation_result, endpoint_name)
+        
+        if validation_result.warnings:
+            return self.create_validation_warning_response(validation_result, success_message)
+        
+        return create_success_response(validation_result, success_message)
+    
+    def create_validation_error_response(self, validation_result: ValidationResult, 
+                                       endpoint_name: str = "unknown") -> StandardResponse:
+        # Create standardized 'validation error' response
+        self.logger.warning(f"Validation failed in {endpoint_name}", extra={
+            "endpoint": endpoint_name,
+            "validation_errors": len(validation_result.errors)
+        })
+        
+        return create_error_response(
+            "Validation failed",
+            [ApiError(code="VALIDATION_FAILED", message=error.message, field=error.field) 
+             for error in validation_result.errors]
+        )
+    
+    def create_validation_warning_response(self, validation_result: ValidationResult, 
+                                         success_message: str) -> StandardResponse:
+        # Create standardized 'validation warning' response
+        return create_warning_response(
+            validation_result,
+            success_message + " (with warnings)",
+            validation_result.warnings
+        )
+    
+    def create_not_found_response(self, resource_name: str, identifier: str, 
+                                field_name: str = "id") -> StandardResponse[None]:
+        # Standardized 'not found' response creation
+        return create_error_response(
+            f"{resource_name} not found",
+            [ApiError(
+                code=f"{resource_name.upper().replace(' ', '_')}_NOT_FOUND",
+                message=f"{resource_name} not found",
+                field=field_name
+            )]
+        )
+    
+    def create_success_with_metadata(self, data: Any, message: str, 
+                                   **metadata_kwargs) -> StandardResponse:
+        # Standardized 'success' response with metadata
+        metadata = {}
+        if hasattr(data, '__len__') and not isinstance(data, (str, dict)):
+            metadata["count"] = len(data)
+        metadata.update(metadata_kwargs)
+        return create_success_response(data, message, metadata=metadata)
+    
+    def create_database_error_response(self, error_message: str, error_code: str, 
+                                     exception: Exception) -> StandardResponse:
+        # Standardized 'database error' response
+        self.logger.error(f"Database operation failed: {error_message} - {exception}")
+        return create_error_response(
+            error_message,
+            [ApiError(code=error_code, message=str(exception))]
+        )
+    
+    def create_no_data_response(self, message: str = "No data found") -> StandardResponse:
+        # Standardized 'no data' response
+        return create_error_response(
+            message,
+            [ApiError(code="NO_DATA_FOUND", message="No data found for the given parameters")]
+        )
+    
+    def format_paginated_response(self, data: List[Any], total_count: int, page: int, 
+                                page_size: int, message: str, metadata: Optional[Dict] = None) -> PaginatedResponse:
+        # Format paginated response with PaginatedResponse structure
+        return create_paginated_response(
+            data=data,
+            page=page,
+            page_size=page_size,
+            total_count=total_count,
+            message=message,
+            metadata=metadata
+        )
+    
+    def format_operation_result(self, result: Any, success_message: str, 
+                              error_message: str, error_code: str) -> StandardResponse:
+        # Format result of database operation
+        if result is None:
+            return self.create_no_data_response()
+        
+        try:
+            return create_success_response(result, success_message)
+        except Exception as e:
+            return self.create_database_error_response(error_message, error_code, e)
+    
+    def create_success_response(self, data: Any, message: str = "Success", 
+                              metadata: Optional[Dict] = None) -> StandardResponse:
+        # Create standardized 'success' response
+        return create_success_response(data, message, metadata=metadata)
+    
+    def create_error_response(self, message: str, errors: List[ApiError] = None) -> StandardResponse:
+        # Create standardized 'error' response
+        return create_error_response(message, errors)

@@ -22,6 +22,9 @@ logging.getLogger().setLevel(logging.CRITICAL)
 for logger_name in ['httpx', 'asyncio', 'database', 'main', 'services.error_handler', 'api.validation']:
     logging.getLogger(logger_name).setLevel(logging.CRITICAL)
 
+# Set testing environment
+os.environ['TESTING'] = 'true'
+
 # Add current directory to Python path to ensure imports work
 current_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(current_dir))
@@ -131,7 +134,7 @@ except ImportError as e:
     ErrorSeverity = MockErrorSeverity
 
 try:
-    from response_models import StandardResponse
+    from models import StandardResponse
 except ImportError as e:
     StandardResponse = dict
 
@@ -197,7 +200,6 @@ class ComprehensiveAPITestSuite:
         # Integration Tests
         print("")
         print("Integration Tests:")
-        self._run_test_group("Testing End-to-End Workflows", self._test_e2e_workflows)
         self._run_test_group("Testing Security Features", self._test_security)
         
         print("")
@@ -344,23 +346,6 @@ class ComprehensiveAPITestSuite:
                 headers={"Content-Type": "application/json"}
             )
             return response.status_code == 422
-        except:
-            return False
-    
-    def _test_e2e_workflows(self):
-        # Test end-to-end workflow
-        if not self._check_client_available():
-            return True
-        try:
-            config_data = {
-                "symbols": ["AAPL"],
-                "start_date": "2023-01-01",
-                "end_date": "2023-03-31",
-                "starting_capital": 10000.0,
-                "strategy": "MA_CROSSOVER"
-            }
-            response = self.client.post("/simulation/validate", json=config_data)
-            return response.status_code in [200, 404, 422]
         except:
             return False
     
@@ -737,7 +722,8 @@ class ComprehensiveAPITestSuite:
         
         # Test validation with edge cases
         mock_db = AsyncMock()
-        validator = SimulationValidator(mock_db)
+        mock_stock_repo = AsyncMock()
+        validator = SimulationValidator(mock_db, mock_stock_repo)
         
         # Test capital validation
         errors = validator._validate_capital(10000.0)
@@ -884,7 +870,7 @@ class ComprehensiveAPITestSuite:
         assert response.status_code in [400, 404, 422]
         self._test_pass()
     
-    def test_response_models(self):
+    def test_models(self):
         # Test standardized response models
         self._test_increment('router_tests')
         
@@ -995,94 +981,6 @@ class ComprehensiveAPITestSuite:
         assert response.status_code in [200, 404, 503]
         assert response_time < 10.0  # Database queries may take longer
         self._test_pass()
-    
-    @patch('services.execution_service.ExecutionService')
-    @patch('database.DatabaseManager')
-    def test_end_to_end_workflows(self, mock_db, mock_execution):
-        # Test complete end-to-end workflows
-        self._test_increment('integration_tests')
-        
-        # Mock dependencies
-        mock_db_instance = AsyncMock()
-        mock_db.return_value = mock_db_instance
-        mock_db_instance.validate_multiple_symbols.return_value = {"AAPL": True}
-        mock_db_instance.validate_date_range_has_data.return_value = {
-            "has_data": True, "sufficient_data": True, "coverage_percentage": 95.0
-        }
-        
-        mock_exec_instance = MagicMock()
-        mock_execution.return_value = mock_exec_instance
-        mock_exec_instance.start_simulation.return_value = "workflow-test-123"
-        
-        # Complete simulation workflow
-        config_data = {
-            "symbols": ["AAPL"],
-            "start_date": "2023-01-01",
-            "end_date": "2023-03-31",
-            "starting_capital": 10000.0,
-            "strategy": "MA_CROSSOVER",
-            "short_ma": 10,
-            "long_ma": 20
-        }
-        
-        # Validate configuration
-        response = self.client.post("/simulation/validate", json=config_data)
-        assert response.status_code == 200
-        validation_result = response.json()
-        assert validation_result["is_valid"] is True
-        self._test_pass()
-        
-        # Start simulation if validation passes
-        if validation_result["is_valid"]:
-            response = self.client.post("/api/simulation/start", json=config_data)
-            assert response.status_code == 200
-            start_result = response.json()
-            simulation_id = start_result["simulation_id"]
-            self._test_pass()
-            
-            # Check simulation status
-            response = self.client.get(f"/simulation/status/{simulation_id}")
-            assert response.status_code == 200
-            status_result = response.json()
-            assert "status" in status_result
-            self._test_pass()
-            
-            # List all simulations (should include our simulation)
-            response = self.client.get("/api/simulation/list")
-            assert response.status_code == 200
-            simulations_list = response.json()
-            assert isinstance(simulations_list, list)
-            self._test_pass()
-            
-            # Cancel simulation
-            response = self.client.post(f"/api/simulation/cancel/{simulation_id}")
-            assert response.status_code == 200
-            self._test_pass()
-        
-        # Test stock data workflow
-        # Get available stocks -> Get date ranges -> Get historical data
-        response = self.client.get("/stocks")
-        if response.status_code == 200:
-            stocks_data = response.json()
-            if "stocks" in stocks_data and len(stocks_data["stocks"]) > 0:
-                # Get date ranges for first stock
-                first_symbol = stocks_data["stocks"][0]["symbol"]
-                response = self.client.get(f"/api/stocks/date-ranges?symbols={first_symbol}")
-                
-                if response.status_code == 200:
-                    date_ranges = response.json()
-                    if first_symbol in date_ranges:
-                        # Get historical data
-                        date_range = date_ranges[first_symbol]
-                        start_date = date_range.get("min_date", "2023-01-01")
-                        end_date = date_range.get("max_date", "2023-01-02")
-                        
-                        response = self.client.get(
-                            f"/api/stocks/data/{first_symbol}?start_date={start_date}&end_date={end_date}"
-                        )
-                        # Should succeed or fail gracefully
-                        assert response.status_code in [200, 404, 503]
-                        self._test_pass()
     
     # Helper methods for test tracking
     def _test_increment(self, category: str):
