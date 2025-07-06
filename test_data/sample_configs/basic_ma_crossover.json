@@ -1,10 +1,10 @@
 {
   "symbols": ["AAPL"],
-  "start_date": "2023-01-01",
-  "end_date": "2023-01-31",
+  "start_date": "2022-01-01",
+  "end_date": "2023-12-31",
   "starting_capital": 10000,
   "strategy": "ma_crossover",
-  "short_ma": 20,
-  "long_ma": 50,
+  "short_ma": 5,
+  "long_ma": 15,
   "description": "Basic MA crossover test configuration for single stock"
 }

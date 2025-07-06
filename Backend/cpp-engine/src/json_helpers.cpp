@@ -20,6 +20,11 @@ nlohmann::json backTestResultToJson(const BacktestResult& result) {
     json_result["signals_generated"] = result.signals_generated.size();
     json_result["start_date"] = result.start_date;
     json_result["end_date"] = result.end_date;
+    json_result["profit_factor"] = result.profit_factor;
+    json_result["average_win"] = result.average_win;
+    json_result["average_loss"] = result.average_loss;
+    json_result["volatility"] = result.volatility;
+    json_result["annualized_return"] = result.annualized_return;
     
     json_result["performance_metrics"] = createPerformanceMetricsJson(result);
     json_result["signals"] = tradingSignalsToJsonArray(result.signals_generated);
@@ -69,6 +74,12 @@ nlohmann::json createPerformanceMetricsJson(const BacktestResult& result) {
     performance_metrics["total_trades"] = result.total_trades;
     performance_metrics["winning_trades"] = result.winning_trades;
     performance_metrics["losing_trades"] = result.losing_trades;
+    performance_metrics["profit_factor"] = result.profit_factor;
+    performance_metrics["average_win"] = result.average_win;
+    performance_metrics["average_loss"] = result.average_loss;
+    performance_metrics["volatility"] = result.volatility;
+    performance_metrics["annualized_return"] = result.annualized_return;
+    
     return performance_metrics;
 }
 
