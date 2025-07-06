@@ -8,16 +8,18 @@ from repositories.stock_data_repository import StockDataRepository
 from services.temporal_validation_service import TemporalValidationService
 from models import SimulationConfig, ValidationError, ValidationResult
 from services.error_handler import ErrorHandler, ErrorCode, ErrorSeverity
+from services.strategy_service import StrategyServiceInterface
 
 logger = logging.getLogger(__name__)
 
 class SimulationValidator:
     # Validator for simulation configurations
     
-    def __init__(self, stock_repo: StockDataRepository):
+    def __init__(self, stock_repo: StockDataRepository, strategy_service: StrategyServiceInterface):
         self.stock_repo = stock_repo  # Repository for all stock-related operations
         self.temporal_service = TemporalValidationService(stock_repo)  # Temporal validation business logic
         self.error_handler = ErrorHandler()
+        self.strategy_service = strategy_service  # Injected strategy service for validation
     
     async def validate_simulation_config(self, config: SimulationConfig) -> ValidationResult:
         # Validation of simulation configuration
@@ -47,7 +49,7 @@ class SimulationValidator:
                 return ValidationResult(is_valid=False, errors=errors, warnings=[])
             
             # Validate strategy parameters (quick validation)
-            strategy_validation = self._validate_strategy_parameters(config)
+            strategy_validation = await self._validate_strategy_parameters(config)
             errors.extend(strategy_validation)
             
             # Early exit if strategy parameters are invalid
@@ -238,54 +240,35 @@ class SimulationValidator:
         
         return errors
     
-    def _validate_strategy_parameters(self, config: SimulationConfig) -> List[ValidationError]:
-        # Validate strategy-specific parameters using dynamic strategy registry
+    async def _validate_strategy_parameters(self, config: SimulationConfig) -> List[ValidationError]:
+        # Validate strategy-specific parameters using injected strategy service
         errors = []
         
         try:
-            # Import here to avoid circular imports
-            from strategy_registry import get_strategy_registry
-            
-            registry = get_strategy_registry()
-            
-            # Validate that strategy exists
-            available_strategies = registry.get_available_strategies()
-            if config.strategy not in available_strategies:
+            # Check if strategy exists
+            if not await self.strategy_service.strategy_exists(config.strategy):
+                available_strategies = await self.strategy_service.get_available_strategies()
                 errors.append(ValidationError(
                     field="strategy",
-                    message=f"Unknown strategy '{config.strategy}'. Available strategies: {list(available_strategies.keys())}",
+                    message=f"Unknown strategy '{config.strategy}'. Available strategies: {available_strategies}",
                     error_code="UNKNOWN_STRATEGY"
                 ))
                 return errors
             
-            # Use strategy registry for dynamic validation
-            validation_errors = registry.validate_strategy_config(config.strategy, config.strategy_parameters)
+            # Use strategy service for validation
+            is_valid = await self.strategy_service.validate_strategy(config.strategy, config.strategy_parameters)
             
-            # Convert strategy registry errors to ValidationError objects
-            for error_msg in validation_errors:
-                # Extract field name if possible (assumes format "Field name: error message")
-                field_name = "strategy_parameters"
-                if ":" in error_msg:
-                    potential_field = error_msg.split(":")[0].strip()
-                    if potential_field.replace("_", "").replace(" ", "").isalnum():
-                        field_name = potential_field.lower().replace(" ", "_")
+            if not is_valid:
+                # Get parameter requirements to provide more detailed error information
+                param_requirements = await self.strategy_service.get_strategy_parameters(config.strategy)
                 
                 errors.append(ValidationError(
-                    field=field_name,
-                    message=error_msg,
-                    error_code="STRATEGY_PARAMETER_INVALID"
+                    field="strategy_parameters",
+                    message=f"Invalid parameters for strategy '{config.strategy}'. Check parameter requirements.",
+                    error_code="STRATEGY_PARAMETER_INVALID",
+                    details={"required_parameters": param_requirements}
                 ))
                 
-        except ImportError as e:
-            # Log the import error but don't fail validation completely
-            logger.warning(f"Strategy registry import failed: {e}")
-            # Provide basic strategy validation as fallback
-            if config.strategy not in ["ma_crossover", "rsi"]:
-                errors.append(ValidationError(
-                    field="strategy",
-                    message=f"Unknown strategy '{config.strategy}'. Available strategies: ma_crossover, rsi",
-                    error_code="UNKNOWN_STRATEGY"
-                ))
         except Exception as e:
             errors.append(ValidationError(
                 field="strategy",
