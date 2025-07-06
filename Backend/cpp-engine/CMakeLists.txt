@@ -34,6 +34,7 @@ set(CORE_SOURCES
     src/progress_service.cpp
     src/result.cpp
     src/error_utils.cpp
+    src/date_time_utils.cpp
 )
 
 

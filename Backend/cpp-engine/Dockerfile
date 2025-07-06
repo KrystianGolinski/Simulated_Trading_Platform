@@ -1,17 +1,18 @@
-# Multi-platform base image
-FROM ubuntu:22.04
+# Multi-stage Docker build for C++ Engine
+
+# Stage 1: Build stage
+FROM ubuntu:22.04 AS builder
 
 # Set environment variables for non-interactive installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install dependencies
+# Install build dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
     libpq-dev \
     nlohmann-json3-dev \
     pkg-config \
-    curl \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -19,19 +20,37 @@ WORKDIR /app
 
 # Copy source files
 COPY CMakeLists.txt .
-COPY build.sh .
 COPY src/ src/
 COPY include/ include/
 COPY tests/ tests/
 
-# Make build script executable and build
-RUN chmod +x build.sh && ./build.sh
+# Configure and build the project
+RUN mkdir -p build && cd build && \
+    cmake .. && \
+    make -j$(nproc)
 
-# Build completes - tests will be run after services are up
+# Stage 2: Runtime stage
+FROM ubuntu:22.04 AS runtime
 
-# Health check for the C++ engine
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-    CMD test -x /shared/trading_engine || exit 1
+# Set environment variables for non-interactive installation
+ENV DEBIAN_FRONTEND=noninteractive
 
-# Keep container running for volume sharing
-CMD ["tail", "-f", "/dev/null"]
+# Install only runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+WORKDIR /app
+
+# Copy built executables from builder stage
+COPY --from=builder /app/build/trading_engine /app/trading_engine
+COPY --from=builder /app/build/test_comprehensive /app/test_comprehensive
+
+# Health check for the C++ engine using status command
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD /app/trading_engine --status || exit 1
+
+# Run the trading engine
+CMD ["/app/trading_engine"]

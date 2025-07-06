@@ -1,11 +1,8 @@
 #include "market_data.h"
 #include "error_utils.h"
 #include "logger.h"
+#include "date_time_utils.h"
 #include <iostream>
-#include <sstream>
-#include <iomanip>
-#include <chrono>
-#include <ctime>
 #include <algorithm>
 #include <stdexcept>
 
@@ -401,36 +398,15 @@ Result<nlohmann::json> MarketData::getDatabaseInfo() const {
 
 // Static helper methods
 std::string MarketData::getCurrentDate() {
-    auto now = std::chrono::system_clock::now();
-    auto time_t = std::chrono::system_clock::to_time_t(now);
-    
-    std::stringstream ss;
-    ss << std::put_time(std::localtime(&time_t), "%Y-%m-%d");
-    return ss.str();
+    return DateTimeUtils::getCurrentDate();
 }
 
 bool MarketData::isValidDateFormat(const std::string& date) {
-    if (date.length() != 10) return false;
-    if (date[4] != '-' || date[7] != '-') return false;
-    
-    try {
-        int year = std::stoi(date.substr(0, 4));
-        int month = std::stoi(date.substr(5, 2));
-        int day = std::stoi(date.substr(8, 2));
-        
-        return (year >= 1900 && year <= 2100 && 
-                month >= 1 && month <= 12 && 
-                day >= 1 && day <= 31);
-    } catch (const std::exception&) {
-        return false;
-    }
+    return DateTimeUtils::isValidDateFormat(date);
 }
 
 std::string MarketData::formatDate(const std::string& date) {
-    if (isValidDateFormat(date)) {
-        return date;
-    }
-    return getCurrentDate();
+    return DateTimeUtils::formatDate(date);
 }
 
 // Database access for temporal validation
