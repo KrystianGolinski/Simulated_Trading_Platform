@@ -8,6 +8,7 @@ This document provides a technical overview of the C++ Trading Engine, a high-pe
 
 -   **Performance**: Built with modern C++17 for high-speed, memory-efficient processing of large datasets.
 -   **Modularity**: A service-oriented architecture with dependency injection allows components to be developed and tested in isolation.
+-   **Separation of Concerns**: The engine is decomposed into specialized services (orchestration, strategy management, data processing, result calculation).
 -   **Safety**: The `Result<T>` pattern is used for error handling in performance-critical paths, avoiding the overhead of exceptions.
 -   **Temporal Accuracy**: A key design feature is the dynamic mitigation of survivorship bias, ensuring backtests are historically accurate.
 -   **Extensibility**: The Strategy pattern allows new trading algorithms to be added with minimal friction.
@@ -15,8 +16,12 @@ This document provides a technical overview of the C++ Trading Engine, a high-pe
 ### 1.2. Key Components and Directory Mapping
 
 -   `src/main.cpp`: Application entry point.
--   `src/trading_engine.cpp`: The central orchestrator for all simulations.
--   `src/command_dispatcher.cpp`: Routes command-line arguments.
+-   `src/trading_orchestrator.cpp`: The central orchestrator for all simulations.
+-   `src/trading_engine.cpp`: Core service manager and container for other components.
+-   `src/strategy_manager.cpp`: Manages strategy creation, validation, and execution.
+-   `src/data_processor.cpp`: Handles data loading, validation, and processing.
+-   `src/result_calculator.cpp`: Calculates performance metrics from simulation results.
+-   `src/command_dispatcher.cpp`: Routes command-line arguments to the orchestrator.
 -   `include/trading_strategy.h`: Abstract base class for all trading strategies.
 -   `src/portfolio.cpp`: Manages cash and stock positions.
 -   `src/market_data.cpp`: Handles data retrieval from the database.
@@ -28,13 +33,15 @@ This document provides a technical overview of the C++ Trading Engine, a high-pe
 ### 2.1. High-Level Data Flow
 
 1.  **Input**: The engine receives a request via command-line arguments, often including a path to a JSON configuration file.
-2.  **Dispatch**: `CommandDispatcher` parses the input and routes it to the appropriate function in `TradingEngine`.
-3.  **Data Retrieval**: `MarketData` service fetches historical price data from the TimescaleDB database.
-4.  **Simulation Loop**: `TradingEngine` iterates through the historical data, day by day.
-5.  **Temporal Validation**: On each day, the engine checks if the stocks in the simulation are actively trading, dynamically handling IPOs and delistings.
-6.  **Signal Generation**: The selected `TradingStrategy` (e.g., `MovingAverageCrossoverStrategy`) analyzes the data and generates BUY, SELL, or HOLD signals.
-7.  **Execution**: `ExecutionService` processes these signals, creating orders that are fulfilled by the `Portfolio`.
-8.  **Output**: After the simulation, results (performance metrics, trades) are serialized to JSON and printed to standard output.
+2.  **Dispatch**: `CommandDispatcher` parses the input and routes it to the `TradingOrchestrator`.
+3.  **Data Processing**: The `TradingOrchestrator` calls the `DataProcessor` to load, validate, and prepare historical market data.
+4.  **Strategy Management**: The `TradingOrchestrator` uses the `StrategyManager` to create and configure the specified trading strategy.
+5.  **Simulation Loop**: The `TradingOrchestrator` iterates through the historical data, day by day.
+6.  **Temporal Validation**: On each day, the `DataProcessor` ensures that stocks are actively trading, dynamically handling IPOs and delistings to prevent survivorship bias.
+7.  **Signal Generation**: Inside the loop, the `TradingOrchestrator` passes the current data to the `StrategyManager`, which executes the `TradingStrategy` to generate BUY, SELL, or HOLD signals.
+8.  **Execution**: The `ExecutionService` processes these signals, creating orders that are fulfilled by the `Portfolio`.
+9.  **Result Calculation**: After the simulation, the `TradingOrchestrator` passes the trade log to the `ResultCalculator`.
+10. **Output**: The `ResultCalculator` computes the final performance metrics, which are then serialized to JSON by the `TradingOrchestrator` and printed to standard output.
 
 ### 2.2. Survivorship Bias Mitigation
 
@@ -55,8 +62,12 @@ The engine does not simply filter out delisted stocks at the start. Instead, it 
 
 ### 3.2. Key Classes and Responsibilities
 
--   **`TradingEngine`**: The main service that orchestrates the entire backtest.
--   **`CommandDispatcher`**: Parses command-line arguments and dispatches commands.
+-   **`TradingOrchestrator`**: The main service that orchestrates the entire backtest, managing the simulation lifecycle from initialization to result processing.
+-   **`TradingEngine`**: Acts as a core service manager and container, holding instances of the various services (`DataProcessor`, `StrategyManager`, etc.) and managing the `Portfolio`. Its public methods delegate high-level tasks to the `TradingOrchestrator`.
+-   **`StrategyManager`**: Responsible for the lifecycle of trading strategies, including instantiation, configuration, validation, and execution of signal generation.
+-   **`DataProcessor`**: Handles all aspects of historical data management, including loading from the database, preprocessing, validation, and managing rolling data windows for strategies.
+-   **`ResultCalculator`**: Calculates all performance and risk metrics from a completed simulation's trade log.
+-   **`CommandDispatcher`**: Parses command-line arguments and dispatches commands to the `TradingOrchestrator`.
 -   **`ArgumentParser`**: Handles the logic of parsing arguments and JSON files.
 -   **`TradingStrategy`**: The interface for all trading algorithms.
 -   **`Portfolio`**: Manages the simulation's cash and stock holdings.

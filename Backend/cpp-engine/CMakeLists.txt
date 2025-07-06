@@ -17,6 +17,10 @@ set(CORE_SOURCES
     src/order.cpp
     src/market_data.cpp
     src/trading_engine.cpp
+    src/result_calculator.cpp
+    src/data_processor.cpp
+    src/strategy_manager.cpp
+    src/trading_orchestrator.cpp
     src/database_connection.cpp
     src/technical_indicators.cpp
     src/trading_strategy.cpp

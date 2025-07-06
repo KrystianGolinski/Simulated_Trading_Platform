@@ -321,7 +321,8 @@ void test_trading_engine() {
     std::cout << "Testing TradingEngine Result<T> Patterns - " << std::flush;
     
     TradingEngine engine(10000.0);
-    engine.setMovingAverageStrategy(5, 10);
+    auto strategy = engine.getStrategyManager()->createMovingAverageStrategy(5, 10);
+    engine.getStrategyManager()->setCurrentStrategy(std::move(strategy));
     
     // Test simulation with parameters (will fail due to no database, but should return proper Result<T>)
     TradingConfig config;
@@ -329,7 +330,7 @@ void test_trading_engine() {
     config.start_date = "2023-01-01";
     config.end_date = "2023-02-01";
     config.starting_capital = 10000.0;
-    auto sim_result = engine.runSimulation(config);
+    auto sim_result = engine.getTradingOrchestrator()->runSimulation(config, engine.getPortfolio(), engine.getMarketData(), engine.getDataProcessor(), engine.getStrategyManager(), engine.getResultCalculator());
     ASSERT_TRUE(sim_result.isSuccess() || sim_result.isError());
     
     if (sim_result.isError()) {
@@ -338,13 +339,9 @@ void test_trading_engine() {
     }
     
     // Test portfolio status (will fail due to no database)
-    auto status_result = engine.getPortfolioStatus();
-    ASSERT_TRUE(status_result.isSuccess() || status_result.isError());
-    
-    if (status_result.isError()) {
-        // Expected without database - check error propagation
-        ASSERT_FALSE(status_result.getErrorMessage().empty());
-    }
+    std::map<std::string, double> current_prices;
+    auto status_result = engine.getPortfolio().toDetailedString(current_prices);
+    ASSERT_TRUE(!status_result.empty());
     
     // Test input validation
     TradingConfig invalid_config;
@@ -352,7 +349,7 @@ void test_trading_engine() {
     invalid_config.start_date = "2023-01-01";
     invalid_config.end_date = "2023-02-01";
     invalid_config.starting_capital = 10000.0;
-    auto invalid_sim = engine.runSimulation(invalid_config);
+    auto invalid_sim = engine.getTradingOrchestrator()->runSimulation(invalid_config, engine.getPortfolio(), engine.getMarketData(), engine.getDataProcessor(), engine.getStrategyManager(), engine.getResultCalculator());
     ASSERT_TRUE(invalid_sim.isError());
     ASSERT_TRUE(invalid_sim.getErrorCode() == ErrorCode::ENGINE_INVALID_SYMBOL);
     
@@ -361,7 +358,7 @@ void test_trading_engine() {
     invalid_capital_config.start_date = "2023-01-01";
     invalid_capital_config.end_date = "2023-02-01";
     invalid_capital_config.starting_capital = -1000.0;
-    auto invalid_capital = engine.runSimulation(invalid_capital_config);
+    auto invalid_capital = engine.getTradingOrchestrator()->runSimulation(invalid_capital_config, engine.getPortfolio(), engine.getMarketData(), engine.getDataProcessor(), engine.getStrategyManager(), engine.getResultCalculator());
     ASSERT_TRUE(invalid_capital.isError());
     ASSERT_TRUE(invalid_capital.getErrorCode() == ErrorCode::ENGINE_INVALID_CAPITAL);
     
@@ -558,7 +555,7 @@ void test_comprehensive_error_paths() {
     invalid_backtest_config.start_date = "";
     invalid_backtest_config.end_date = "";
     invalid_backtest_config.starting_capital = -1000.0;
-    auto invalid_backtest = engine.runSimulation(invalid_backtest_config);
+    auto invalid_backtest = engine.getTradingOrchestrator()->runSimulation(invalid_backtest_config, engine.getPortfolio(), engine.getMarketData(), engine.getDataProcessor(), engine.getStrategyManager(), engine.getResultCalculator());
     ASSERT_TRUE(invalid_backtest.isError());
     ASSERT_TRUE(invalid_backtest.getErrorCode() == ErrorCode::ENGINE_INVALID_SYMBOL);
     
@@ -1046,14 +1043,16 @@ void test_multi_symbol_simulation_bugs() {
     
     try {
         TradingEngine multi_engine(10000.0);
-        multi_engine.setMovingAverageStrategy(10, 20);
+        auto multi_strategy = multi_engine.getStrategyManager()->createMovingAverageStrategy(10, 20);
+        multi_engine.getStrategyManager()->setCurrentStrategy(std::move(multi_strategy));
         
         TradingEngine single_engine(10000.0);
-        single_engine.setMovingAverageStrategy(10, 20);
+        auto single_strategy = single_engine.getStrategyManager()->createMovingAverageStrategy(10, 20);
+        single_engine.getStrategyManager()->setCurrentStrategy(std::move(single_strategy));
         
         // Run simulations
-        auto multi_result = multi_engine.runSimulation(multi_config);
-        auto single_result = single_engine.runSimulation(single_config);
+        auto multi_result = multi_engine.getTradingOrchestrator()->runSimulation(multi_config, multi_engine.getPortfolio(), multi_engine.getMarketData(), multi_engine.getDataProcessor(), multi_engine.getStrategyManager(), multi_engine.getResultCalculator());
+        auto single_result = single_engine.getTradingOrchestrator()->runSimulation(single_config, single_engine.getPortfolio(), single_engine.getMarketData(), single_engine.getDataProcessor(), single_engine.getStrategyManager(), single_engine.getResultCalculator());
         
         // Both should succeed if database is available
         if (multi_result.isSuccess() && single_result.isSuccess()) {
@@ -1099,8 +1098,8 @@ void test_multi_symbol_simulation_bugs() {
             ASSERT_FALSE(single_config.isMultiSymbol());
             ASSERT_EQ(5, multi_config.symbols.size());
             ASSERT_EQ(1, single_config.symbols.size());
-            ASSERT_EQ("AAPL", multi_config.getPrimarySymbol());
-            ASSERT_EQ("AAPL", single_config.getPrimarySymbol());
+            ASSERT_EQ("AAPL", multi_config.symbols[0]);
+            ASSERT_EQ("AAPL", single_config.symbols[0]);
         }
         
     } catch (const std::exception& e) {
@@ -1156,10 +1155,10 @@ void test_single_vs_multi_symbol_comparison() {
         TradingEngine engine4(10000.0);
         
         // Run all simulations
-        auto many_result = engine1.runSimulation(many_config);
-        auto single_result = engine2.runSimulation(single_config);
-        auto amzn_only_result = engine3.runSimulation(amzn_only);
-        auto amzn_adbe_result = engine4.runSimulation(amzn_adbe);
+        auto many_result = engine1.getTradingOrchestrator()->runSimulation(many_config, engine1.getPortfolio(), engine1.getMarketData(), engine1.getDataProcessor(), engine1.getStrategyManager(), engine1.getResultCalculator());
+        auto single_result = engine2.getTradingOrchestrator()->runSimulation(single_config, engine2.getPortfolio(), engine2.getMarketData(), engine2.getDataProcessor(), engine2.getStrategyManager(), engine2.getResultCalculator());
+        auto amzn_only_result = engine3.getTradingOrchestrator()->runSimulation(amzn_only, engine3.getPortfolio(), engine3.getMarketData(), engine3.getDataProcessor(), engine3.getStrategyManager(), engine3.getResultCalculator());
+        auto amzn_adbe_result = engine4.getTradingOrchestrator()->runSimulation(amzn_adbe, engine4.getPortfolio(), engine4.getMarketData(), engine4.getDataProcessor(), engine4.getStrategyManager(), engine4.getResultCalculator());
         
         if (many_result.isSuccess() && single_result.isSuccess()) {
             std::cout << "[TEST] 25-symbol vs AAPL-only comparison:" << std::endl;

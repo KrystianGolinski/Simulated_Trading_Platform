@@ -93,13 +93,13 @@ int CommandDispatcher::executeBacktest(const TradingConfig& config) {
                 backtest_config.symbols = {config.symbols[0]}; // Take only the first symbol
             }
             
-            auto backtest_result = engine.runBacktest(backtest_config);
+            auto backtest_result = engine.getTradingOrchestrator()->runBacktest(backtest_config, engine.getPortfolio(), engine.getMarketData(), engine.getExecutionService(), engine.getProgressService(), engine.getPortfolioAllocator(), engine.getDataProcessor(), engine.getStrategyManager(), engine.getResultCalculator());
             if (backtest_result.isError()) {
                 std::cout << "[ERROR] Backtest failed: " << backtest_result.getErrorMessage() << std::endl;
                 return 1;
             }
             
-            auto json_result = engine.getBacktestResultsAsJson(backtest_result.getValue());
+            auto json_result = engine.getTradingOrchestrator()->getBacktestResultsAsJson(backtest_result.getValue(), engine.getMarketData(), engine.getDataProcessor());
             if (json_result.isError()) {
                 std::cout << "[ERROR] Failed to generate backtest results: " << json_result.getErrorMessage() << std::endl;
                 return 1;
@@ -200,15 +200,12 @@ int CommandDispatcher::executeSimulationFromConfig(const std::string& config_fil
 int CommandDispatcher::executeStatus() {
     try {
         TradingEngine engine(10000.0);
-        auto status_result = engine.getPortfolioStatus();
-        if (status_result.isError()) {
-            std::cerr << "Error getting portfolio status: " << status_result.getErrorMessage() << std::endl;
-            if (!status_result.getErrorDetails().empty()) {
-                std::cerr << "Details: " << status_result.getErrorDetails() << std::endl;
-            }
+        auto prices_result = engine.getMarketData()->getCurrentPrices();
+        if (prices_result.isError()) {
+            std::cerr << "Error getting current prices for portfolio status: " << prices_result.getErrorMessage() << std::endl;
             return 1;
         }
-        std::cout << status_result.getValue() << std::endl;
+        std::cout << engine.getPortfolio().toDetailedString(prices_result.getValue()) << std::endl;
         return 0;
     } catch (const std::exception& e) {
         std::cerr << "Unexpected error: " << e.what() << std::endl;
@@ -303,7 +300,8 @@ void CommandDispatcher::setupStrategy(TradingEngine& engine, const TradingConfig
         if (verbose) {
             std::cerr << "[DEBUG]   Using MA crossover: short=" << short_ma << ", long=" << long_ma << std::endl;
         }
-        engine.setMovingAverageStrategy(short_ma, long_ma);
+        auto strategy = engine.getStrategyManager()->createMovingAverageStrategy(short_ma, long_ma);
+        engine.getStrategyManager()->setCurrentStrategy(std::move(strategy));
     } else if (config.strategy_name == "rsi") {
         int rsi_period = config.getIntParameter("rsi_period", 14);
         double rsi_oversold = config.getDoubleParameter("rsi_oversold", 30.0);
@@ -311,14 +309,16 @@ void CommandDispatcher::setupStrategy(TradingEngine& engine, const TradingConfig
         if (verbose) {
             std::cerr << "[DEBUG]   Using RSI: period=" << rsi_period << ", oversold=" << rsi_oversold << ", overbought=" << rsi_overbought << std::endl;
         }
-        engine.setRSIStrategy(rsi_period, rsi_oversold, rsi_overbought);
+        auto strategy = engine.getStrategyManager()->createRSIStrategy(rsi_period, rsi_oversold, rsi_overbought);
+        engine.getStrategyManager()->setCurrentStrategy(std::move(strategy));
     } else {
         if (verbose) {
             std::cerr << "[DEBUG] Unknown strategy '" << config.strategy_name << "', defaulting to MA crossover" << std::endl;
         }
         int short_ma = config.getIntParameter("short_ma", 20);
         int long_ma = config.getIntParameter("long_ma", 50);
-        engine.setMovingAverageStrategy(short_ma, long_ma);
+        auto strategy = engine.getStrategyManager()->createMovingAverageStrategy(short_ma, long_ma);
+        engine.getStrategyManager()->setCurrentStrategy(std::move(strategy));
     }
 }
 
@@ -328,7 +328,7 @@ int CommandDispatcher::executeCommonSimulation(const TradingConfig& config, bool
     
     try {
         // Use unified runSimulation method for all cases
-        auto result = engine.runSimulation(config);
+        auto result = engine.getTradingOrchestrator()->runSimulation(config, engine.getPortfolio(), engine.getMarketData(), engine.getDataProcessor(), engine.getStrategyManager(), engine.getResultCalculator());
         if (result.isError()) {
             std::cerr << "Error: " << result.getErrorMessage() << std::endl;
             if (!result.getErrorDetails().empty()) {
