@@ -16,20 +16,51 @@ The API is built on a set of core principles to ensure consistency, maintainabil
 
 ### 1.2. Key Directory Mapping
 
+#### Core API Structure
 -   `Backend/api/routers/`: API Endpoint definitions (the "API Layer").
+    -   `health.py`: Health check endpoints.
+    -   `simulation.py`: Simulation lifecycle management.
+    -   `stocks.py`: Stock data and temporal validation.
+    -   `strategies.py`: Strategy management.
+    -   `engine.py`: C++ engine interface.
+    -   `performance.py`: Performance analytics.
 -   `Backend/api/services/`: Core business logic.
+    -   `equity_processor.py`: Equity processing logic.
+    -   `error_categorizers.py`: Error categorization.
+    -   `error_handler.py`: Centralized error handling.
+    -   `error_types.py`: Error type definitions.
+    -   `execution_service.py`: Trade execution logic.
+    -   `performance_calculator.py`: Performance metrics calculation.
+    -   `result_processor.py`: Result processing and aggregation.
+    -   `strategy_service.py`: Strategy interface.
+    -   `strategy_service_implementation.py`: Strategy service implementation.
+    -   `temporal_validation_service.py`: Temporal validation logic.
+    -   `trade_converter.py`: Trade data conversion.
 -   `Backend/api/repositories/`: Data access logic (the "Repository Layer").
+    -   `stock_data_repository.py`: Stock data access.
 -   `Backend/api/models.py`: Pydantic models for request/response validation and standardised API responses.
 -   `Backend/api/dependencies.py`: Service and repository dependency injector functions.
 -   `Backend/api/routing/`: Core router implementation (`RouterBase`).
+    -   `router_base.py`: Base router class.
+    -   `service_factory.py`: Service factory for router creation.
 -   `Backend/api/api_components/`: Shared infrastructure (logging, response formatting, validation).
+    -   `response_formatter.py`: Response formatting utilities.
+    -   `router_logger.py`: Router-specific logging.
+    -   `validation_service.py`: Validation utilities.
 -   `Backend/api/db_components/`: Low-level database interaction components.
+    -   `cache_manager.py`: In-memory caching.
+    -   `connection_manager.py`: Database connection management.
+    -   `query_executor.py`: Query execution utilities.
 -   `Backend/api/strategies/`: Core trading strategy implementations.
 -   `Backend/api/plugins/strategies/`: Discoverable trading strategy plugins.
 -   `Backend/api/strategy_registry.py`: Dynamic strategy registration and discovery system.
 -   `Backend/api/strategy_factory.py`: Strategy instantiation and configuration management.
 -   `Backend/api/simulation_engine.py`: Simulation orchestration and C++ engine integration.
 -   `Backend/api/performance_optimizer.py`: Performance optimizations and execution analytics.
+-   `Backend/api/database.py`: Database connection management.
+-   `Backend/api/validation.py`: Global validation utilities.
+-   `Backend/api/main.py`: FastAPI application entry point.
+-   `Backend/api/tests/`: Comprehensive test suite.
 
 ## 2. Architecture
 
@@ -46,6 +77,11 @@ The API follows a layered architecture, as illustrated in the diagram below.
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐                  │
 │  │  stocks.py      │  │ simulation.py   │  │   health.py     │                  │
 │  │  /stocks/*      │  │ /simulation/*   │  │   /health/*     │                  │
+│  │ (RouterBase)    │  │ (RouterBase)    │  │ (RouterBase)    │                  │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘                  │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐                  │
+│  │ strategies.py   │  │  engine.py      │  │ performance.py  │                  │
+│  │ /strategies/*   │  │  /engine/*      │  │ /performance/*  │                  │
 │  │ (RouterBase)    │  │ (RouterBase)    │  │ (RouterBase)    │                  │
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘                  │
 └─────────────────────────┬───────────────────────────────────────────────────────┘
@@ -83,24 +119,40 @@ The API follows a layered architecture, as illustrated in the diagram below.
 │  └─────────────────────────────────────────────────────────────────────────────┘│
 └─────────────────────────┬───────────────────────────────────────────────────────┘
                           │
-┌─────────────────────────▼───────────────────────────────────────────────────────┐
-│                      Business Logic Layer                                       │
-│  ┌───────────────────┐       ┌──────────────────┐       ┌───────────────────┐   │
-│  │StockDataRepository│       │TemporalValidation│       │SimulationValidator│   │
-│  │                   │       │    Service       │       │                   │   │
-│  │• get_stocks()     │       │• is_tradeable()  │       │• validate_config  │   │
-│  │• get_prices()     │       │• validate_period │       │• check_symbols    │   │
-│  │• validate_symbol  │       │• get_eligible()  │       │• aggregate_errors │   │
-│  └───────────────────┘       └──────────────────┘       └───────────────────┘   │
-│                                                                                 │
-│  ┌───────────────────┐       ┌──────────────────┐       ┌────────────────────┐  │
-│  │ StrategyRegistry  │       │ SimulationEngine │       │PerformanceOptimizer│  │
-│  │                   │       │                  │       │                    │  │
-│  │• register_strategy│       │• start_simulation│       │• optimize_config   │  │
-│  │• discover_plugins │       │• orchestrate_runs│       │• track_metrics     │  │
-│  │• validate_configs │       │• process_results │       │• cache_management  │  │
-│  └───────────────────┘       └──────────────────┘       └────────────────────┘  │
-└─────────────────────────┬───────────────────────────────────────────────────────┘
+┌─────────────────────────▼────────────────────────────────────────────────────────────┐
+│                      Business Logic Layer                                            │
+│  ┌───────────────────┐       ┌──────────────────┐           ┌───────────────────┐    │
+│  │StockDataRepository│       │TemporalValidation│           │SimulationValidator│    │
+│  │                   │       │    Service       │           │                   │    │
+│  │• get_stocks()     │       │• is_tradeable()  │           │• validate_config  │    │
+│  │• get_prices()     │       │• validate_period │           │• check_symbols    │    │
+│  │• validate_symbol  │       │• get_eligible()  │           │• aggregate_errors │    │
+│  └───────────────────┘       └──────────────────┘           └───────────────────┘    │
+│                                                                                      │
+│  ┌───────────────────┐       ┌──────────────────────┐       ┌────────────────────┐   │
+│  │ StrategyRegistry  │       │ SimulationEngine     │       │PerformanceOptimizer│   │
+│  │                   │       │                      │       │                    │   │
+│  │• register_strategy│       │• start_simulation    │       │• analyze_complexity│   │
+│  │• discover_plugins │       │• parallel_tracking   │       │• execute_parallel  │   │
+│  │• validate_configs │       │• progress_aggregation│       │• group_optimization│   │
+│  └───────────────────┘       └──────────────────────┘       └────────────────────┘   │
+│                                                                                      │
+│  ┌───────────────────┐       ┌──────────────────┐           ┌─────────────────────┐  │
+│  │ ExecutionService  │       │StrategyService   │           │PerformanceCalculator│  │
+│  │                   │       │                  │           │                     │  │
+│  │• execute_trades() │       │• validate_params │           │• calculate_metrics  │  │
+│  │• manage_orders()  │       │• create_strategy │           │• compute_returns    │  │
+│  │• position_mgmt()  │       │• execute_signals │           │• risk_analysis      │  │
+│  └───────────────────┘       └──────────────────┘           └─────────────────────┘  │
+│                                                                                      │
+│  ┌───────────────────┐       ┌──────────────────┐           ┌────────────────────┐   │
+│  │ ErrorHandler      │       │ ResultProcessor  │           │ TradeConverter     │   │
+│  │                   │       │                  │           │                    │   │
+│  │• categorize_error │       │• process_results │           │• convert_trades    │   │
+│  │• handle_exception │       │• aggregate_data  │           │• format_output     │   │
+│  │• log_errors       │       │• validate_output │           │• validate_trades   │   │
+│  └───────────────────┘       └──────────────────┘           └────────────────────┘   │
+└─────────────────────────┬────────────────────────────────────────────────────────────┘
                           │
 ┌─────────────────────────▼───────────────────────────────────────────────────────┐
 │                    Database Layer                                               │
@@ -123,16 +175,19 @@ The API follows a layered architecture, as illustrated in the diagram below.
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 2.2. Data Flow Example: Stock Data Request
+### 2.2. Data Flow Example: Parallel Simulation Execution
 
-1.  **HTTP Request**: `GET /stocks/{symbol}/data` arrives at the FastAPI application.
-2.  **API Layer**: The request is routed to the appropriate endpoint in `routers/stocks.py`. This router is an instance of `RouterBase`.
-3.  **Logging**: `RouterLogger` logs the incoming request with a unique correlation ID.
-4.  **Dependency Injection**: FastAPI injects the `StockDataRepository` into the endpoint function by calling `get_stock_data_repository()` from `dependencies.py`.
-5.  **Repository Layer**: The endpoint calls `StockDataRepository.get_stock_prices()`.
-6.  **Database Layer**: The repository uses `QueryExecutor` to execute the SQL query against the TimescaleDB. Caching is checked via `CacheManager`.
-7.  **Response Formatting**: The data is returned to the router, which uses the injected `ResponseFormatter` to construct a standard, paginated JSON response.
-8.  **Logging**: `RouterLogger` logs the successful response before it is sent to the client.
+1.  **HTTP Request**: `POST /simulation/start` arrives with simulation configuration.
+2.  **API Layer**: Request routed to `routers/simulation.py` with validation via `SimulationValidator`.
+3.  **Complexity Analysis**: `PerformanceOptimizer` analyzes symbols count, date range, and strategy complexity.
+4.  **Strategy Selection**: System chooses sequential or parallel execution based on complexity score.
+5.  **Parallel Execution** (if selected):
+    - Symbols grouped into balanced sets using `ParallelExecutionStrategy`
+    - Multiple `ExecutionService` instances execute groups concurrently
+    - Each group reports progress via C++ engine stderr JSON streams
+6.  **Progress Aggregation**: `SimulationEngine` aggregates real-time progress from all parallel groups.
+7.  **Result Processing**: Completed groups' results combined via `_aggregate_parallel_results()`.
+8.  **Response**: Unified simulation results returned with optimization metadata.
 
 ## 3. API Reference
 
@@ -244,11 +299,11 @@ The API follows a layered architecture, as illustrated in the diagram below.
 
 #### Simulation
 -   `POST /simulation/validate`: Validate a simulation configuration without running it.
--   `POST /simulation/start`: Start a new simulation.
--   `GET /simulation/{simulation_id}/status`: Get the status and progress of a running simulation.
--   `GET /simulation/{simulation_id}/results`: Get the complete results of a finished simulation.
--   `GET /simulation/{simulation_id}/cancel`: Cancel a running simulation.
--   `GET /simulations`: List all historical simulations.
+-   `POST /simulation/start`: Start a new simulation with automatic optimization.
+-   `GET /simulation/{simulation_id}/status`: Get real-time status and aggregated progress (sequential/parallel).
+-   `GET /simulation/{simulation_id}/results`: Get complete results with optimization metadata.
+-   `GET /simulation/{simulation_id}/cancel`: Cancel a running simulation (supports parallel cancellation).
+-   `GET /simulations`: List all historical simulations with performance metrics.
 
 #### Strategy
 -   `GET /strategies`: Get all available, discovered strategies.
@@ -258,8 +313,8 @@ The API follows a layered architecture, as illustrated in the diagram below.
 -   `GET /strategies/categories`: Get strategy categories for filtering.
 
 #### Performance & Engine
--   `GET /performance/stats`: System performance and cache metrics.
+-   `GET /performance/stats`: Parallel execution metrics and optimization analytics.
 -   `POST /performance/clear-cache`: Clear all system caches.
--   `GET /performance/cache-stats`: Get detailed cache performance statistics.
--   `GET /engine/test`: Directly test the C++ engine connection.
--   `GET /engine/status`: Get the status and path information for the C++ engine.
+-   `GET /performance/cache-stats`: Cache performance and hit rates.
+-   `GET /engine/test`: Test C++ engine connection and parallel execution capability.
+-   `GET /engine/status`: Engine status with worker availability and resource usage.

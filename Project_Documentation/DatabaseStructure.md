@@ -123,6 +123,7 @@ Indexes are critical for query performance, especially for time-series and tempo
 
 ### Performance Indexes
 -   **Primary Backtesting Index**: `CREATE INDEX IF NOT EXISTS idx_daily_symbol_time ON stock_prices_daily (symbol, time DESC);`
+-   **Parallel Query Optimization**: Index supports concurrent access from multiple parallel groups.
 -   **Trade Retrieval**: `CREATE INDEX IF NOT EXISTS idx_trades_session_id ON trades_log (session_id);`
 
 ### Temporal Validation Indexes
@@ -150,8 +151,8 @@ Custom database logic is used for validation and maintenance.
 
 ### 5.1. Connection Management
 
--   **Python (asyncpg)**: A `DatabaseConnectionManager` class manages an `asyncpg` connection pool. It is instantiated once and shared across the application.
--   **C++ (libpq)**: Uses a standard connection string: `"host={host} port={port} dbname={database} user={username} password={password}"`.
+-   **Python (asyncpg)**: A `DatabaseConnectionManager` class manages an `asyncpg` connection pool. Shared across parallel execution groups for consistency.
+-   **C++ (libpq)**: Uses a standard connection string: `"host={host} port={port} dbname={database} user={username} password={password}"`. Each parallel group maintains its own connection.
 
 ### 5.2. Data Access Layer (Python)
 
