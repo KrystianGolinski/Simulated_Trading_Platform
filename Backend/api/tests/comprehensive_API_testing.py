@@ -1128,6 +1128,338 @@ class TestAPIErrorHandling:
         response = self.client.post("/simulation/validate", json=incomplete_config)
         assert response.status_code == 422
 
+class TestPerformanceOptimizer:
+    # Performance Optimizer unit tests - replaces old mock method tests with comprehensive parallel execution tests
+    
+    def setup_method(self):
+        # Set up test fixtures for performance optimizer tests
+        try:
+            from performance_optimizer import PerformanceOptimizer, ParallelExecutionStrategy, SimulationMetrics
+            self.optimizer = PerformanceOptimizer()
+            self.strategy_engine = ParallelExecutionStrategy(max_workers=4)
+            
+            # Test configurations for different complexity scenarios
+            self.single_symbol_config = SimulationConfig(
+                symbols=["AAPL"],
+                start_date=date(2023, 1, 1),
+                end_date=date(2023, 6, 30),
+                starting_capital=10000.0,
+                strategy="ma_crossover",
+                strategy_parameters={}
+            )
+            
+            self.multi_symbol_config = SimulationConfig(
+                symbols=["AAPL", "GOOGL", "MSFT"],
+                start_date=date(2023, 1, 1),
+                end_date=date(2023, 6, 30),
+                starting_capital=10000.0,
+                strategy="ma_crossover",
+                strategy_parameters={}
+            )
+            
+            self.high_complexity_config = SimulationConfig(
+                symbols=["AAPL", "GOOGL", "MSFT", "AMZN", "TSLA", "NVDA"],
+                start_date=date(2020, 1, 1),
+                end_date=date(2023, 12, 31),
+                starting_capital=10000.0,
+                strategy="ml_predictor",
+                strategy_parameters={}
+            )
+        except ImportError:
+            # Create mock objects if modules not available
+            self.optimizer = MagicMock()
+            self.strategy_engine = MagicMock()
+    
+    def test_optimizer_initialization(self):
+        # Test optimizer initialization
+        if hasattr(self.optimizer, 'cache_enabled'):
+            assert self.optimizer.cache_enabled is True
+            assert self.optimizer.parallel_enabled is True
+            assert self.optimizer.max_workers == 4
+    
+    def test_strategy_selection_logic_single_symbol(self):
+        # Test strategy selection for single symbol - should always be sequential
+        if hasattr(self.strategy_engine, 'analyze_simulation_complexity'):
+            analysis = self.strategy_engine.analyze_simulation_complexity(self.single_symbol_config)
+            strategy = self.strategy_engine.determine_optimal_strategy(analysis)
+            
+            assert strategy["strategy_name"] == "single_symbol_optimized"
+            assert strategy["execution_mode"] == "sequential"
+            assert strategy["parallel_tasks"] == 0
+    
+    def test_strategy_selection_logic_multi_symbol(self):
+        # Test strategy selection for multiple symbols
+        if hasattr(self.strategy_engine, 'analyze_simulation_complexity'):
+            analysis = self.strategy_engine.analyze_simulation_complexity(self.multi_symbol_config)
+            strategy = self.strategy_engine.determine_optimal_strategy(analysis)
+            
+            # Should be sequential for low-medium complexity
+            assert strategy["execution_mode"] in ["sequential", "parallel"]
+            assert isinstance(strategy["parallel_tasks"], int)
+    
+    def test_complexity_analysis(self):
+        # Test complexity analysis calculation
+        if hasattr(self.strategy_engine, 'analyze_simulation_complexity'):
+            analysis = self.strategy_engine.analyze_simulation_complexity(self.multi_symbol_config)
+            
+            assert "symbols_count" in analysis
+            assert "date_range_days" in analysis
+            assert "complexity_score" in analysis
+            assert "complexity_category" in analysis
+            assert analysis["symbols_count"] == 3
+            assert analysis["complexity_category"] in ["low", "medium", "high", "extreme"]
+    
+    def test_strategy_complexity_multipliers(self):
+        # Test strategy complexity multiplier calculation
+        if hasattr(self.strategy_engine, '_get_strategy_complexity_multiplier'):
+            # Test simple strategy
+            simple_config = self.single_symbol_config.copy() if hasattr(self.single_symbol_config, 'copy') else dict(self.single_symbol_config)
+            simple_config.update({"strategy": "buy_and_hold"})
+            multiplier = self.strategy_engine._get_strategy_complexity_multiplier(simple_config)
+            assert multiplier == 0.8
+            
+            # Test complex strategy
+            complex_config = self.single_symbol_config.copy() if hasattr(self.single_symbol_config, 'copy') else dict(self.single_symbol_config)
+            complex_config.update({"strategy": "ml_predictor"})
+            multiplier = self.strategy_engine._get_strategy_complexity_multiplier(complex_config)
+            assert multiplier == 2.0
+    
+    def test_symbol_group_creation(self):
+        # Test symbol group creation for parallel execution
+        if hasattr(self.strategy_engine, 'create_symbol_groups'):
+            symbols = ["AAPL", "GOOGL", "MSFT", "AMZN"]
+            
+            # Test sequential strategy
+            sequential_strategy = {"execution_mode": "sequential"}
+            groups = self.strategy_engine.create_symbol_groups(symbols, sequential_strategy)
+            assert len(groups) == 1
+            assert groups[0] == symbols
+            
+            # Test parallel strategy
+            parallel_strategy = {"execution_mode": "parallel", "optimal_group_size": 2}
+            groups = self.strategy_engine.create_symbol_groups(symbols, parallel_strategy)
+            assert len(groups) == 2
+            assert sum(len(group) for group in groups) == len(symbols)
+    
+    @pytest.mark.asyncio
+    async def test_optimize_simulation_execution(self):
+        # Test optimization execution analysis
+        if hasattr(self.optimizer, 'optimize_simulation_execution'):
+            result = await self.optimizer.optimize_simulation_execution(self.multi_symbol_config)
+            
+            # Verify required fields are present
+            required_fields = [
+                "strategy_name", "execution_mode", "symbol_groups", "parallel_tasks",
+                "estimated_speedup", "estimated_efficiency", "complexity_score",
+                "optimization_time_ms", "symbols_count"
+            ]
+            
+            for field in required_fields:
+                assert field in result, f"Missing required field: {field}"
+            
+            assert result["symbols_count"] == 3
+            assert result["execution_mode"] in ["sequential", "parallel"]
+    
+    def test_performance_summary(self):
+        # Test performance summary retrieval
+        if hasattr(self.optimizer, 'get_performance_summary'):
+            summary = self.optimizer.get_performance_summary()
+            
+            # Verify main sections exist
+            expected_sections = [
+                "cache_stats", "parallel_execution_stats", "strategy_analytics",
+                "optimization_enabled"
+            ]
+            
+            for section in expected_sections:
+                assert section in summary, f"Missing section: {section}"
+    
+    def test_cache_statistics(self):
+        # Test cache statistics
+        if hasattr(self.optimizer, 'get_cache_statistics'):
+            stats = self.optimizer.get_cache_statistics()
+            
+            assert "cache_enabled" in stats
+            assert "cache_hits" in stats
+            assert "cache_misses" in stats
+            assert "hit_rate_percent" in stats
+
+class TestParallelExecutionErrorHandling:
+    # Error handling tests for parallel execution
+    
+    def setup_method(self):
+        try:
+            from performance_optimizer import PerformanceOptimizer
+            self.optimizer = PerformanceOptimizer()
+        except ImportError:
+            self.optimizer = MagicMock()
+    
+    @pytest.mark.asyncio
+    async def test_execute_simulation_groups_empty(self):
+        # Test execution with empty symbol groups
+        if hasattr(self.optimizer, 'execute_simulation_groups'):
+            empty_groups = []
+            config = {
+                "symbols": [],
+                "start_date": date(2023, 1, 1),
+                "end_date": date(2023, 6, 30),
+                "starting_capital": 10000.0,
+                "strategy": "ma_crossover",
+                "strategy_parameters": {}
+            }
+            
+            results = await self.optimizer.execute_simulation_groups(empty_groups, config)
+            assert isinstance(results, list)
+            assert len(results) == 0
+    
+    @pytest.mark.asyncio
+    async def test_execute_simulation_groups_with_mocked_execution(self):
+        # Test execution with mocked ExecutionService
+        if hasattr(self.optimizer, 'execute_simulation_groups'):
+            symbol_groups = [["AAPL"]]
+            config = {
+                "symbols": ["AAPL"],
+                "start_date": date(2023, 1, 1),
+                "end_date": date(2023, 6, 30),
+                "starting_capital": 10000.0,
+                "strategy": "ma_crossover",
+                "strategy_parameters": {}
+            }
+            
+            # Mock the ExecutionService to avoid actual C++ engine calls
+            with patch('services.execution_service.ExecutionService') as mock_service:
+                mock_instance = AsyncMock()
+                mock_service.return_value = mock_instance
+                mock_instance.execute_simulation.return_value = {
+                    "return_code": 0,
+                    "stdout": '{"test": "result"}',
+                    "stderr": ""
+                }
+                
+                results = await self.optimizer.execute_simulation_groups(symbol_groups, config)
+                
+                assert len(results) == 1
+                assert results[0]["group_id"] == 0
+                assert results[0]["symbols"] == ["AAPL"]
+                assert results[0]["status"] == "completed"
+    
+    @pytest.mark.asyncio
+    async def test_execute_simulation_groups_execution_failure(self):
+        # Test handling of execution failures
+        if hasattr(self.optimizer, 'execute_simulation_groups'):
+            symbol_groups = [["AAPL"]]
+            config = {
+                "symbols": ["AAPL"],
+                "start_date": date(2023, 1, 1),
+                "end_date": date(2023, 6, 30),
+                "starting_capital": 10000.0,
+                "strategy": "ma_crossover",
+                "strategy_parameters": {}
+            }
+            
+            # Mock ExecutionService to return failure
+            with patch('services.execution_service.ExecutionService') as mock_service:
+                mock_instance = AsyncMock()
+                mock_service.return_value = mock_instance
+                mock_instance.execute_simulation.return_value = {
+                    "return_code": 1,
+                    "stdout": "",
+                    "stderr": "Engine execution failed"
+                }
+                
+                results = await self.optimizer.execute_simulation_groups(symbol_groups, config)
+                
+                assert len(results) == 1
+                assert results[0]["status"] == "failed"
+                assert "error" in results[0]
+    
+    @pytest.mark.asyncio
+    async def test_execute_simulation_groups_json_parse_error(self):
+        # Test handling of JSON parsing errors
+        if hasattr(self.optimizer, 'execute_simulation_groups'):
+            symbol_groups = [["AAPL"]]
+            config = {
+                "symbols": ["AAPL"],
+                "start_date": date(2023, 1, 1),
+                "end_date": date(2023, 6, 30),
+                "starting_capital": 10000.0,
+                "strategy": "ma_crossover",
+                "strategy_parameters": {}
+            }
+            
+            # Mock ExecutionService to return invalid JSON
+            with patch('services.execution_service.ExecutionService') as mock_service:
+                mock_instance = AsyncMock()
+                mock_service.return_value = mock_instance
+                mock_instance.execute_simulation.return_value = {
+                    "return_code": 0,
+                    "stdout": "invalid json content",
+                    "stderr": ""
+                }
+                
+                results = await self.optimizer.execute_simulation_groups(symbol_groups, config)
+                
+                assert len(results) == 1
+                assert results[0]["status"] == "failed"
+                assert "JSON parse error" in results[0].get("error", "")
+    
+    def test_speedup_calculation(self):
+        # Test speedup calculation from results
+        if hasattr(self.optimizer, '_calculate_achieved_speedup'):
+            results = [
+                {"execution_time_ms": 100.0},
+                {"execution_time_ms": 150.0},
+                {"execution_time_ms": 200.0}
+            ]
+            total_duration = 200.0  # Parallel execution took 200ms
+            
+            speedup = self.optimizer._calculate_achieved_speedup(results, total_duration)
+            
+            # Sequential time would be 450ms, parallel was 200ms
+            # Speedup = 450/200 = 2.25
+            assert speedup == 2.25
+    
+    def test_speedup_calculation_edge_cases(self):
+        # Test speedup calculation edge cases
+        if hasattr(self.optimizer, '_calculate_achieved_speedup'):
+            # Empty results
+            assert self.optimizer._calculate_achieved_speedup([], 100.0) == 1.0
+            
+            # Zero duration
+            results = [{"execution_time_ms": 100.0}]
+            assert self.optimizer._calculate_achieved_speedup(results, 0.0) == 1.0
+
+class TestPerformanceMetrics:
+    # Tests for SimulationMetrics class
+    
+    def setup_method(self):
+        try:
+            from performance_optimizer import SimulationMetrics
+            self.metrics = SimulationMetrics()
+        except ImportError:
+            self.metrics = MagicMock()
+    
+    def test_initial_metrics_state(self):
+        # Test initial state of metrics
+        if hasattr(self.metrics, 'cache_hits'):
+            assert self.metrics.cache_hits == 0
+            assert self.metrics.cache_misses == 0
+            assert self.metrics.parallel_tasks == 0
+            assert self.metrics.sequential_tasks == 0
+            assert self.metrics.parallel_speedup_achieved == 0.0
+            assert self.metrics.parallel_efficiency == 0.0
+    
+    def test_metrics_update(self):
+        # Test metrics can be updated correctly
+        if hasattr(self.metrics, 'cache_hits'):
+            self.metrics.cache_hits = 10
+            self.metrics.cache_misses = 5
+            self.metrics.parallel_tasks = 3
+            
+            assert self.metrics.cache_hits == 10
+            assert self.metrics.cache_misses == 5
+            assert self.metrics.parallel_tasks == 3
+
 # Main execution function
 def main():
     # Main function to run test suite

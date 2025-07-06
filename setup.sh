@@ -581,12 +581,12 @@ run_api_tests() {
     deactivate
     
     if [ $test_result -eq 0 ]; then
-        print_success "[PASS] API tests"
+        print_success "API tests"
     elif [ $test_result -eq 124 ]; then
         print_error "[TIMEOUT] API tests timed out after 10 minutes"
         exit 1
     else
-        print_error "[FAIL] API tests (exit code: $test_result)"
+        print_error "API tests (exit code: $test_result)"
         exit 1
     fi
     
@@ -703,7 +703,7 @@ verify_setup() {
         running_services=$($COMPOSE_CMD -f Docker/docker-compose.dev.yml ps --services --filter "status=running" 2>/dev/null | wc -l)
         if [ "$running_services" -eq 0 ]; then
             # Fallback check with original method
-            if ! $COMPOSE_CMD -f Docker/docker-compose.dev.yml ps 2>/dev/null | grep -q -E "(Up|running)"; then
+            if ! $COMPOSE_CMD -f Docker/docker-compose.dev.yml ps 2>/dev/null | grep -q -E "running"; then
                 setup_issues+=("Docker services not running")
             fi
         fi

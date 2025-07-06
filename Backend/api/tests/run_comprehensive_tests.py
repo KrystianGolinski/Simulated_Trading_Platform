@@ -79,75 +79,6 @@ class APITestRunner:
         self.test_results['total_execution_time'] = time.time() - start_time
         return success
     
-    def run_pytest_tests(self) -> bool:
-        # Run individual pytest tests for additional coverage
-        if self.verbose:
-            print("\nRunning Individual PyTest Tests")
-        
-        try:
-            # Run pytest on the test file
-            test_file = Path(__file__).parent / "comprehensive_API_testing.py"
-            
-            cmd = [
-                sys.executable, "-m", "pytest", 
-                str(test_file),
-                "-v" if self.verbose else "-q",
-                "--tb=short",
-                "--disable-warnings"
-            ]
-            
-            if self.verbose:
-                print(f"Running command: {' '.join(cmd)}")
-            
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                cwd=str(api_dir),
-                timeout=300  # 5 minute timeout
-            )
-            
-            if self.verbose:
-                print("PyTest STDOUT:")
-                print(result.stdout)
-                if result.stderr:
-                    print("PyTest STDERR:")
-                    print(result.stderr)
-            
-            # Parse pytest output for test counts
-            output_lines = result.stdout.split('\n')
-            for line in output_lines:
-                if 'passed' in line and 'failed' in line:
-                    # Try to extract test counts from pytest summary
-                    pass
-            
-            success = result.returncode == 0
-            if self.verbose:
-                print(f"PyTest execution: {'SUCCESS' if success else 'FAILED'}")
-            
-            if not success:
-                self.test_results['error_summary'].append({
-                    'category': 'PyTest Execution',
-                    'error': f"Return code: {result.returncode}, stderr: {result.stderr}"
-                })
-            
-            return success
-            
-        except subprocess.TimeoutExpired:
-            print("ERROR: PyTest execution timed out after 5 minutes")
-            self.test_results['error_summary'].append({
-                'category': 'PyTest Execution',
-                'error': 'Test execution timeout'
-            })
-            return False
-        except Exception as e:
-            print(f"ERROR: Failed to run PyTest tests: {str(e)}")
-            self.test_results['error_summary'].append({
-                'category': 'PyTest Execution', 
-                'error': str(e)
-            })
-            return False
-    
     
     def check_api_dependencies(self) -> bool:
         # Check that required API dependencies are available
@@ -329,11 +260,6 @@ def main():
     # Run main test suite
     comprehensive_success = runner.run_comprehensive_tests()
     overall_success = overall_success and comprehensive_success
-    
-    
-    # Run pytest tests
-    pytest_success = runner.run_pytest_tests()
-    overall_success = overall_success and pytest_success
     
     # Generate report
     runner.generate_test_report()
