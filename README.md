@@ -237,3 +237,10 @@ These may be featured in version 2.0 of the platform. Improving code quality tak
 - More data
 - Simulation saving, exporting...
 - General platform improvements
+
+
+--------Legal Notice---------
+Krystian Golinski © 
+This project is for personal and showcase purposes only.
+Unauthorized use, reproduction, distribution, or modification is not permitted without explicit written consent.
+Do not copy or submit any part of this work as your own.
