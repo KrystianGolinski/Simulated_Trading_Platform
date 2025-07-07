@@ -4,13 +4,14 @@
 #include "trading_exceptions.h"
 #include "portfolio.h"
 #include "trading_strategy.h"
+#include "memory_optimizable.h"
 #include <string>
 #include <vector>
 
-class ExecutionService {
+class ExecutionService : public IMemoryOptimizable {
 private:
     std::vector<TradingSignal> executed_signals_;
-    // TODO: Add failed_executions_counter_ to track execution failures
+    int failed_executions_counter_ = 0;
     
 public:
     ExecutionService() = default;
@@ -36,6 +37,7 @@ public:
     // Execution statistics
     int getTotalExecutions() const;
     int getSuccessfulExecutions() const;
+    int getFailedExecutions() const;
     
 private:
     // Internal execution logic
@@ -50,4 +52,10 @@ private:
     
     // Execution validation
     Result<void> validateSignal(const TradingSignal& signal, const std::string& symbol) const;
+    
+public:
+    // Memory optimization interface
+    void optimizeMemory() override;
+    size_t getMemoryUsage() const override;
+    std::string getMemoryReport() const override;
 };

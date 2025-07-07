@@ -1,3 +1,4 @@
+# TODO: These Python strategies will not be as performant as C++ engine strategies
 # Example Plugin Strategy: Bollinger Bands Strategy
 from typing import Dict, Any, List
 import sys

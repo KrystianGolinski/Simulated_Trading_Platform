@@ -130,6 +130,18 @@ class SimulationResults(BaseModel):
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     error_message: Optional[str] = None
+    
+    # Memory tracking (added for memory optimization analysis)
+    memory_statistics: Optional[Dict[str, Any]] = Field(
+        default=None, 
+        description="Memory usage statistics captured during simulation execution"
+    )
+    
+    # Optimization tracking (added for parallel execution analysis)
+    optimization_info: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Optimization metadata including actual vs estimated speedup for parallel execution"
+    )
 
 class SimulationResponse(BaseModel):
     simulation_id: str

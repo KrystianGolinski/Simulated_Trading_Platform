@@ -32,6 +32,7 @@ Result<std::unique_ptr<TradingStrategy>> StrategyManager::createStrategyFromConf
     
     // Update current strategy tracking
     current_strategy_name_ = config.strategy_name;
+    current_strategy_parameters_ = parameters;
     
     Logger::debug("Created strategy: ", config.strategy_name);
     return Result<std::unique_ptr<TradingStrategy>>(std::move(strategy_result.getValue()));
@@ -80,9 +81,8 @@ std::string StrategyManager::getCurrentStrategyName() const {
 }
 
 std::map<std::string, double> StrategyManager::getCurrentStrategyParameters() const {
-    // TODO: This would need to be implemented based on strategy interface
-    // For now, return empty map as strategies don't expose their parameters
-    return std::map<std::string, double>();
+    // Return the stored parameters from when the strategy was created
+    return current_strategy_parameters_;
 }
 
 // Strategy validation and configuration
@@ -127,6 +127,7 @@ Result<StrategyConfig> StrategyManager::buildStrategyConfig(const TradingConfig&
 void StrategyManager::resetStrategy() {
     current_strategy_.reset();
     current_strategy_name_.clear();
+    current_strategy_parameters_.clear();
 }
 
 void StrategyManager::clearStrategy() {
@@ -137,6 +138,11 @@ void StrategyManager::clearStrategy() {
 void StrategyManager::initializeDefaultStrategy() {
     current_strategy_ = createMovingAverageStrategy();
     current_strategy_name_ = "ma_crossover";
+    // Set default parameters for the moving average strategy
+    current_strategy_parameters_ = {
+        {"short_ma", 20.0},
+        {"long_ma", 50.0}
+    };
 }
 
 // Helper methods for strategy creation

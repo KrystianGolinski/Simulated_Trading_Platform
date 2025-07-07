@@ -733,7 +733,107 @@ class PerformanceOptimizer:
             "total_requests": total_requests
         }
     
-    def get_performance_summary(self) -> Dict[str, Any]:
+    async def get_memory_statistics(self) -> Dict[str, Any]:
+        """
+        Get engine memory statistics from the C++ trading engine.
+        
+        Returns comprehensive memory usage information for monitoring and optimization.
+        Integrates with the C++ engine's memory reporting system to provide real-time
+        memory usage data across all engine services.
+        
+        Returns:
+            Dict[str, Any]: Memory statistics containing:
+                - status: "success", "error", or "unavailable"
+                - total_memory_bytes: Total engine memory usage
+                - portfolio_memory_bytes: Portfolio service memory usage
+                - market_data_cache_bytes: Market data cache memory usage
+                - execution_service_bytes: Execution service memory usage
+                - data_processor_bytes: Data processor memory usage
+                - portfolio_allocator_bytes: Portfolio allocator memory usage
+                - price_cache_symbols: Number of symbols in price cache
+                - memory_optimization_available: Whether optimization is possible
+                - detailed_report: Full memory report from engine (if successful)
+                - error: Error message (if failed)
+        
+        Example:
+            memory_stats = await performance_optimizer.get_memory_statistics()
+            if memory_stats["status"] == "success":
+                total_mb = memory_stats["total_memory_bytes"] / (1024 * 1024)
+                print(f"Engine using {total_mb:.2f} MB")
+        """
+        try:
+            # Import ExecutionService locally to avoid circular imports
+            from services.execution_service import ExecutionService
+            from pathlib import Path
+            import os
+            
+            # Get engine path from environment
+            engine_path_str = os.getenv('CPP_ENGINE_PATH', '/shared/trading_engine')
+            engine_path = Path(engine_path_str)
+            
+            # Create temporary ExecutionService instance for memory query
+            execution_service = ExecutionService(engine_path)
+            
+            # Query engine memory statistics
+            memory_result = await execution_service.get_engine_memory_statistics()
+            
+            if memory_result.get("status") == "success":
+                # Add additional derived metrics
+                total_bytes = memory_result.get("total_memory_bytes", 0)
+                memory_result["total_memory_mb"] = round(total_bytes / (1024 * 1024), 2)
+                memory_result["memory_optimization_available"] = total_bytes > 0
+                
+                # Add cache efficiency metrics
+                cache_symbols = memory_result.get("price_cache_symbols", 0)
+                cache_bytes = memory_result.get("market_data_cache_bytes", 0)
+                if cache_symbols > 0 and cache_bytes > 0:
+                    memory_result["cache_bytes_per_symbol"] = round(cache_bytes / cache_symbols, 2)
+                else:
+                    memory_result["cache_bytes_per_symbol"] = 0
+                
+                # Add memory distribution percentages
+                if total_bytes > 0:
+                    memory_result["memory_distribution"] = {
+                        "portfolio_percent": round((memory_result.get("portfolio_memory_bytes", 0) / total_bytes) * 100, 2),
+                        "cache_percent": round((memory_result.get("market_data_cache_bytes", 0) / total_bytes) * 100, 2),
+                        "execution_percent": round((memory_result.get("execution_service_bytes", 0) / total_bytes) * 100, 2),
+                        "allocator_percent": round((memory_result.get("portfolio_allocator_bytes", 0) / total_bytes) * 100, 2),
+                        "processor_percent": round((memory_result.get("data_processor_bytes", 0) / total_bytes) * 100, 2)
+                    }
+                
+                logger.info(f"Retrieved engine memory statistics: {total_bytes} bytes total")
+                return memory_result
+            else:
+                # Engine query failed
+                logger.warning(f"Engine memory query failed: {memory_result.get('error', 'Unknown error')}")
+                return {
+                    "status": "error",
+                    "error": memory_result.get("error", "Engine memory query failed"),
+                    "error_code": memory_result.get("error_code", "QUERY_FAILED"),
+                    "total_memory_bytes": 0,
+                    "memory_optimization_available": False
+                }
+                
+        except ImportError as e:
+            logger.error(f"Failed to import ExecutionService for memory statistics: {e}")
+            return {
+                "status": "unavailable",
+                "error": "ExecutionService not available for memory queries",
+                "error_code": "SERVICE_UNAVAILABLE",
+                "total_memory_bytes": 0,
+                "memory_optimization_available": False
+            }
+        except Exception as e:
+            logger.error(f"Failed to get engine memory statistics: {e}")
+            return {
+                "status": "error", 
+                "error": str(e),
+                "error_code": "EXECUTION_FAILED",
+                "total_memory_bytes": 0,
+                "memory_optimization_available": False
+            }
+    
+    async def get_performance_summary(self) -> Dict[str, Any]:
         """
         Enhanced performance summary with comprehensive analytics.
         
@@ -777,9 +877,13 @@ class PerformanceOptimizer:
             for mode, count in self.metrics.execution_mode_counts.items():
                 execution_mode_percentages[mode] = round((count / total_executions) * 100, 2)
         
+        # Get memory statistics if available
+        memory_stats = await self.get_memory_statistics()
+        
         return {
             "cache_stats": self.get_cache_statistics(),
             "operation_times": avg_times,
+            "memory_usage": memory_stats,
             
             # Parallel execution metrics
             "parallel_execution_stats": {

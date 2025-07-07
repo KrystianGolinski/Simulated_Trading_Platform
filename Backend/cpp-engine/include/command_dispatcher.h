@@ -18,6 +18,7 @@ private:
     int executeSimulation(const TradingConfig& config);
     int executeSimulationFromConfig(const std::string& config_file);
     int executeStatus();
+    int executeMemoryReport();
     int showHelp(const char* program_name);
     
     void printHeader();

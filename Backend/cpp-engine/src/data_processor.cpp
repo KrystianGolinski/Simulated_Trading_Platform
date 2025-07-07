@@ -4,12 +4,6 @@
 #include <algorithm>
 #include <set>
 
-Result<std::vector<PriceData>> DataProcessor::loadHistoricalData(const std::string& symbol, const DateRange& range) {
-    // TODO: This would typically interface with MarketData but for now is a placeholder
-    // Implementation would be similar to single symbol processing in processSymbolData
-    return Result<std::vector<PriceData>>(ErrorCode::SYSTEM_UNEXPECTED_ERROR, "Not implemented in this refactor");
-}
-
 Result<std::map<std::string, std::vector<PriceData>>> DataProcessor::loadMultiSymbolData(
     const std::vector<std::string>& symbols,
     const std::string& start_date,
@@ -66,12 +60,6 @@ Result<std::map<std::string, std::vector<PriceData>>> DataProcessor::loadMultiSy
     }
     
     return Result<std::map<std::string, std::vector<PriceData>>>(std::move(multi_symbol_data));
-}
-
-std::vector<PriceData> DataProcessor::getWindow(const std::string& symbol, int windowSize) {
-    // TODO: Placeholder for windowing logic - would maintain internal state
-    // This would return the last N data points for a symbol
-    return std::vector<PriceData>();
 }
 
 void DataProcessor::updateHistoricalWindows(
@@ -248,4 +236,27 @@ Result<std::vector<PriceData>> DataProcessor::processSymbolData(
         std::string error_msg = createDataErrorMessage(symbol, start_date, end_date, "conversion_failed");
         return Result<std::vector<PriceData>>(ErrorCode::DATA_PARSING_FAILED, error_msg);
     }
+}
+
+// Memory optimization methods
+void DataProcessor::optimizeMemory() {
+    // Note: DataProcessor doesn't maintain internal containers for optimization
+    // Most data is processed on-demand and passed through
+    // Future implementations might cache processed data that could be optimized
+}
+
+size_t DataProcessor::getMemoryUsage() const {
+    // Base class size - DataProcessor doesn't maintain significant internal state
+    size_t total = sizeof(*this);
+    // Future: Add memory usage calculation for any cached data structures
+    return total;
+}
+
+std::string DataProcessor::getMemoryReport() const {
+    std::ostringstream report;
+    report << "DataProcessor Memory Usage:\n";
+    report << "  Base memory: " << sizeof(*this) << " bytes\n";
+    report << "  Cached data: None (stateless processor)\n";
+    report << "  Total estimated memory: " << getMemoryUsage() << " bytes\n";
+    return report.str();
 }

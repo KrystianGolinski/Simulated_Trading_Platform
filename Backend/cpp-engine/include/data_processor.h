@@ -3,6 +3,7 @@
 #include "trading_strategy.h"
 #include "market_data.h"
 #include "result.h"
+#include "memory_optimizable.h"
 #include <vector>
 #include <map>
 #include <string>
@@ -18,7 +19,7 @@ struct DateRange {
 };
 
 // Data processing and windowing for backtesting
-class DataProcessor {
+class DataProcessor : public IMemoryOptimizable {
 public:
     DataProcessor() = default;
     ~DataProcessor() = default;
@@ -80,4 +81,10 @@ private:
                                                     const std::string& start_date,
                                                     const std::string& end_date,
                                                     MarketData* market_data) const;
+    
+public:
+    // Memory optimization interface
+    void optimizeMemory() override;
+    size_t getMemoryUsage() const override;
+    std::string getMemoryReport() const override;
 };

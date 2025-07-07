@@ -14,9 +14,9 @@ router.tags = ["performance"]
 
 @router.get("/performance/stats")
 async def get_performance_stats() -> StandardResponse[Dict[str, Any]]:
-    # Get performance stats
+    # Get performance stats including memory statistics
     # Get optimizer performance stats
-    optimizer_stats = performance_optimizer.get_performance_summary()
+    optimizer_stats = await performance_optimizer.get_performance_summary()
     
     stats_data = {
         "optimization": optimizer_stats,

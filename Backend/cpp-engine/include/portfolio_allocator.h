@@ -3,6 +3,7 @@
 #include "portfolio.h"
 #include "trading_strategy.h"
 #include "result.h"
+#include "memory_optimizable.h"
 #include <string>
 #include <vector>
 #include <map>
@@ -56,7 +57,7 @@ struct AllocationResult {
                         rebalancing_needed(false) {}
 };
 
-class PortfolioAllocator {
+class PortfolioAllocator : public IMemoryOptimizable {
 private:
     AllocationConfig config_;
     std::map<std::string, std::vector<double>> price_history_;  // For volatility/momentum calculations
@@ -152,4 +153,10 @@ private:
     std::vector<std::string> applyRiskFilters(const std::vector<std::string>& symbols, const std::map<std::string, double>& current_prices) const;
     void enforceConstraints(AllocationResult& result) const;
     bool isRebalancingDue(const std::string& current_date) const;
+    
+public:
+    // Memory optimization interface
+    void optimizeMemory() override;
+    size_t getMemoryUsage() const override;
+    std::string getMemoryReport() const override;
 };

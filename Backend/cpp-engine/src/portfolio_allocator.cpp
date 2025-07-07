@@ -588,3 +588,57 @@ void PortfolioAllocator::updatePriceHistory(const std::map<std::string, std::vec
     }
     Logger::debug("Updated price history for ", all_prices.size(), " symbols");
 }
+
+// Memory optimization methods
+void PortfolioAllocator::optimizeMemory() {
+    // Optimize price history storage by shrinking vectors to fit
+    for (auto& [symbol, history] : price_history_) {
+        history.shrink_to_fit();
+    }
+    
+    // Clear old rebalancing data if it exists
+    last_rebalance_weights_.clear();
+}
+
+size_t PortfolioAllocator::getMemoryUsage() const {
+    size_t total = sizeof(*this);
+    
+    // Calculate price history memory usage
+    for (const auto& [symbol, history] : price_history_) {
+        total += symbol.capacity() + (history.capacity() * sizeof(double));
+    }
+    
+    // Calculate rebalancing weights memory usage
+    for (const auto& [symbol, weight] : last_rebalance_weights_) {
+        total += symbol.capacity() + sizeof(double);
+    }
+    
+    // Calculate current target weights memory usage
+    for (const auto& [symbol, weight] : current_target_weights_) {
+        total += symbol.capacity() + sizeof(double);
+    }
+    
+    // Add string storage for last rebalance date
+    total += last_rebalance_date_.capacity();
+    
+    return total;
+}
+
+std::string PortfolioAllocator::getMemoryReport() const {
+    std::ostringstream report;
+    report << "PortfolioAllocator Memory Usage:\n";
+    report << "  Price history symbols: " << price_history_.size() << "\n";
+    
+    size_t total_price_data_points = 0;
+    for (const auto& [symbol, history] : price_history_) {
+        total_price_data_points += history.size();
+    }
+    
+    report << "  Total price data points: " << total_price_data_points << "\n";
+    report << "  Last rebalance weights: " << last_rebalance_weights_.size() << "\n";
+    report << "  Current target weights: " << current_target_weights_.size() << "\n";
+    report << "  Allocation strategy: " << static_cast<int>(config_.strategy) << "\n";
+    report << "  Estimated memory: " << getMemoryUsage() << " bytes\n";
+    
+    return report.str();
+}

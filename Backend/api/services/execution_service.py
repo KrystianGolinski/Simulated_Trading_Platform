@@ -275,6 +275,177 @@ class ExecutionService:
         
         return unhealthy
     
+    async def get_engine_memory_statistics(self) -> Dict[str, Any]:
+        # Query the C++ engine for memory statistics
+        try:
+            # Build command to get memory report from engine
+            cmd = [
+                str(self.cpp_engine_path),
+                "--memory-report"  # We'll need to add this flag to C++ engine
+            ]
+            
+            # Check if engine is available
+            validation_result = self.validate_cpp_engine()
+            if not validation_result["is_valid"]:
+                return {
+                    "status": "error",
+                    "error": validation_result["error"],
+                    "error_code": validation_result["error_code"]
+                }
+            
+            working_dir = self.cpp_engine_path.parent
+            
+            # Prepare environment
+            env = os.environ.copy()
+            db_env_vars = ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD']
+            for var in db_env_vars:
+                if var in os.environ:
+                    env[var] = os.environ[var]
+            
+            # Execute memory query with timeout
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=working_dir,
+                env=env
+            )
+            
+            # Wait for completion with timeout
+            try:
+                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=10.0)
+                
+                if process.returncode == 0:
+                    # Parse memory statistics from stdout
+                    memory_report = stdout.decode().strip()
+                    return self._parse_memory_report(memory_report)
+                else:
+                    error_msg = stderr.decode().strip() if stderr else "Unknown error"
+                    return {
+                        "status": "error",
+                        "error": f"Engine memory query failed: {error_msg}",
+                        "return_code": process.returncode
+                    }
+                    
+            except asyncio.TimeoutError:
+                process.kill()
+                await process.wait()
+                return {
+                    "status": "error",
+                    "error": "Memory query timed out after 10 seconds",
+                    "error_code": "TIMEOUT"
+                }
+                
+        except Exception as e:
+            logger.error(f"Failed to get engine memory statistics: {e}")
+            return {
+                "status": "error",
+                "error": str(e),
+                "error_code": "EXECUTION_FAILED"
+            }
+    
+    def _parse_memory_report(self, memory_report: str) -> Dict[str, Any]:
+        # Parse the C++ engine memory report into structured data
+        try:
+            # Expected format from C++ engine getMemoryReport()
+            lines = memory_report.split('\n')
+            memory_stats = {
+                "status": "success",
+                "total_memory_bytes": 0,
+                "portfolio_memory_bytes": 0,
+                "market_data_cache_bytes": 0,
+                "execution_service_bytes": 0,
+                "data_processor_bytes": 0,
+                "portfolio_allocator_bytes": 0,
+                "price_cache_symbols": 0,
+                "detailed_report": memory_report
+            }
+            
+            # Parse key metrics from the report
+            for line in lines:
+                line = line.strip()
+                
+                # Parse total memory
+                if "Total Engine Memory:" in line:
+                    try:
+                        memory_stats["total_memory_bytes"] = int(line.split()[-2])
+                    except (ValueError, IndexError):
+                        pass
+                
+                # Parse portfolio memory
+                elif "Portfolio Memory Usage:" in line and "Estimated memory:" in memory_report:
+                    # Look for the estimated memory line after portfolio section
+                    portfolio_section = memory_report[memory_report.find("Portfolio Memory Usage:"):]
+                    for portfolio_line in portfolio_section.split('\n'):
+                        if "Estimated memory:" in portfolio_line:
+                            try:
+                                memory_stats["portfolio_memory_bytes"] = int(portfolio_line.split()[-2])
+                            except (ValueError, IndexError):
+                                pass
+                            break
+                
+                # Parse cache information
+                elif "Cached symbols:" in line:
+                    try:
+                        memory_stats["price_cache_symbols"] = int(line.split()[-1])
+                    except (ValueError, IndexError):
+                        pass
+                
+                # Parse service-specific memory usage
+                elif "MarketData Memory Usage:" in line:
+                    # Look for estimated memory in MarketData section
+                    market_data_section = memory_report[memory_report.find("MarketData Memory Usage:"):]
+                    for md_line in market_data_section.split('\n'):
+                        if "Estimated memory:" in md_line:
+                            try:
+                                memory_stats["market_data_cache_bytes"] = int(md_line.split()[-2])
+                            except (ValueError, IndexError):
+                                pass
+                            break
+                
+                elif "ExecutionService Memory Usage:" in line:
+                    # Look for estimated memory in ExecutionService section
+                    exec_section = memory_report[memory_report.find("ExecutionService Memory Usage:"):]
+                    for exec_line in exec_section.split('\n'):
+                        if "Total estimated memory:" in exec_line:
+                            try:
+                                memory_stats["execution_service_bytes"] = int(exec_line.split()[-2])
+                            except (ValueError, IndexError):
+                                pass
+                            break
+                
+                elif "PortfolioAllocator Memory Usage:" in line:
+                    # Look for estimated memory in PortfolioAllocator section
+                    pa_section = memory_report[memory_report.find("PortfolioAllocator Memory Usage:"):]
+                    for pa_line in pa_section.split('\n'):
+                        if "Estimated memory:" in pa_line:
+                            try:
+                                memory_stats["portfolio_allocator_bytes"] = int(pa_line.split()[-2])
+                            except (ValueError, IndexError):
+                                pass
+                            break
+                
+                elif "DataProcessor Memory Usage:" in line:
+                    # Look for estimated memory in DataProcessor section  
+                    dp_section = memory_report[memory_report.find("DataProcessor Memory Usage:"):]
+                    for dp_line in dp_section.split('\n'):
+                        if "Total estimated memory:" in dp_line:
+                            try:
+                                memory_stats["data_processor_bytes"] = int(dp_line.split()[-2])
+                            except (ValueError, IndexError):
+                                pass
+                            break
+            
+            return memory_stats
+            
+        except Exception as e:
+            logger.error(f"Failed to parse memory report: {e}")
+            return {
+                "status": "error",
+                "error": f"Failed to parse memory report: {str(e)}",
+                "raw_report": memory_report
+            }
+    
     def get_simulation_progress(self, simulation_id: str) -> Dict[str, Any]:
         if simulation_id not in self.active_simulations:
             return {"status": "not_found"}

@@ -69,6 +69,16 @@ class ResultProcessor:
             # Process equity curve using specialized processor
             simulation_result.equity_curve = self.equity_processor.process_equity_curve(result_data)
             
+            # Process memory statistics if available
+            if "memory_statistics" in result_data:
+                simulation_result.memory_statistics = result_data["memory_statistics"]
+                logger.debug(f"Memory statistics added for simulation {simulation_id}")
+            
+            # Process optimization info if available
+            if "optimization_info" in result_data:
+                simulation_result.optimization_info = result_data["optimization_info"]
+                logger.debug(f"Optimization info added for simulation {simulation_id}")
+            
             logger.info(f"Successfully processed results for simulation {simulation_id}")
             
         except Exception as e:

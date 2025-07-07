@@ -14,6 +14,7 @@ Result<void> ExecutionService::executeSignal(const TradingSignal& signal,
     // Validate the signal first
     auto validation_result = validateSignal(signal, symbol);
     if (validation_result.isError()) {
+        failed_executions_counter_++;
         Logger::warning("ExecutionService: Signal validation failed: ", validation_result.getErrorMessage());
         return validation_result;
     }
@@ -33,6 +34,7 @@ Result<void> ExecutionService::executeSignal(const TradingSignal& signal,
         executed_signals_.push_back(signal);
         Logger::debug("ExecutionService: Signal executed successfully");
     } else {
+        failed_executions_counter_++;
         Logger::debug("ExecutionService: Signal execution failed: ", execution_result.getErrorMessage());
     }
     
@@ -144,6 +146,7 @@ std::vector<TradingSignal> ExecutionService::getExecutedSignals() const {
 
 void ExecutionService::clearExecutedSignals() {
     executed_signals_.clear();
+    failed_executions_counter_ = 0;
 }
 
 void ExecutionService::addExecutedSignal(const TradingSignal& signal) {
@@ -151,7 +154,7 @@ void ExecutionService::addExecutedSignal(const TradingSignal& signal) {
 }
 
 int ExecutionService::getTotalExecutions() const {
-    return static_cast<int>(executed_signals_.size());
+    return static_cast<int>(executed_signals_.size()) + failed_executions_counter_;
 }
 
 int ExecutionService::getSuccessfulExecutions() const {
@@ -159,3 +162,29 @@ int ExecutionService::getSuccessfulExecutions() const {
     return static_cast<int>(executed_signals_.size());
 }
 
+int ExecutionService::getFailedExecutions() const {
+    return failed_executions_counter_;
+}
+
+// Memory optimization methods
+void ExecutionService::optimizeMemory() {
+    // Shrink executed signals vector to fit current size
+    executed_signals_.shrink_to_fit();
+}
+
+size_t ExecutionService::getMemoryUsage() const {
+    size_t total = sizeof(*this);
+    // Calculate memory usage of executed signals vector
+    total += executed_signals_.capacity() * sizeof(TradingSignal);
+    return total;
+}
+
+std::string ExecutionService::getMemoryReport() const {
+    std::ostringstream report;
+    report << "ExecutionService Memory Usage:\n";
+    report << "  Executed signals: " << executed_signals_.size() << "\n";
+    report << "  Vector capacity: " << executed_signals_.capacity() << "\n";
+    report << "  Memory overhead: " << (executed_signals_.capacity() - executed_signals_.size()) * sizeof(TradingSignal) << " bytes\n";
+    report << "  Total estimated memory: " << getMemoryUsage() << " bytes\n";
+    return report.str();
+}

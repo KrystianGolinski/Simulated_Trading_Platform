@@ -36,6 +36,8 @@ int CommandDispatcher::execute(int argc, char* argv[]) {
                 }
             } else if (command == "--status") {
                 return executeStatus();
+            } else if (command == "--memory-report") {
+                return executeMemoryReport();
             } else {
                 return showHelp(argv[0]);
             }
@@ -213,11 +215,23 @@ int CommandDispatcher::executeStatus() {
     }
 }
 
+int CommandDispatcher::executeMemoryReport() {
+    try {
+        TradingEngine engine(10000.0);
+        std::cout << engine.getMemoryReport() << std::endl;
+        return 0;
+    } catch (const std::exception& e) {
+        std::cerr << "Error generating memory report: " << e.what() << std::endl;
+        return 1;
+    }
+}
+
 int CommandDispatcher::showHelp(const char* program_name) {
     printHeader();
     std::cout << "\nUsage:" << std::endl;
     std::cout << "  " << program_name << " --simulate              Run simulation and output JSON" << std::endl;
     std::cout << "  " << program_name << " --status                Show portfolio status" << std::endl;
+    std::cout << "  " << program_name << " --memory-report         Show engine memory usage statistics" << std::endl;
     std::cout << "  " << program_name << " --test-db [options]     Test database connectivity" << std::endl;
     std::cout << "  " << program_name << " --backtest [options]    Run backtest with moving average strategy" << std::endl;
     std::cout << "  " << program_name << " --help                  Show this help" << std::endl;

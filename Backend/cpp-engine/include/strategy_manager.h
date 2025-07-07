@@ -54,6 +54,7 @@ public:
 private:
     std::unique_ptr<TradingStrategy> current_strategy_;
     std::string current_strategy_name_;
+    std::map<std::string, double> current_strategy_parameters_;
     
     // Helper methods for strategy creation
     Result<std::unique_ptr<TradingStrategy>> createStrategyByName(const std::string& name, const std::map<std::string, double>& parameters);

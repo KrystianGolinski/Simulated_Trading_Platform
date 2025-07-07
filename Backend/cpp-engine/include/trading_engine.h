@@ -96,6 +96,8 @@ public:
     // Memory optimization methods
     void optimizeMemoryUsage();
     void clearCache();
+    std::string getMemoryReport() const;
+    size_t getTotalMemoryUsage() const;
     
     // Portfolio access
     Portfolio& getPortfolio();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "position.h"
+#include "memory_optimizable.h"
 #include <map>
 #include <vector>
 #include <string>
@@ -9,7 +10,7 @@
  * Portfolio class manages a collection of stock positions and cash balance.
  * Handles buying/selling operations and portfolio value calculations.
  */
-class Portfolio {
+class Portfolio : public IMemoryOptimizable {
 private:
     std::map<std::string, Position> positions_;
     double cash_balance_;
@@ -55,4 +56,9 @@ public:
     // Utility
     std::string toString() const;
     std::string toDetailedString(const std::map<std::string, double>& current_prices) const;
+    
+    // Memory optimization interface
+    void optimizeMemory() override;
+    size_t getMemoryUsage() const override;
+    std::string getMemoryReport() const override;
 };

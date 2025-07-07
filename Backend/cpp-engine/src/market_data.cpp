@@ -413,3 +413,54 @@ std::string MarketData::formatDate(const std::string& date) {
 DatabaseConnection* MarketData::getDatabaseConnection() const {
     return db_connection_.get();
 }
+
+// Memory optimization methods
+void MarketData::optimizeMemory() {
+    // Clear price cache to free memory
+    {
+        std::lock_guard<std::mutex> lock(cache_mutex_);
+        price_cache_.clear();
+    }
+    
+    // Note: Connection pool optimization would be handled by DatabaseConnection
+    // if it implements IMemoryOptimizable interface
+}
+
+size_t MarketData::getMemoryUsage() const {
+    size_t total = sizeof(*this);
+    
+    // Calculate price cache memory usage
+    {
+        std::lock_guard<std::mutex> lock(cache_mutex_);
+        total += price_cache_.size() * (sizeof(std::string) + sizeof(double));
+        // Add estimated string storage
+        for (const auto& pair : price_cache_) {
+            total += pair.first.capacity();
+        }
+    }
+    
+    // Add database connection memory (if available)
+    if (db_connection_) {
+        total += sizeof(*db_connection_);
+    }
+    
+    return total;
+}
+
+std::string MarketData::getMemoryReport() const {
+    std::ostringstream report;
+    report << "MarketData Memory Usage:\n";
+    
+    size_t cache_size = 0;
+    {
+        std::lock_guard<std::mutex> lock(cache_mutex_);
+        cache_size = price_cache_.size();
+    }
+    
+    report << "  Price cache entries: " << cache_size << "\n";
+    report << "  Cache enabled: " << (cache_enabled_ ? "Yes" : "No") << "\n";
+    report << "  Database connection: " << (db_connection_ ? "Active" : "None") << "\n";
+    report << "  Estimated memory: " << getMemoryUsage() << " bytes\n";
+    
+    return report.str();
+}

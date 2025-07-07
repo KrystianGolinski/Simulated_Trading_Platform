@@ -261,3 +261,39 @@ std::string Portfolio::toDetailedString(const std::map<std::string, double>& cur
     
     return oss.str();
 }
+
+// Memory optimization methods
+void Portfolio::optimizeMemory() {
+    // Remove empty positions to reduce map size
+    auto it = positions_.begin();
+    while (it != positions_.end()) {
+        if (it->second.getShares() <= 0) {
+            it = positions_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    
+    // Log optimization completion
+    // Note: Avoiding Logger dependency for now to keep implementation simple
+}
+
+size_t Portfolio::getMemoryUsage() const {
+    size_t total = sizeof(*this);
+    // Estimate memory usage of positions map
+    total += positions_.size() * (sizeof(std::string) + sizeof(Position));
+    // Add estimated string storage for symbols
+    for (const auto& pair : positions_) {
+        total += pair.first.capacity();
+    }
+    return total;
+}
+
+std::string Portfolio::getMemoryReport() const {
+    std::ostringstream report;
+    report << "Portfolio Memory Usage:\n";
+    report << "  Active positions: " << positions_.size() << "\n";
+    report << "  Estimated memory: " << getMemoryUsage() << " bytes\n";
+    report << "  Cash balance: $" << cash_balance_ << "\n";
+    return report.str();
+}

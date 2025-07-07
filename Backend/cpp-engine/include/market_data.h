@@ -10,13 +10,14 @@
 #include "technical_indicators.h"
 #include "result.h"
 #include "trading_exceptions.h"
+#include "memory_optimizable.h"
 
 /**
  * MarketData class handles historical price data access from DB.
  * Provides methods to fetch stock prices for specific date ranges and symbols.
  */
 
-class MarketData {
+class MarketData : public IMemoryOptimizable {
 private:
     std::unique_ptr<DatabaseConnection> db_connection_;
     mutable std::map<std::string, double> price_cache_;
@@ -104,5 +105,10 @@ public:
     static std::string getCurrentDate();
     static bool isValidDateFormat(const std::string& date);
     static std::string formatDate(const std::string& date);
+    
+    // Memory optimization interface
+    void optimizeMemory() override;
+    size_t getMemoryUsage() const override;
+    std::string getMemoryReport() const override;
 };
 

@@ -125,13 +125,124 @@ void TradingEngine::optimizeMemoryUsage() {
     // Clear caches
     clearCache();
     
-    // TODO: Shrink internal containers to fit their current size
-    // portfolio_.optimizeMemory();
+    // Optimize memory usage across all services
+    portfolio_.optimizeMemory();
     
-    Logger::info("Memory optimization complete.");
+    if (market_data_) {
+        market_data_->optimizeMemory();
+    }
+    
+    if (execution_service_) {
+        execution_service_->optimizeMemory();
+    }
+    
+    if (data_processor_) {
+        data_processor_->optimizeMemory();
+    }
+    
+    if (portfolio_allocator_) {
+        portfolio_allocator_->optimizeMemory();
+    }
+    
+    if (result_calculator_) {
+        // Note: ResultCalculator doesn't implement IMemoryOptimizable yet
+        // result_calculator_->optimizeMemory();
+    }
+    
+    if (trading_orchestrator_) {
+        // Note: TradingOrchestrator doesn't implement IMemoryOptimizable yet
+        // trading_orchestrator_->optimizeMemoryUsage();
+    }
+    
+    // Shrink cache containers
+    price_data_cache_.clear();
+    
+    Logger::info("All service memory optimization complete");
 }
 
 void TradingEngine::clearCache() {
+    // Clear price data cache and shrink to fit
     price_data_cache_.clear();
-    Logger::info("Price data cache cleared.");
+    
+    // Also clear caches in services if they support it
+    if (market_data_) {
+        market_data_->clearCache();
+    }
+    
+    Logger::info("All caches cleared and optimized.");
+}
+
+// Memory reporting methods
+std::string TradingEngine::getMemoryReport() const {
+    std::ostringstream report;
+    report << "=== TradingEngine Memory Report ===\n";
+    
+    // Portfolio memory report
+    report << portfolio_.getMemoryReport() << "\n";
+    
+    // Price data cache memory
+    size_t total_cache_memory = 0;
+    for (const auto& [symbol, data] : price_data_cache_) {
+        total_cache_memory += symbol.capacity() + (data.capacity() * sizeof(PriceData));
+    }
+    
+    report << "Price Data Cache:\n";
+    report << "  Cached symbols: " << price_data_cache_.size() << "\n";
+    report << "  Estimated memory: " << total_cache_memory << " bytes\n\n";
+    
+    // Service memory reports
+    if (market_data_) {
+        report << market_data_->getMemoryReport() << "\n";
+    }
+    
+    if (execution_service_) {
+        report << execution_service_->getMemoryReport() << "\n";
+    }
+    
+    if (data_processor_) {
+        report << data_processor_->getMemoryReport() << "\n";
+    }
+    
+    if (portfolio_allocator_) {
+        report << portfolio_allocator_->getMemoryReport() << "\n";
+    }
+    
+    // Total memory summary
+    report << "Total Engine Memory: " << getTotalMemoryUsage() << " bytes\n";
+    
+    return report.str();
+}
+
+size_t TradingEngine::getTotalMemoryUsage() const {
+    size_t total = sizeof(*this);
+    
+    // Portfolio memory
+    total += portfolio_.getMemoryUsage();
+    
+    // Cache memory
+    for (const auto& [symbol, data] : price_data_cache_) {
+        total += symbol.capacity() + (data.capacity() * sizeof(PriceData));
+    }
+    
+    // Service memory
+    if (market_data_) {
+        total += market_data_->getMemoryUsage();
+    }
+    
+    if (execution_service_) {
+        total += execution_service_->getMemoryUsage();
+    }
+    
+    if (data_processor_) {
+        total += data_processor_->getMemoryUsage();
+    }
+    
+    if (portfolio_allocator_) {
+        total += portfolio_allocator_->getMemoryUsage();
+    }
+    
+    // Add estimated memory for unique_ptr overhead
+    total += 6 * sizeof(std::unique_ptr<void>);
+    
+    return total;
 }

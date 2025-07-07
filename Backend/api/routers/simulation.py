@@ -178,6 +178,53 @@ async def get_simulation_results(simulation_id: str):
     router_base.router_logger.log_success(f"/simulation/{simulation_id}/results")
     return response
 
+@router.get("/simulation/{simulation_id}/memory", response_model=StandardResponse[Dict])
+async def get_simulation_memory_statistics(simulation_id: str):
+    # Get memory statistics for a specific simulation
+    result = simulation_engine.get_simulation_status(simulation_id)
+    
+    router_base.router_logger.log_request(f"/simulation/{simulation_id}/memory", {"simulation_id": simulation_id})
+    
+    if not result:
+        response = router_base.response_formatter.create_not_found_response(
+            "Simulation", simulation_id, "simulation_id"
+        )
+        router_base.router_logger.log_error(f"/simulation/{simulation_id}/memory", 
+                                          Exception("Simulation not found"), "SIMULATION_NOT_FOUND")
+        return response
+    
+    # Extract memory statistics from the simulation result
+    memory_stats = result.memory_statistics if hasattr(result, 'memory_statistics') and result.memory_statistics else None
+    
+    if not memory_stats:
+        # If no memory statistics are available, return a structured response
+        memory_response = {
+            "simulation_id": simulation_id,
+            "status": "no_memory_data",
+            "message": "No memory statistics available for this simulation",
+            "simulation_status": result.status.value if hasattr(result, 'status') else "unknown"
+        }
+    else:
+        # Return the memory statistics with additional metadata
+        memory_response = {
+            "simulation_id": simulation_id,
+            "status": "success", 
+            "simulation_status": result.status.value if hasattr(result, 'status') else "unknown",
+            "memory_statistics": memory_stats,
+            "summary": {
+                "has_timeline": "timeline" in memory_stats if isinstance(memory_stats, dict) else False,
+                "has_analysis": "analysis" in memory_stats if isinstance(memory_stats, dict) else False,
+                "tracking_status": memory_stats.get("status") if isinstance(memory_stats, dict) else "unknown"
+            }
+        }
+    
+    response = router_base.response_formatter.create_success_response(
+        memory_response, 
+        "Memory statistics retrieved successfully" if memory_stats else "No memory data available"
+    )
+    router_base.router_logger.log_success(f"/simulation/{simulation_id}/memory")
+    return response
+
 @router.get("/simulation/{simulation_id}/cancel")
 async def cancel_simulation(simulation_id: str) -> StandardResponse[Dict[str, str]]:
     # Cancel a running simulation
