@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 
-# API Test Runner Script
-# Similar to the C++ engine testing script
-# Runs all API tests with detailed reporting and metrics
+# This script runs the comprehensive API test suite from comprehensive_API_testing.py.
+#
+# It provides a command-line interface to:
+# - Check for dependencies and correct API file structure.
+# - Execute the test suite.
+# - Print a summary of the results.
+# - Optionally save the results to a JSON file.
 
 import sys
 import os
@@ -21,12 +25,18 @@ sys.path.insert(0, str(api_dir))
 from tests.comprehensive_API_testing import ComprehensiveAPITestSuite
 
 class APITestRunner:
-    # Test runner for the API
-    # Provides detailed test execution, reporting, and metrics collection
+    """
+    Orchestrates the test execution process.
+    
+    This class is responsible for checking dependencies, validating the API structure,
+    running the test suite, and reporting the results.
+    """
     
     def __init__(self, verbose: bool = False, include_integration: bool = True):
+        """Initializes the test runner."""
         self.verbose = verbose
         self.include_integration = include_integration
+        
         self.test_results = {
             'total_execution_time': 0,
             'test_suites_run': 0,
@@ -39,9 +49,14 @@ class APITestRunner:
         }
         
     def run_comprehensive_tests(self) -> bool:
-        # Run the test suite and return success status
+        """
+        Executes the main test suite and collects the results.
+        
+        Returns:
+            bool: True if all tests pass, False otherwise.
+        """
         if self.verbose:
-            print("Running API test suite with detailed reporting:")
+            print("Executing API test suite:")
             print(f"Verbose mode: {'ON' if self.verbose else 'OFF'}")
             print(f"Integration tests: {'INCLUDED' if self.include_integration else 'EXCLUDED'}")
             print()
@@ -49,11 +64,10 @@ class APITestRunner:
         start_time = time.time()
         
         try:
-            # Initialize and run the test suite
             test_suite = ComprehensiveAPITestSuite()
             
             if self.verbose:
-                print("Initializing test suite:")
+                print("Initializing test suite...")
             test_suite.run_all_tests()
             
             # Collect results from the test suite
@@ -69,7 +83,7 @@ class APITestRunner:
             success = test_suite.test_results['failed_tests'] == 0
             
         except Exception as e:
-            print(f"CRITICAL ERROR: Failed to run test suite: {str(e)}")
+            print(f"CRITICAL ERROR: Failed to execute test suite: {str(e)}")
             self.test_results['error_summary'].append({
                 'category': 'Test Suite Execution',
                 'error': str(e)
@@ -81,9 +95,14 @@ class APITestRunner:
     
     
     def check_api_dependencies(self) -> bool:
-        # Check that required API dependencies are available
+        """
+        Verifies that required Python packages for testing are installed.
+
+        Returns:
+            bool: True if all dependencies are available, False otherwise.
+        """
         if self.verbose:
-            print("\nChecking API Dependencies")
+            print("\nChecking API dependencies...")
         
         required_modules = [
             'fastapi',
@@ -100,11 +119,11 @@ class APITestRunner:
             try:
                 __import__(module)
                 if self.verbose:
-                    print(f"  PASS {module}")
+                    print(f"  PASS: {module}")
             except ImportError:
                 missing_modules.append(module)
                 if self.verbose:
-                    print(f"  FAIL {module} - NOT FOUND")
+                    print(f"  FAIL: {module} - NOT FOUND")
         
         if missing_modules:
             if self.verbose:
@@ -114,13 +133,18 @@ class APITestRunner:
             return False
         
         if self.verbose:
-            print("All required dependencies are available")
+            print("All required dependencies are available.")
         return True
     
     def check_api_structure(self) -> bool:
-        # Check that the API structure is complete
+        """
+        Verifies that key API files and directories exist.
+
+        Returns:
+            bool: True if the structure seems correct, False otherwise.
+        """
         if self.verbose:
-            print("\nChecking API Structure")
+            print("\nChecking API file structure...")
         
         required_files = [
             'main.py',
@@ -141,28 +165,28 @@ class APITestRunner:
             full_path = api_dir / file_path
             if full_path.exists():
                 if self.verbose:
-                    print(f"  PASS {file_path}")
+                    print(f"  PASS: {file_path}")
             else:
                 missing_files.append(file_path)
                 if self.verbose:
-                    print(f"  FAIL {file_path} - NOT FOUND")
+                    print(f"  FAIL: {file_path} - NOT FOUND")
         
         if missing_files:
             if self.verbose:
                 print(f"\nWARNING: Missing API files: {', '.join(missing_files)}")
-                print("Some tests may fail due to missing components")
+                print("Some tests may fail due to missing components.")
             return False
         
         if self.verbose:
-            print("API structure is complete")
+            print("API structure is complete.")
         return True
     
     def generate_test_report(self) -> None:
-        # Generate test report
+        """Prints a summary of the test results to the console."""
         if not self.verbose:
             return
         
-        print("\n API Test Report:")
+        print("\nAPI Test Report:")
         
         execution_time = self.test_results['total_execution_time']
         total_tests = self.test_results['individual_tests_run']
@@ -178,10 +202,8 @@ class APITestRunner:
             pass_rate = (passed_tests / total_tests) * 100
             print(f"Pass Rate: {pass_rate:.1f}%")
         
-        # Test categories breakdown
         print(f"\nTest Suites Executed: {self.test_results['test_suites_run']}")
         
-        # Error summary
         if self.test_results['error_summary']:
             print(f"\nErrors Encountered: {len(self.test_results['error_summary'])}")
             for i, error in enumerate(self.test_results['error_summary'], 1):
@@ -190,7 +212,6 @@ class APITestRunner:
                 else:
                     print(f"  {i}. {error}")
         
-        # Performance analysis
         if execution_time > 0 and total_tests > 0:
             avg_time_per_test = execution_time / total_tests
             print(f"\nPerformance Metrics:")
@@ -202,7 +223,6 @@ class APITestRunner:
             if execution_time > 60:
                 print(f"  WARNING: Total execution time is high ({execution_time:.1f}s)")
         
-        # Final status
         print("\nFINAL RESULTS:")
         if failed_tests == 0 and not self.test_results['error_summary']:
             print("SUCCESS: API is functioning correctly.")
@@ -212,7 +232,12 @@ class APITestRunner:
             print(f"FAILURE: {failed_tests} tests failed. API needs attention.")
     
     def save_test_results(self, output_file: str = None) -> None:
-        # Save test results to JSON file
+        """
+        Saves test results to a JSON file.
+        
+        Args:
+            output_file: Optional custom filename for result export.
+        """
         if output_file is None:
             output_file = f"api_test_results_{int(time.time())}.json"
         
@@ -224,8 +249,8 @@ class APITestRunner:
             print(f"Failed to save test results: {str(e)}")
 
 def main():
-    # Main function for running API tests
-    parser = argparse.ArgumentParser(description="API Test Runner")
+    """Parses command-line arguments and runs the API test runner."""
+    parser = argparse.ArgumentParser(description="Runs the API test suite.")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
     parser.add_argument("--no-integration", action="store_true", help="Skip integration tests")
     parser.add_argument("--save-results", type=str, help="Save results to specified file")
@@ -233,44 +258,34 @@ def main():
     
     args = parser.parse_args()
     
-    # Initialize test runner
     runner = APITestRunner(
         verbose=args.verbose,
         include_integration=not args.no_integration
     )
     
-    # Check dependencies and structure
     deps_ok = runner.check_api_dependencies()
     structure_ok = runner.check_api_structure()
     
     if args.check_only:
         if deps_ok and structure_ok:
-            print("\n[PASS] API is ready for testing")
+            print("\n[PASS] API is ready for testing.")
             return 0
         else:
-            print("\n[FAIL] API setup issues found")
+            print("\n[FAIL] API setup issues found.")
             return 1
     
     if not deps_ok:
-        print("\nCannot run tests due to missing dependencies")
+        print("\nCannot execute tests due to missing dependencies.")
         return 1
 
-    overall_success = True
+    overall_success = runner.run_comprehensive_tests()
     
-    # Run main test suite
-    comprehensive_success = runner.run_comprehensive_tests()
-    overall_success = overall_success and comprehensive_success
-    
-    # Generate report
     runner.generate_test_report()
     
-    # Save results if requested
     if args.save_results:
         runner.save_test_results(args.save_results)
     
-    # Return appropriate exit code
     return 0 if overall_success else 1
 
 if __name__ == "__main__":
-    exit_code = main()
-    sys.exit(exit_code)
+    sys.exit(main())

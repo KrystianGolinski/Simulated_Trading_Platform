@@ -1,3 +1,22 @@
+# Simulation Engine - Core Orchestration Layer
+# This module provides the central simulation orchestration system for the Trading Platform
+# Key responsibilities:
+# - Simulation lifecycle management (start, monitor, cancel, complete)
+# - Integration with C++ trading engine for execution
+# - Intelligent optimization through performance optimizer integration
+# - Parallel and sequential execution coordination
+# - Real-time progress tracking and status monitoring
+# - Memory usage monitoring and optimization
+# - Result aggregation and processing
+# - Error handling and recovery mechanisms
+#
+# Architecture Integration:
+# - Acts as the central coordinator between API layer and C++ engine
+# - Integrates with PerformanceOptimizer for intelligent execution strategies
+# - Uses ExecutionService for C++ engine communication
+# - Employs ResultProcessor for output parsing and validation
+# - Provides unified interface for both sequential and parallel simulations
+
 import asyncio
 import json
 import uuid
@@ -15,189 +34,285 @@ from services.error_handler import ErrorHandler
 logger = logging.getLogger(__name__)
 
 class SimulationEngine:
+    # Central simulation orchestration engine
+    # Coordinates all aspects of simulation execution from API requests to result delivery
+    # Integrates multiple specialized services for optimal performance and reliability
+    
     def __init__(self):
-        # C++ engine is accessible via shared volume in Docker
+        # C++ trading engine integration via Docker shared volume
+        # The engine executable is mounted at /shared/trading_engine in the container
         self.cpp_engine_path = Path("/shared/trading_engine")
         logger.info(f"Using shared C++ engine path: {self.cpp_engine_path}")
         
-        # Initialize separated services
-        self.execution_service = ExecutionService(self.cpp_engine_path)
-        self.result_processor = ResultProcessor()
-        self.error_handler = ErrorHandler()
+        # Initialize specialized service components using dependency injection pattern
+        self.execution_service = ExecutionService(self.cpp_engine_path)  # C++ engine communication
+        self.result_processor = ResultProcessor()                        # Result parsing and validation
+        self.error_handler = ErrorHandler()                             # Structured error handling
         
-        # Track parallel execution metadata
-        self.parallel_executions = {}  # main_sim_id -> {group_ids: [...], optimization_info: {...}}
+        # Parallel execution tracking and coordination
+        # Maps main simulation IDs to their parallel execution metadata
+        # Structure: main_sim_id -> {group_ids: [...], optimization_info: {...}, status: ...}
+        self.parallel_executions = {}  # Active parallel simulation tracking
         
     def _validate_cpp_engine(self) -> Dict[str, Any]:
+        # Validate C++ trading engine availability and functionality
+        # Delegates to ExecutionService for comprehensive engine validation
         return self.execution_service.validate_cpp_engine()
     
     
     async def start_simulation(self, config: SimulationConfig) -> str:
-        # Start a new simulation and return simulation ID
-        # Enhanced engine validation with detailed error messages
+        # Start a new simulation with intelligent optimization and return unique simulation ID
+        # This method initiates the complete simulation lifecycle including:
+        # - Engine validation and readiness checks
+        # - Performance optimization analysis
+        # - Background execution with progress tracking
+        # - Result processing and storage coordination
+        
+        # Comprehensive engine validation before simulation start
         engine_validation = self._validate_cpp_engine()
         if not engine_validation['is_valid']:
             raise RuntimeError(f"C++ trading engine validation failed: {engine_validation['error']}")
         
+        # Generate unique simulation identifier for tracking and correlation
         simulation_id = str(uuid.uuid4())
         
-        # Initialize simulation result using result processor
+        # Initialize simulation result storage and metadata
+        # Creates initial result structure for progress tracking
         self.result_processor.initialize_simulation_result(simulation_id, config)
         
-        # Optimize simulation based on configuration
+        # Perform intelligent optimization analysis to determine execution strategy
+        # Analyzes complexity and determines sequential vs parallel execution
         optimization_info = await performance_optimizer.optimize_simulation_execution(config)
-        logger.info(f"Simulation {simulation_id} optimization: {optimization_info}")
+        logger.info(f"Simulation {simulation_id} optimization strategy: {optimization_info['strategy_name']} "
+                   f"({optimization_info['execution_mode']}) - estimated speedup: {optimization_info.get('estimated_speedup', 1.0)}x")
         
-        # Start simulation in background
+        # Start simulation execution in background to avoid blocking API response
+        # Uses asyncio.create_task for proper async execution without blocking
         asyncio.create_task(self._run_simulation(simulation_id, config, optimization_info))
         
         return simulation_id
     
     async def _run_simulation(self, simulation_id: str, config: SimulationConfig, optimization_info: Dict[str, Any] = None):
+        # Core simulation execution workflow with comprehensive monitoring and error handling
+        # Handles both sequential and parallel execution modes with real-time progress tracking
+        # Integrates memory monitoring, result processing, and optimization analytics
         try:
-            # Log optimization strategy information
+            # Log optimization strategy selection for monitoring and debugging
             if optimization_info:
-                logger.info(f"Simulation {simulation_id} executing with strategy: {optimization_info.get('strategy_name', 'unknown')}")
-                logger.info(f"Execution mode: {optimization_info.get('execution_mode', 'unknown')}, "
-                           f"Expected speedup: {optimization_info.get('estimated_speedup', 1.0)}x")
+                strategy_name = optimization_info.get('strategy_name', 'unknown')
+                execution_mode = optimization_info.get('execution_mode', 'unknown')
+                estimated_speedup = optimization_info.get('estimated_speedup', 1.0)
+                complexity_score = optimization_info.get('complexity_score', 'unknown')
+                
+                logger.info(f"Simulation {simulation_id} executing with strategy: {strategy_name}")
+                logger.info(f"Execution mode: {execution_mode}, Expected speedup: {estimated_speedup}x, "
+                           f"Complexity score: {complexity_score}")
             
-            # Capture baseline memory statistics before simulation starts
+            # Capture baseline memory statistics for optimization analysis
+            # Enables memory usage tracking and optimization recommendations
             baseline_memory = await self._capture_memory_statistics("baseline")
             memory_timeline = [baseline_memory] if baseline_memory else []
             
-            # Update status to running
+            # Update simulation status to running with timestamp
+            # Enables real-time status monitoring via API endpoints
             self.result_processor.update_simulation_status(
                 simulation_id, SimulationStatus.RUNNING, datetime.now()
             )
             
-            # Execute simulation based on optimizer decision
+            # Execute simulation using optimizer-determined strategy (parallel or sequential)
             if optimization_info and optimization_info.get('execution_mode') == 'parallel':
-                # Use parallel execution through performance optimizer
+                # Parallel execution path for complex simulations with multiple symbol groups
                 symbol_groups = optimization_info.get('symbol_groups', [])
-                logger.info(f"Executing parallel simulation with {len(symbol_groups)} groups, "
-                           f"{optimization_info.get('parallel_tasks', 0)} parallel tasks")
+                parallel_tasks = optimization_info.get('parallel_tasks', 0)
                 
-                # Pre-generate group IDs for immediate progress tracking
+                logger.info(f"Executing parallel simulation with {len(symbol_groups)} groups, "
+                           f"{parallel_tasks} parallel tasks, estimated efficiency: "
+                           f"{optimization_info.get('estimated_efficiency', 'unknown')}")
+                
+                # Pre-generate unique group IDs for immediate progress tracking
+                # Enables real-time progress monitoring before execution starts
                 group_ids = [f"group_{i}_{str(uuid.uuid4())[:8]}" for i in range(len(symbol_groups))]
                 
-                # Store parallel execution metadata immediately for progress tracking
+                # Store comprehensive parallel execution metadata for progress tracking
+                # This metadata enables real-time progress aggregation across all groups
                 self.parallel_executions[simulation_id] = {
-                    "group_ids": group_ids,  # Pre-populated group IDs
-                    "optimization_info": optimization_info,
-                    "symbol_groups": symbol_groups,
-                    "status": "running",  # Use valid enum value
-                    "total_groups": len(symbol_groups)
+                    "group_ids": group_ids,              # Pre-generated unique identifiers
+                    "optimization_info": optimization_info, # Optimization strategy and metrics
+                    "symbol_groups": symbol_groups,      # Symbol distribution across groups
+                    "status": "running",                 # Current execution status
+                    "total_groups": len(symbol_groups),  # Total number of parallel groups
+                    "start_time": datetime.now()         # Execution start timestamp
                 }
                 
-                logger.info(f"Stored parallel execution metadata for {simulation_id}: {len(group_ids)} groups")
+                logger.info(f"Stored parallel execution metadata for {simulation_id}: {len(group_ids)} groups "
+                           f"with optimization strategy '{optimization_info.get('strategy_name')}'")
                 
-                # Execute simulation groups in parallel and track group IDs
+                # Execute parallel simulation groups with comprehensive tracking
+                # Coordinates execution across multiple groups while maintaining progress visibility
                 group_results = await self._execute_parallel_with_tracking(
                     simulation_id, symbol_groups, config, optimization_info, group_ids
                 )
                 
-                # Aggregate results from all groups
+                # Aggregate results from all parallel groups into unified simulation result
+                # Combines performance metrics, trade data, and execution metadata
                 aggregated_result = await self._aggregate_parallel_results(
                     simulation_id, group_results, optimization_info
                 )
                 
-                # Process the aggregated result
+                # Process aggregated parallel execution results with comprehensive analysis
                 if aggregated_result["status"] == "success":
-                    # Capture final memory statistics after parallel execution
+                    # Capture final memory statistics for optimization analysis
                     final_memory = await self._capture_memory_statistics("final")
                     if final_memory:
                         memory_timeline.append(final_memory)
                     
-                    # Add memory tracking to the aggregated result
+                    # Enhance result data with memory optimization insights
                     if memory_timeline:
-                        aggregated_result["data"]["memory_statistics"] = self._create_memory_summary(memory_timeline, optimization_info)
+                        aggregated_result["data"]["memory_statistics"] = self._create_memory_summary(
+                            memory_timeline, optimization_info
+                        )
                     
+                    # Process successful parallel execution results
                     self.result_processor.process_simulation_results(simulation_id, aggregated_result["data"])
+                    
+                    logger.info(f"Parallel simulation {simulation_id} completed successfully with "
+                               f"{len(group_results)} groups, actual speedup: "
+                               f"{aggregated_result['data'].get('optimization_info', {}).get('actual_speedup', 'unknown')}x")
                 else:
-                    self.result_processor.mark_simulation_failed(simulation_id, aggregated_result["error"])
+                    # Handle parallel execution failure with detailed error information
+                    error_msg = aggregated_result["error"]
+                    failed_groups = aggregated_result.get("failed_groups", [])
+                    
+                    self.result_processor.mark_simulation_failed(simulation_id, error_msg)
+                    logger.error(f"Parallel simulation {simulation_id} failed: {error_msg}, "
+                                f"failed groups: {len(failed_groups)}")
                 
-                # Clean up parallel execution tracking once complete
+                # Clean up parallel execution tracking to prevent memory leaks
                 if simulation_id in self.parallel_executions:
                     del self.parallel_executions[simulation_id]
+                    logger.debug(f"Cleaned up parallel execution metadata for {simulation_id}")
                     
             else:
-                # Use sequential execution (single group or optimizer recommended sequential)
-                logger.info(f"Executing sequential simulation")
+                # Sequential execution path for simple simulations or optimizer-recommended sequential mode
+                logger.info(f"Executing sequential simulation (reason: {optimization_info.get('reasoning', 'optimizer recommendation') if optimization_info else 'default mode'})")
                 
-                # Execute simulation using execution service
+                # Execute simulation directly using execution service
+                # Single-threaded execution with full resource dedication
                 execution_result = await self.execution_service.execute_simulation(
                     simulation_id, config
                 )
                 
-                # Process results based on execution outcome
+                # Process sequential execution results with comprehensive validation and enhancement
                 if execution_result["return_code"] == 0:
                     try:
+                        # Parse and validate JSON results from C++ engine
                         result_data = self.result_processor.parse_json_result(execution_result["stdout"])
+                        
                         if self.result_processor.validate_result_data(result_data):
-                            # Capture final memory statistics after sequential execution
+                            # Capture final memory statistics for optimization analysis
                             final_memory = await self._capture_memory_statistics("final")
                             if final_memory:
                                 memory_timeline.append(final_memory)
                             
-                            # Enhance result data with optimization information for future analysis
+                            # Enhance result data with optimization metadata for performance analysis
                             if optimization_info:
                                 result_data["optimization_info"] = {
                                     "strategy_used": optimization_info.get('strategy_name'),
                                     "execution_mode": optimization_info.get('execution_mode'),
                                     "complexity_score": optimization_info.get('complexity_score'),
                                     "estimated_speedup": optimization_info.get('estimated_speedup'),
-                                    "optimization_time_ms": optimization_info.get('optimization_time_ms')
+                                    "actual_speedup": 1.0,  # Sequential execution baseline
+                                    "optimization_time_ms": optimization_info.get('optimization_time_ms'),
+                                    "reasoning": optimization_info.get('reasoning')
                                 }
                             
-                            # Add memory tracking to the result data
+                            # Add comprehensive memory tracking and analysis
                             if memory_timeline:
-                                result_data["memory_statistics"] = self._create_memory_summary(memory_timeline, optimization_info)
+                                result_data["memory_statistics"] = self._create_memory_summary(
+                                    memory_timeline, optimization_info
+                                )
                             
+                            # Process successful sequential execution results
                             self.result_processor.process_simulation_results(simulation_id, result_data)
+                            logger.info(f"Sequential simulation {simulation_id} completed successfully")
                         else:
+                            # Handle result validation failure with detailed error context
                             error = self.error_handler.create_validation_error(
-                                "Invalid result data structure",
-                                {"stdout_preview": execution_result["stdout"][:200]}
+                                "Invalid result data structure from C++ engine",
+                                {
+                                    "stdout_preview": execution_result["stdout"][:200],
+                                    "simulation_id": simulation_id,
+                                    "execution_mode": "sequential"
+                                }
                             )
                             self.result_processor.mark_simulation_failed(simulation_id, error.message)
+                            logger.error(f"Result validation failed for simulation {simulation_id}: {error.message}")
+                            
                     except json.JSONDecodeError as e:
+                        # Handle JSON parsing errors with structured error information
                         error = self.error_handler.create_json_parse_error(str(e), execution_result["stdout"])
                         self.result_processor.mark_simulation_failed(simulation_id, error.message)
+                        logger.error(f"JSON parsing failed for simulation {simulation_id}: {str(e)}")
+                        
                 else:
-                    # Handle execution failure
+                    # Handle C++ engine execution failure with categorized error analysis
                     error = self.error_handler.categorize_cpp_engine_error(
                         execution_result["return_code"],
                         execution_result["stdout"],
                         execution_result["stderr"]
                     )
                     self.result_processor.mark_simulation_failed(simulation_id, error.message)
+                    logger.error(f"C++ engine execution failed for simulation {simulation_id}: "
+                                f"return code {execution_result['return_code']}, error: {error.message}")
                 
         except Exception as e:
+            # Handle unexpected errors during simulation execution with comprehensive context
             error = self.error_handler.create_generic_error(
                 f"Unexpected error in simulation {simulation_id}: {str(e)}",
-                {"simulation_id": simulation_id}
+                {
+                    "simulation_id": simulation_id,
+                    "execution_mode": optimization_info.get('execution_mode', 'unknown') if optimization_info else 'unknown',
+                    "strategy_name": optimization_info.get('strategy_name', 'unknown') if optimization_info else 'unknown',
+                    "exception_type": type(e).__name__,
+                    "error_context": "simulation_execution"
+                }
             )
             self.result_processor.mark_simulation_failed(simulation_id, error.message)
+            logger.error(f"Unexpected simulation error for {simulation_id}: {str(e)}", exc_info=True)
     
     async def _execute_parallel_with_tracking(self, simulation_id: str, symbol_groups: List[List[str]], 
                                             config: SimulationConfig, optimization_info: Dict[str, Any],
                                             group_ids: List[str]) -> List[Dict[str, Any]]:
-        # Execute parallel simulation while tracking group IDs for progress monitoring
+        # Execute parallel simulation with comprehensive progress tracking and group coordination
+        # Coordinates execution across multiple symbol groups while maintaining real-time visibility
+        # Integrates with PerformanceOptimizer for optimal parallel execution management
         from performance_optimizer import performance_optimizer
         
-        # Execute the parallel groups with pre-assigned group IDs using our execution service
+        logger.info(f"Starting parallel execution for {simulation_id} with {len(symbol_groups)} groups")
+        
+        # Execute parallel groups using performance optimizer with pre-assigned group IDs
+        # This enables immediate progress tracking and result correlation
         group_results = await performance_optimizer.execute_simulation_groups(
             symbol_groups, config, group_ids, self.execution_service
         )
         
-        # Verify group IDs match what was expected
+        # Verify group ID consistency for progress tracking integrity
         actual_group_ids = [result.get("simulation_id") for result in group_results if result.get("simulation_id")]
         
         if len(actual_group_ids) != len(group_ids):
-            logger.warning(f"Group ID mismatch for {simulation_id}: expected {len(group_ids)}, got {len(actual_group_ids)}")
-            # Update with actual group IDs if they differ
+            logger.warning(f"Group ID mismatch for {simulation_id}: expected {len(group_ids)}, "
+                          f"got {len(actual_group_ids)}. This may affect progress tracking accuracy.")
+            # Update tracking metadata with actual group IDs to maintain consistency
             if simulation_id in self.parallel_executions:
                 self.parallel_executions[simulation_id]["group_ids"] = actual_group_ids
+                logger.debug(f"Updated group IDs for {simulation_id} to maintain tracking consistency")
+        
+        # Log execution results summary for monitoring
+        successful_groups = [r for r in group_results if r.get("status") == "completed"]
+        failed_groups = [r for r in group_results if r.get("status") == "failed"]
+        
+        logger.info(f"Parallel execution completed for {simulation_id}: {len(successful_groups)} successful, "
+                   f"{len(failed_groups)} failed out of {len(group_results)} total groups")
         
         return group_results
     
@@ -344,17 +459,25 @@ class SimulationEngine:
             }
     
     def get_simulation_status(self, simulation_id: str) -> Optional[SimulationResults]:
-        # Get current status of a simulation
+        # Retrieve current status and metadata for a simulation
+        # Returns complete simulation results including progress, performance metrics, and metadata
         return self.result_processor.get_simulation_result(simulation_id)
     
     def get_simulation_progress(self, simulation_id: str) -> Dict[str, Any]:
-        # Check if this is a parallel simulation using stored metadata
+        # Get real-time simulation progress with intelligent routing for parallel vs sequential simulations
+        # Automatically detects execution mode and provides appropriate progress aggregation
+        
+        # Check if this is an active parallel simulation
         if simulation_id in self.parallel_executions:
-            # This is a parallel simulation - aggregate progress from all groups
+            # Parallel simulation - aggregate progress from all groups
             parallel_info = self.parallel_executions[simulation_id]
-            return self._aggregate_parallel_progress(simulation_id, parallel_info["group_ids"])
+            group_ids = parallel_info["group_ids"]
+            
+            logger.debug(f"Retrieving parallel progress for {simulation_id} with {len(group_ids)} groups")
+            return self._aggregate_parallel_progress(simulation_id, group_ids)
         else:
-            # This is a sequential simulation - delegate to execution service
+            # Sequential simulation - delegate directly to execution service
+            logger.debug(f"Retrieving sequential progress for {simulation_id}")
             return self.execution_service.get_simulation_progress(simulation_id)
     
     def _aggregate_parallel_progress(self, main_simulation_id: str, group_ids: List[str]) -> Dict[str, Any]:
@@ -478,22 +601,40 @@ class SimulationEngine:
         return result
     
     def list_simulations(self) -> Dict[str, SimulationResults]:
-        # List all simulations
+        # Retrieve all simulation results for monitoring and analysis
+        # Returns comprehensive simulation history with performance metrics and status information
         return self.result_processor.get_all_simulation_results()
     
     async def cancel_simulation(self, simulation_id: str) -> bool:
-        # Cancel a running simulation using the execution service
+        # Cancel a running simulation with support for both sequential and parallel execution modes
+        # Handles graceful shutdown and cleanup of resources for all execution types
         try:
-            # Try to cancel the running process
+            logger.info(f"Attempting to cancel simulation {simulation_id}")
+            
+            # Check if this is a parallel simulation requiring group-level cancellation
+            if simulation_id in self.parallel_executions:
+                logger.info(f"Cancelling parallel simulation {simulation_id} with multiple groups")
+                
+                # For parallel simulations, we should ideally cancel all group processes
+                # Currently delegating to execution service which handles the main process
+                # Future enhancement: implement individual group cancellation
+            
+            # Attempt to cancel the running process via execution service
             cancelled = await self.execution_service.cancel_simulation(simulation_id)
             
             if cancelled:
-                # Mark as failed in result processor
+                # Successfully cancelled - mark as failed with cancellation reason
                 self.result_processor.mark_simulation_failed(simulation_id, "Simulation cancelled by user")
+                
+                # Clean up parallel execution tracking if applicable
+                if simulation_id in self.parallel_executions:
+                    del self.parallel_executions[simulation_id]
+                    logger.debug(f"Cleaned up parallel execution metadata for cancelled simulation {simulation_id}")
+                
                 logger.info(f"Simulation {simulation_id} successfully cancelled")
                 return True
             else:
-                # Process not found or already completed, just mark as cancelled
+                # Process not found or already completed - mark as cancelled anyway
                 self.result_processor.mark_simulation_failed(simulation_id, "Simulation cancellation requested")
                 logger.info(f"Simulation {simulation_id} marked as cancelled (process not active)")
                 return True
@@ -635,4 +776,6 @@ class SimulationEngine:
             }
 
 # Global simulation engine instance
+# Singleton pattern ensures consistent simulation state and resource management
+# Used by simulation routers and background task coordination
 simulation_engine = SimulationEngine()

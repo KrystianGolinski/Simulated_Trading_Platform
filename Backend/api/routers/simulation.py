@@ -1,3 +1,38 @@
+# Simulation Router - Trading Simulation Lifecycle Management Endpoints
+# This module provides comprehensive API endpoints for trading simulation management
+# Key responsibilities:
+# - Simulation configuration validation and parameter checking
+# - Simulation lifecycle management (start, monitor, cancel, complete)
+# - Real-time simulation progress tracking and status monitoring
+# - Simulation result retrieval and analysis
+# - Memory usage monitoring and optimization analytics
+# - Parallel and sequential simulation coordination
+# - Error handling and validation for simulation operations
+#
+# Architecture Features:
+# - RouterBase pattern for consistent endpoint structure and logging
+# - Integration with SimulationEngine for comprehensive simulation orchestration
+# - Dependency injection for SimulationValidator and repository access
+# - Real-time progress tracking for both parallel and sequential simulations
+# - Comprehensive validation with detailed error reporting
+# - Memory statistics tracking for optimization analysis
+# - Simulation cancellation support for long-running operations
+#
+# Endpoints Provided:
+# - /simulation/validate: Validate simulation configuration without execution
+# - /simulation/start: Start new simulation with automatic optimization
+# - /simulation/{simulation_id}/status: Get real-time simulation status and progress
+# - /simulation/{simulation_id}/results: Get complete simulation results with metrics
+# - /simulation/{simulation_id}/memory: Get memory usage statistics and optimization data
+# - /simulation/{simulation_id}/cancel: Cancel running simulation
+# - /simulations: List all historical simulations with status
+#
+# Integration Points:
+# - Uses SimulationEngine for simulation orchestration and execution
+# - Integrates with SimulationValidator for configuration validation
+# - Supports RouterBase pattern for consistent response formatting
+# - Provides real-time progress tracking for monitoring systems
+
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict
 import logging
@@ -15,7 +50,7 @@ from validation import SimulationValidator
 from models import StandardResponse, ApiError
 from routing import get_router_service_factory
 
-# Create router using RouterBase pattern
+# Create router using RouterBase pattern for consistent simulation endpoint structure
 router_factory = get_router_service_factory()
 router_base = router_factory.create_router_base("simulation")
 router = router_base.get_router()
@@ -25,6 +60,8 @@ logger = logging.getLogger(__name__)
 
 async def _validate_config(config: SimulationConfig, validator: SimulationValidator) -> ValidationResult:
     # Centralized validation logic for simulation configurations
+    # Provides comprehensive parameter validation and error handling
+    # Used by both validation and simulation start endpoints
     try:
         return await validator.validate_simulation_config(config)
     except Exception as e:
@@ -32,17 +69,22 @@ async def _validate_config(config: SimulationConfig, validator: SimulationValida
         raise HTTPException(status_code=500, detail=f"Validation failed: {str(e)}")
 
 def _handle_validation_warnings(validation_result: ValidationResult) -> None:
-    # Log validation warnings if present
+    # Log validation warnings for monitoring and user awareness
+    # Provides visibility into potential simulation configuration issues
+    # Used to inform users of non-critical configuration concerns
     if validation_result.warnings:
         for warning in validation_result.warnings:
             logger.warning(f"Simulation validation warning: {warning}")
 
 @router.post("/simulation/validate", response_model=StandardResponse[ValidationResult])
 async def validate_simulation_config(config: SimulationConfig, validator: SimulationValidator = Depends(get_simulation_validator)):
-    # Validate simulation configuration without starting simulation
+    # Validate simulation configuration without starting simulation execution
+    # Performs comprehensive parameter validation including symbol existence and temporal checks
+    # Returns detailed validation results with errors and warnings for configuration refinement
     validation_result = await _validate_config(config, validator)
     router_base.router_logger.log_request("/simulation/validate", {"symbols": len(config.symbols)})
     
+    # Format validation response based on validation outcome
     if validation_result.is_valid:
         response = router_base.response_formatter.create_success_response(validation_result, "Configuration is valid")
         router_base.router_logger.log_success("/simulation/validate")
@@ -57,13 +99,15 @@ async def validate_simulation_config(config: SimulationConfig, validator: Simula
 
 @router.post("/simulation/start", response_model=StandardResponse[SimulationResponse])
 async def start_simulation(config: SimulationConfig, validator: SimulationValidator = Depends(get_simulation_validator)):
-    # Start a new trading simulation with validation
+    # Start a new trading simulation with comprehensive validation and automatic optimization
+    # Validates configuration, starts simulation execution, and returns simulation ID for tracking
+    # Supports both parallel and sequential execution based on optimization analysis
     try:
-        # Validate configuration
+        # Perform comprehensive configuration validation before simulation start
         validation_result = await _validate_config(config, validator)
         
+        # Handle validation failures with detailed error reporting
         if not validation_result.is_valid:
-            # Return validation errors
             error_messages = [f"{error.field}: {error.message}" for error in validation_result.errors]
             raise HTTPException(
                 status_code=400, 
@@ -74,12 +118,13 @@ async def start_simulation(config: SimulationConfig, validator: SimulationValida
                 }
             )
         
-        # Handle warnings
+        # Log validation warnings for user awareness
         _handle_validation_warnings(validation_result)
         
-        # Start simulation
+        # Start simulation execution with automatic optimization
         simulation_id = await simulation_engine.start_simulation(config)
         
+        # Create simulation response with warning information
         message = "Simulation started successfully"
         if validation_result.warnings:
             message += f" (with {len(validation_result.warnings)} warnings)"
@@ -90,6 +135,7 @@ async def start_simulation(config: SimulationConfig, validator: SimulationValida
             message=message
         )
         
+        # Format response with warnings if present
         if validation_result.warnings:
             response = router_base.response_formatter.create_success_with_metadata(
                 response_data,
@@ -103,10 +149,10 @@ async def start_simulation(config: SimulationConfig, validator: SimulationValida
         return response
         
     except HTTPException:
-        # Re-raise HTTP exceptions (validation errors)
+        # Re-raise HTTP exceptions for proper error handling
         raise
     except Exception as e:
-        # Handle unexpected errors
+        # Handle unexpected simulation start errors
         logger.error(f"Unexpected error starting simulation: {e}")
         router_base.router_logger.log_error("/simulation/start", e, "SIMULATION_START_ERROR")
         return router_base.response_formatter.create_error_response(
@@ -116,7 +162,9 @@ async def start_simulation(config: SimulationConfig, validator: SimulationValida
 
 @router.get("/simulation/{simulation_id}/status", response_model=StandardResponse[SimulationStatusResponse])
 async def get_simulation_status(simulation_id: str):
-    # Get the current status of a simulation
+    # Get real-time simulation status and progress for both parallel and sequential simulations
+    # Returns comprehensive progress information including completion percentage and timing
+    # Supports progress aggregation for parallel execution with multiple symbol groups
     progress = simulation_engine.get_simulation_progress(simulation_id)
     
     router_base.router_logger.log_request(f"/simulation/{simulation_id}/status", {"simulation_id": simulation_id})
@@ -161,7 +209,9 @@ async def get_simulation_status(simulation_id: str):
 
 @router.get("/simulation/{simulation_id}/results", response_model=StandardResponse[SimulationResults])
 async def get_simulation_results(simulation_id: str):
-    # Get the complete results of a simulation
+    # Get comprehensive simulation results including performance metrics and optimization data
+    # Returns complete simulation analysis with trading statistics and execution metadata
+    # Includes optimization information for parallel execution analysis
     result = simulation_engine.get_simulation_status(simulation_id)
     
     router_base.router_logger.log_request(f"/simulation/{simulation_id}/results", {"simulation_id": simulation_id})
@@ -180,7 +230,9 @@ async def get_simulation_results(simulation_id: str):
 
 @router.get("/simulation/{simulation_id}/memory", response_model=StandardResponse[Dict])
 async def get_simulation_memory_statistics(simulation_id: str):
-    # Get memory statistics for a specific simulation
+    # Get comprehensive memory usage statistics and optimization analytics for simulation
+    # Returns memory timeline data, optimization correlation, and efficiency analysis
+    # Used for performance monitoring and memory optimization insights
     result = simulation_engine.get_simulation_status(simulation_id)
     
     router_base.router_logger.log_request(f"/simulation/{simulation_id}/memory", {"simulation_id": simulation_id})
@@ -193,11 +245,11 @@ async def get_simulation_memory_statistics(simulation_id: str):
                                           Exception("Simulation not found"), "SIMULATION_NOT_FOUND")
         return response
     
-    # Extract memory statistics from the simulation result
+    # Extract and process memory statistics from simulation results
     memory_stats = result.memory_statistics if hasattr(result, 'memory_statistics') and result.memory_statistics else None
     
     if not memory_stats:
-        # If no memory statistics are available, return a structured response
+        # Return structured response when no memory data is available
         memory_response = {
             "simulation_id": simulation_id,
             "status": "no_memory_data",
@@ -205,7 +257,7 @@ async def get_simulation_memory_statistics(simulation_id: str):
             "simulation_status": result.status.value if hasattr(result, 'status') else "unknown"
         }
     else:
-        # Return the memory statistics with additional metadata
+        # Return comprehensive memory statistics with analysis metadata
         memory_response = {
             "simulation_id": simulation_id,
             "status": "success", 
@@ -227,7 +279,9 @@ async def get_simulation_memory_statistics(simulation_id: str):
 
 @router.get("/simulation/{simulation_id}/cancel")
 async def cancel_simulation(simulation_id: str) -> StandardResponse[Dict[str, str]]:
-    # Cancel a running simulation
+    # Cancel a running simulation with support for both parallel and sequential execution
+    # Performs graceful shutdown and cleanup of simulation resources
+    # Returns cancellation status and cleanup confirmation
     success = await simulation_engine.cancel_simulation(simulation_id)
     
     router_base.router_logger.log_request(f"/simulation/{simulation_id}/cancel", {"simulation_id": simulation_id})
@@ -250,7 +304,9 @@ async def cancel_simulation(simulation_id: str) -> StandardResponse[Dict[str, st
 
 @router.get("/simulations", response_model=StandardResponse[Dict[str, SimulationResults]])
 async def list_simulations():
-    # List all simulations with status
+    # List all historical simulations with comprehensive status and performance information
+    # Returns simulation history with execution metadata, performance metrics, and optimization data
+    # Used for simulation monitoring, analysis, and historical performance tracking
     try:
         simulations = simulation_engine.list_simulations()
         response = router_base.response_formatter.create_success_with_metadata(
@@ -261,6 +317,7 @@ async def list_simulations():
         router_base.router_logger.log_success("/simulations", len(simulations))
         return response
     except Exception as e:
+        # Handle simulation listing errors with comprehensive error reporting
         router_base.router_logger.log_error("/simulations", e, "SIMULATION_LIST_ERROR")
         return router_base.response_formatter.create_error_response(
             "Failed to list simulations",

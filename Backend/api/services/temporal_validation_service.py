@@ -1,6 +1,41 @@
-# Temporal Validation Service
-# Handles IPO/delisting validation, trading period checks, and survivorship bias mitigation
-# Provides trading logic layer on top of StockDataRepository for temporal operations
+# Temporal Validation Service - Advanced Stock Trading Period Validation and Survivorship Bias Prevention
+# This module provides comprehensive temporal validation for stock trading periods in the Trading Platform API
+# 
+# Architecture Overview:
+# The TemporalValidationService implements sophisticated validation logic for stock trading periods,
+# ensuring that trading simulations account for actual stock availability during specified time periods.
+# It provides critical survivorship bias prevention by validating stock existence, IPO dates, and
+# delisting dates to ensure realistic and historically accurate trading simulations.
+#
+# Key Responsibilities:
+# 1. Stock trading period validation (IPO to delisting date verification)
+# 2. Survivorship bias prevention through temporal eligibility checking
+# 3. Batch validation for multiple stocks across specified periods
+# 4. Comprehensive error handling and detailed feedback generation
+# 5. Business logic integration with repository data access
+# 6. Temporal information analysis and warning generation
+# 7. Simulation-specific validation with quality assessment
+#
+# Survivorship Bias Prevention:
+# The service addresses survivorship bias by ensuring that:
+# - Only stocks that were actually trading during simulation periods are included
+# - IPO dates are validated to prevent including stocks that didn't exist yet
+# - Delisting dates are checked to avoid including stocks that were no longer trading
+# - Dynamic trading periods are supported for realistic historical simulations
+#
+# Integration with Trading Platform:
+# - Provides business logic layer on top of StockDataRepository
+# - Integrates with error handling system for comprehensive error management
+# - Supports simulation validation with quality metrics and recommendations
+# - Enables informed decision-making through detailed temporal analysis
+# - Facilitates realistic backtesting with historical accuracy
+#
+# Validation Quality Assessment:
+# The service provides quality metrics for validation results:
+# - Rejection rate analysis for validation quality assessment
+# - Business warnings for high rejection rates or insufficient valid stocks
+# - Period analysis with timeline and duration information
+# - IPO proximity warnings for early-stage trading volatility
 
 import logging
 from typing import List, Dict, Any, Optional
@@ -13,16 +48,67 @@ from services.error_handler import ErrorHandler, ErrorSeverity
 logger = logging.getLogger(__name__)
 
 class TemporalValidationService:
-    # Service for temporal validation logic and survivorship bias mitigation
-    # Handles IPO/delisting validation, trading period checks, and batch temporal validation
+    """
+    Advanced Stock Trading Period Validation and Survivorship Bias Prevention Service.
+    
+    This class provides comprehensive temporal validation for stock trading periods,
+    implementing sophisticated logic to ensure trading simulations account for actual
+    stock availability during specified time periods. It serves as a critical component
+    for preventing survivorship bias in trading simulations and backtesting.
+    
+    Key Features:
+    - Comprehensive stock trading period validation with IPO/delisting verification
+    - Survivorship bias prevention through temporal eligibility checking
+    - Batch validation capabilities for multiple stocks across periods
+    - Business logic integration with detailed error handling and feedback
+    - Quality assessment metrics for validation results
+    - Dynamic trading period support for realistic historical simulations
+    
+    Survivorship Bias Prevention:
+    The service prevents survivorship bias by ensuring only stocks that were actually
+    trading during simulation periods are included, validating IPO dates to prevent
+    including non-existent stocks, and checking delisting dates to avoid including
+    stocks that were no longer trading.
+    
+    Architecture Integration:
+    The service provides a business logic layer on top of StockDataRepository,
+    integrating comprehensive error handling, validation quality assessment, and
+    detailed feedback generation for informed decision-making in trading simulations.
+    """
     
     def __init__(self, stock_repo: StockDataRepository):
+        """
+        Initialize the TemporalValidationService with repository and error handling.
+        
+        Args:
+            stock_repo: StockDataRepository instance for data access operations
+            
+        The service integrates with the stock data repository for temporal information
+        access and maintains an error handler for comprehensive error management
+        throughout validation operations.
+        """
         self.stock_repo = stock_repo
         self.error_handler = ErrorHandler()
     
     async def is_stock_tradeable(self, symbol: str, check_date: date) -> bool:
-        # Check if a stock was tradeable on a specific date
-        # Wrapper around repository method
+        """
+        Check if a stock was tradeable on a specific date with comprehensive error handling.
+        
+        This method provides a business logic wrapper around repository functionality
+        to determine stock trading availability on a specific date. It accounts for
+        IPO dates, delisting dates, and other factors that affect stock tradeability.
+        
+        Args:
+            symbol: Stock symbol to check for trading availability
+            check_date: Date to validate stock trading availability
+            
+        Returns:
+            bool: True if stock was tradeable on the specified date, False otherwise
+            
+        The method provides safe error handling to ensure validation operations
+        can continue even if individual stock checks encounter issues, supporting
+        robust batch validation operations.
+        """
         try:
             return await self.stock_repo.validate_stock_tradeable(symbol, check_date)
         except Exception as e:
@@ -30,11 +116,36 @@ class TemporalValidationService:
             return False
     
     async def validate_period_eligibility(self, symbols: List[str], start_date: date, end_date: date) -> Dict[str, Any]:
-        # Validate if stocks were trading during specified period
-        # Accounts for IPO dates, delisting dates, and provides detailed feedback
+        """
+        Validate stock trading eligibility during a specified period with comprehensive error handling.
+        
+        This method validates whether stocks were actively trading during the specified
+        time period, accounting for IPO dates, delisting dates, and other factors that
+        affect stock availability. It provides detailed feedback for validation results
+        and comprehensive error handling for system reliability.
+        
+        Args:
+            symbols: List of stock symbols to validate for period eligibility
+            start_date: Start date of the period to validate
+            end_date: End date of the period to validate
+            
+        Returns:
+            Dict[str, Any]: Comprehensive validation results containing:
+                - valid_symbols: List of symbols that were trading during the period
+                - rejected_symbols: List of symbols that were not trading during the period
+                - errors: List of error messages for rejected symbols
+                - total_requested: Total number of symbols requested for validation
+                - total_valid: Number of valid symbols
+                - total_rejected: Number of rejected symbols
+                
+        The method provides comprehensive error handling to ensure validation operations
+        continue even when encountering system issues, returning appropriate fallback
+        responses with detailed error context for debugging and monitoring.
+        """
         try:
             return await self.stock_repo.validate_symbols_for_period(symbols, start_date, end_date)
         except Exception as e:
+            # Create comprehensive error with detailed context for debugging
             error = self.error_handler.create_generic_error(
                 message=f"Temporal validation failed: {str(e)}",
                 context={
@@ -47,6 +158,8 @@ class TemporalValidationService:
             )
             
             logger.error(f"Temporal validation error: {error.message} | Context: {error.context}")
+            
+            # Return comprehensive fallback response for system errors
             return {
                 "valid_symbols": [],
                 "rejected_symbols": symbols,
@@ -57,8 +170,22 @@ class TemporalValidationService:
             }
     
     async def get_temporal_info_for_logging(self, symbols: List[str], start_date: date, end_date: date) -> Dict[str, List[str]]:
-        # Get temporal information for logging and user awareness
-        # Provides informational warnings about dynamic trading periods
+        """
+        Get temporal information for logging and user awareness.
+
+        This method provides informational warnings about dynamic trading periods,
+        such as stocks that have a delayed IPO or are delisted during the
+        simulation period. For performance reasons, it only checks a sample of
+        the provided symbols.
+
+        Args:
+            symbols: A list of stock symbols.
+            start_date: The start date of the simulation period.
+            end_date: The end date of the simulation period.
+
+        Returns:
+            A dictionary containing a list of warning messages.
+        """
         warnings = []
         
         try:
@@ -141,8 +268,22 @@ class TemporalValidationService:
         return {"warnings": warnings}
     
     async def validate_temporal_eligibility(self, symbol: str, start_date: date, end_date: date) -> Dict[str, List]:
-        # Validate symbol temporal eligibility with detailed error reporting
-        # Provides coherent validation for individual symbols
+        """
+        Validate the temporal eligibility of a single symbol with detailed error reporting.
+
+        This method provides coherent validation for an individual symbol, checking
+        if it was tradeable at the start and end dates of the simulation period.
+        It also includes warnings for potential issues, such as starting a
+        simulation very close to a stock's IPO date.
+
+        Args:
+            symbol: The stock symbol to validate.
+            start_date: The start date of the simulation period.
+            end_date: The end date of the simulation period.
+
+        Returns:
+            A dictionary containing lists of errors and warnings.
+        """
         errors = []
         warnings = []
         
@@ -230,8 +371,21 @@ class TemporalValidationService:
         return {"errors": errors, "warnings": warnings}
     
     async def check_ipo_proximity_warning(self, symbol: str, start_date: date, days_threshold: int = 90) -> Optional[str]:
-        # Check if simulation starts too close to IPO and return warning if so
-        # Business logic for determining IPO proximity warnings
+        """
+        Check if a simulation starts too close to a stock's IPO date.
+
+        This method implements the business logic for determining if a warning
+        should be issued when a simulation starts within a certain number of days
+        following a stock's IPO.
+
+        Args:
+            symbol: The stock symbol to check.
+            start_date: The start date of the simulation.
+            days_threshold: The number of days after the IPO to trigger a warning.
+
+        Returns:
+            A warning string if the simulation starts close to the IPO, otherwise None.
+        """
         try:
             temporal_info = await self.stock_repo.get_stock_temporal_info(symbol)
             if not temporal_info:
@@ -259,8 +413,18 @@ class TemporalValidationService:
         return None
     
     async def get_eligible_stocks_for_period(self, start_date: date, end_date: date) -> List[str]:
-        # Get stocks that were eligible for trading during a specific period
-        # Uses the correct repository method for this
+        """
+        Get a list of stocks that were eligible for trading during a specific period.
+
+        This method is a direct pass-through to the corresponding repository method.
+
+        Args:
+            start_date: The start date of the period.
+            end_date: The end date of the period.
+
+        Returns:
+            A list of stock symbols that were eligible for trading.
+        """
         try:
             return await self.stock_repo.get_eligible_stocks_for_period(start_date, end_date)
         except Exception as e:
@@ -268,8 +432,22 @@ class TemporalValidationService:
             return []
     
     async def batch_temporal_validation(self, symbols: List[str], start_date: date, end_date: date) -> Dict[str, Any]:
-        # Perform batch temporal validation with adequate reporting
-        # Combines repository operations with business logic for reporting
+        """
+        Perform batch temporal validation with adequate reporting.
+
+        This method combines repository operations with business logic to provide
+        a comprehensive report on the temporal validity of a list of symbols
+        for a given period. It includes metrics like rejection rate and
+        validation quality.
+
+        Args:
+            symbols: A list of stock symbols to validate.
+            start_date: The start date of the validation period.
+            end_date: The end date of the validation period.
+
+        Returns:
+            A dictionary containing the validation results and business logic analysis.
+        """
         try:
             # Get basic validation from repository
             validation_result = await self.stock_repo.validate_symbols_for_period(symbols, start_date, end_date)
@@ -343,8 +521,23 @@ class TemporalValidationService:
             }
     
     async def validate_simulation_temporal(self, symbols: List[str], start_date: date, end_date: date) -> Dict[str, Any]:
-        # Simulation-specific temporal validation with business logic
-        # Determines if a simulation can proceed based on temporal validation results
+        """
+        Perform simulation-specific temporal validation.
+
+        This method determines if a simulation can proceed based on the temporal
+        validation results. It checks if there are any valid symbols for the
+        specified period and provides a clear indication of whether the
+        simulation is valid.
+
+        Args:
+            symbols: A list of stock symbols for the simulation.
+            start_date: The start date of the simulation.
+            end_date: The end date of the simulation.
+
+        Returns:
+            A dictionary containing the validation results and a flag indicating
+            if the simulation is valid.
+        """
         try:
             # Get pure data validation from repository
             validation_result = await self.stock_repo.validate_symbols_for_period(symbols, start_date, end_date)

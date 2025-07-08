@@ -1,5 +1,19 @@
 # Performance Optimization Module
-# Complete parallel processing implementation with intelligent strategy selection
+# This module provides intelligent parallel execution optimization for trading simulations
+# Key responsibilities:
+# - Complexity analysis of simulation configurations
+# - Intelligent strategy selection (sequential vs parallel execution)
+# - Dynamic symbol grouping for optimal parallel processing
+# - Performance prediction using Amdahl's Law with overhead modelling
+# - Real-time parallel execution with progress tracking
+# - Memory usage monitoring and optimization analytics
+# - Comprehensive performance metrics and diagnostics
+#
+# The module integrates with the C++ trading engine to provide:
+# - Automatic optimization based on simulation complexity
+# - Parallel group execution with proper error handling
+# - Memory statistics collection and analysis
+# - Performance regression detection and reporting
 
 import asyncio
 import time
@@ -13,39 +27,52 @@ from models import SimulationConfig
 logger = logging.getLogger(__name__)
 
 class ParallelExecutionStrategy:
-    # Strategy decision engine for execution planning
+    # Strategy decision engine for intelligent execution planning
+    # Analyses simulation complexity and determines optimal execution mode
+    # Uses machine learning principles to optimize parallel vs sequential execution
     def __init__(self, max_workers: int = 4):
         self.max_workers = max_workers
-        self.strategy_history = {}  # Track strategy performance over time
+        self.strategy_history = {}  # Track strategy performance over time for learning
+        
+        # Complexity thresholds for strategy decision making
+        # Based on empirical analysis of execution times vs complexity
         self.complexity_thresholds = {
-            "low": 5000,
-            "medium": 25000,
-            "high": 100000
+            "low": 5000,       # Sequential execution optimal
+            "medium": 25000,   # Moderate parallelism beneficial
+            "high": 100000     # Aggressive parallelism required
         }
-        self.parallel_efficiency_baseline = 0.7  # Minimum efficiency threshold for parallel execution
+        
+        # Minimum efficiency threshold for parallel execution to be worthwhile
+        self.parallel_efficiency_baseline = 0.7  # 70% efficiency minimum
         
     def analyze_simulation_complexity(self, config: SimulationConfig) -> Dict[str, Any]:
-        # Analyze simulation complexity for strategy decisions
+        # Comprehensive complexity analysis for optimal execution strategy selection
+        # Considers multiple factors: symbols count, date range, strategy type, market conditions
+        # Returns detailed complexity metrics used for intelligent decision making
         from datetime import datetime
         
         symbols_count = len(config.symbols)
         
-        # Calculate date range
+        # Calculate date range with proper type handling
         start_date = datetime.fromisoformat(config.start_date) if isinstance(config.start_date, str) else config.start_date
         end_date = datetime.fromisoformat(config.end_date) if isinstance(config.end_date, str) else config.end_date
         date_range_days = (end_date - start_date).days
         
-        # Base complexity calculation
+        # Base complexity: fundamental measure of computational load
+        # Each symbol-day combination represents a unit of computational work
         base_complexity = symbols_count * date_range_days
         
-        # Strategy complexity multiplier
+        # Strategy complexity multiplier based on algorithmic complexity
+        # Different strategies have varying computational requirements
         strategy_multiplier = self._get_strategy_complexity_multiplier(config)
         
-        # Market data complexity (more volatile periods require more computation)
+        # Market data complexity for volatile periods requiring more computation
+        # Long-term simulations have additional complexity due to memory management
         market_complexity_multiplier = 1.0
         if date_range_days > 365:  # Long-term simulations
             market_complexity_multiplier = 1.2
         
+        # Final complexity score combining all factors
         total_complexity = base_complexity * strategy_multiplier * market_complexity_multiplier
         
         # Determine complexity category
@@ -312,58 +339,63 @@ class ParallelExecutionStrategy:
             return "io_bound"
 
 class SimulationMetrics:
-    # Comprehensive performance analytics with parallel execution tracking
+    # Comprehensive performance analytics and monitoring system
+    # Tracks execution metrics across all simulation modes and optimization strategies
+    # Provides detailed insights for performance tuning and regression detection
     def __init__(self):
-        # Cache metrics
+        # Cache performance metrics for optimization analysis
         self.cache_hits = 0
         self.cache_misses = 0
         
-        # Timing metrics
-        self.query_time_ms = 0.0
-        self.simulation_time_ms = 0.0
-        self.optimization_time_ms = 0.0
+        # Detailed timing metrics for performance analysis
+        self.query_time_ms = 0.0          # Database query execution time
+        self.simulation_time_ms = 0.0     # Core simulation execution time
+        self.optimization_time_ms = 0.0   # Time spent on optimization analysis
         
-        # Resource metrics
-        self.memory_usage_mb = 0.0
-        self.cpu_usage_percent = 0.0
+        # System resource utilization metrics
+        self.memory_usage_mb = 0.0        # Memory consumption during execution
+        self.cpu_usage_percent = 0.0      # CPU utilization percentage
         
-        # Parallel execution metrics
-        self.parallel_tasks = 0
-        self.sequential_tasks = 0
-        self.worker_utilization = 0.0
-        self.parallel_speedup_achieved = 0.0
-        self.parallel_efficiency = 0.0
+        # Parallel execution performance tracking
+        self.parallel_tasks = 0           # Number of parallel tasks executed
+        self.sequential_tasks = 0         # Number of sequential tasks executed
+        self.worker_utilization = 0.0     # Worker thread utilization efficiency
+        self.parallel_speedup_achieved = 0.0  # Actual speedup vs sequential execution
+        self.parallel_efficiency = 0.0   # Parallel efficiency percentage
         
-        # Strategy metrics
-        self.strategy_decisions = {}  # Track which strategies were chosen
-        self.execution_mode_counts = {"sequential": 0, "parallel": 0}
+        # Strategy decision analytics for optimization learning
+        self.strategy_decisions = {}      # Track which optimization strategies were chosen
+        self.execution_mode_counts = {"sequential": 0, "parallel": 0}  # Mode usage statistics
         
-        # Performance regression tracking
-        self.baseline_performance = {}
-        self.performance_regression_detected = False
+        # Performance regression detection and baseline tracking
+        self.baseline_performance = {}         # Historical performance baselines
+        self.performance_regression_detected = False  # Regression alert flag
         
-        # Symbol grouping metrics
-        self.symbol_groups_created = 0
-        self.optimal_group_size = 0
-        self.group_balance_score = 0.0
+        # Symbol grouping optimization metrics
+        self.symbol_groups_created = 0    # Number of symbol groups created for parallel execution
+        self.optimal_group_size = 0       # Optimal group size determined by algorithm
+        self.group_balance_score = 0.0    # Load balancing effectiveness score
 
 class PerformanceOptimizer:
-    # Handles performance optimizations for trading simulations
+    # Central performance optimization coordinator for trading simulations
+    # Provides intelligent execution optimization, parallel processing, and performance monitoring
+    # Integrates with C++ trading engine for optimal simulation execution
     
     def __init__(self):
-        self.cache_enabled = True
-        self.cache_ttl = 3600  # 1 hour
-        self.parallel_enabled = True
-        self.max_workers = 4
+        # Configuration settings for optimization behavior
+        self.cache_enabled = True     # Enable caching for repeated operations
+        self.cache_ttl = 3600        # Cache time-to-live (1 hour)
+        self.parallel_enabled = True  # Enable parallel execution optimization
+        self.max_workers = 4         # Maximum parallel worker threads
         
-        # Performance tracking
+        # Comprehensive performance tracking and analytics
         self.metrics = SimulationMetrics()
-        self.operation_times: Dict[str, List[float]] = {}
+        self.operation_times: Dict[str, List[float]] = {}  # Historical operation timing data
         
-        # Strategy decision engine
+        # Intelligent strategy decision engine for execution planning
         self.strategy_engine = ParallelExecutionStrategy(max_workers=self.max_workers)
         
-        # Executors for parallel processing
+        # Parallel execution infrastructure
         self.thread_executor = ThreadPoolExecutor(max_workers=self.max_workers)
         self.process_executor = ProcessPoolExecutor(max_workers=min(4, self.max_workers))
         
@@ -383,39 +415,50 @@ class PerformanceOptimizer:
     
     async def optimize_simulation_execution(self, config: SimulationConfig) -> Dict[str, Any]:
         """
-        Modern optimization with complexity analysis and intelligent strategy selection.
+        Advanced simulation execution optimization with intelligent strategy selection.
         
-        Analyzes simulation configuration and determines optimal execution strategy including:
-        - Complexity analysis based on symbols count, date range, and strategy type
-        - Intelligent strategy selection (sequential vs parallel execution modes)
-        - Symbol grouping for parallel execution optimization
-        - Performance prediction using Amdahl's Law with overhead modeling
+        This method performs comprehensive analysis of simulation configuration to determine
+        the optimal execution strategy. It considers multiple factors including computational
+        complexity, resource availability, and historical performance data to make intelligent
+        decisions about sequential vs parallel execution.
+        
+        The optimization process includes:
+        - Multi-factor complexity analysis (symbols, date range, strategy complexity)
+        - Intelligent execution mode selection using machine learning principles
+        - Dynamic symbol grouping for optimal parallel load distribution
+        - Performance prediction using advanced mathematical models (Amdahl's Law)
+        - Resource estimation for memory and CPU usage planning
         
         Args:
-            config (SimulationConfig): Simulation configuration containing symbols, 
-                                     date range, strategy, and parameters
+            config (SimulationConfig): Complete simulation configuration including:
+                - symbols: List of stock symbols to simulate
+                - date range: Start and end dates for simulation period
+                - strategy: Trading strategy identifier and parameters
+                - capital: Starting capital and risk parameters
         
         Returns:
-            Dict[str, Any]: Comprehensive optimization analysis containing:
-                - strategy_name: Selected optimization strategy
-                - execution_mode: "sequential" or "parallel"
-                - symbol_groups: List of symbol groups for parallel execution
-                - parallel_tasks: Number of parallel tasks recommended
-                - estimated_speedup: Predicted performance improvement factor
-                - estimated_efficiency: Parallel execution efficiency percentage
-                - complexity_score: Calculated complexity score
-                - complexity_category: "low", "medium", "high", or "extreme"
-                - optimization_time_ms: Time taken for optimization analysis
-                - memory_estimate_mb: Estimated memory usage
-                - reasoning: Human-readable explanation of strategy choice
-                - expected_bottleneck: Predicted performance bottleneck
-                - scaling_potential: Assessment of parallel scaling potential
+            Dict[str, Any]: Comprehensive optimization analysis report containing:
+                - strategy_name: Selected optimization strategy name
+                - execution_mode: "sequential" or "parallel" execution mode
+                - symbol_groups: Optimized symbol groups for parallel execution
+                - parallel_tasks: Recommended number of parallel worker tasks
+                - estimated_speedup: Predicted performance improvement multiplier
+                - estimated_efficiency: Parallel execution efficiency (0-100%)
+                - complexity_score: Numerical complexity assessment
+                - complexity_category: Categorized complexity level
+                - optimization_time_ms: Time spent on optimization analysis
+                - memory_estimate_mb: Predicted memory usage requirement
+                - reasoning: Human-readable strategy selection explanation
+                - expected_bottleneck: Predicted primary performance limitation
+                - scaling_potential: Assessment of parallel scaling benefits
         
-        Example:
+        Example Usage:
             optimization_result = await performance_optimizer.optimize_simulation_execution(config)
             if optimization_result['execution_mode'] == 'parallel':
                 symbol_groups = optimization_result['symbol_groups']
-                await performance_optimizer.execute_simulation_groups(symbol_groups, config)
+                results = await performance_optimizer.execute_simulation_groups(symbol_groups, config)
+                speedup = optimization_result['estimated_speedup']
+                logger.info(f"Parallel execution achieved {speedup}x speedup")
         """
         start_time = self.start_timer("simulation_optimization")
         
@@ -464,47 +507,70 @@ class PerformanceOptimizer:
                                       group_ids: Optional[List[str]] = None,
                                       execution_service=None) -> List[Dict[str, Any]]:
         """
-        Execute simulation groups with real parallel processing using ExecutionService.
+        Execute optimized simulation groups with intelligent parallel processing.
         
-        Performs intelligent execution strategy selection and runs simulation groups
-        either sequentially or in parallel based on group count and system capabilities.
-        Integrates with C++ trading engine through ExecutionService for actual execution.
+        This method implements the core parallel execution engine for trading simulations.
+        It automatically selects the optimal execution strategy (sequential vs parallel)
+        based on group count and system capabilities, then executes all groups with
+        comprehensive error handling and performance monitoring.
+        
+        The execution process includes:
+        - Automatic execution strategy selection based on group count
+        - True parallel execution using asyncio.gather() for multiple groups
+        - Individual group isolation with separate ExecutionService instances
+        - Real-time performance metrics collection and analysis
+        - Comprehensive error handling with detailed diagnostic information
+        - Progress tracking and correlation ID management
+        
+        Integration with C++ Trading Engine:
+        - Each group executes as a separate simulation in the C++ engine
+        - Results are parsed and validated from JSON output
+        - Memory usage and performance statistics are collected
+        - Engine errors are categorized and handled appropriately
         
         Args:
-            symbol_groups (List[List[str]]): List of symbol groups to execute. Each group
-                                           contains a list of stock symbols to simulate together.
-            config (SimulationConfig): Base simulation configuration that will be applied
-                                     to each group with group-specific symbol overrides.
-            group_ids (Optional[List[str]]): Pre-generated group IDs for progress tracking.
-                                           If None, IDs will be generated automatically.
-            execution_service: Shared ExecutionService instance for consistent progress tracking.
+            symbol_groups (List[List[str]]): Optimized symbol groups for execution.
+                Each group contains symbols that will be simulated together for optimal
+                resource utilization and load balancing.
+            config (SimulationConfig): Base simulation configuration applied to all groups.
+                Group-specific symbol lists override the global symbols list.
+            group_ids (Optional[List[str]]): Pre-generated unique group identifiers.
+                Used for progress tracking and result correlation. Auto-generated if None.
+            execution_service: Shared ExecutionService instance for consistent engine
+                integration and progress tracking across all groups.
         
         Returns:
-            List[Dict[str, Any]]: List of execution results, one per group containing:
-                - group_id: Unique identifier for the group
-                - symbols: List of symbols in this group
-                - status: "completed", "failed", or "cancelled"
-                - execution_time_ms: Actual execution time for this group
-                - simulation_id: Unique simulation ID generated for this group
-                - result_data: Parsed JSON results from C++ engine (if successful)
-                - return_code: C++ engine return code
-                - error: Error message (if failed)
-                - raw_output/stderr: Debugging information (if failed)
+            List[Dict[str, Any]]: Detailed execution results for each group containing:
+                - group_id: Unique identifier for progress tracking and correlation
+                - symbols: List of stock symbols executed in this group
+                - status: Execution outcome ("completed", "failed", "cancelled")
+                - execution_time_ms: Actual execution time for performance analysis
+                - simulation_id: Unique simulation ID from the C++ engine
+                - result_data: Parsed JSON results with performance metrics (if successful)
+                - return_code: C++ engine exit code for error diagnosis
+                - error: Structured error message with categorization (if failed)
+                - raw_output/stderr: Raw engine output for debugging (if failed)
         
-        Notes:
-            - Automatically chooses sequential execution for single groups
-            - Uses asyncio.gather() for true parallel execution of multiple groups
-            - Each group gets its own ExecutionService instance and unique simulation ID
-            - Comprehensive error handling with detailed diagnostic information
-            - Real-time performance metrics tracking including speedup and efficiency
-            - Updates optimizer metrics for parallel vs sequential execution counts
+        Performance Characteristics:
+            - Sequential execution: Used for single groups or small workloads
+            - Parallel execution: Automatic for multiple groups with asyncio.gather()
+            - Speedup tracking: Real-time measurement of parallel efficiency
+            - Resource monitoring: Memory and CPU usage tracking per group
+            - Error isolation: Group failures don't affect other groups
         
-        Example:
-            symbol_groups = [['AAPL', 'GOOGL'], ['MSFT', 'AMZN'], ['TSLA', 'NVDA']]
-            results = await performance_optimizer.execute_simulation_groups(symbol_groups, config)
-            for result in results:
-                if result['status'] == 'completed':
-                    print(f"Group {result['group_id']} completed in {result['execution_time_ms']}ms")
+        Example Usage:
+            # Optimize simulation for parallel execution
+            optimization = await optimizer.optimize_simulation_execution(config)
+            symbol_groups = optimization['symbol_groups']
+            
+            # Execute groups with performance monitoring
+            results = await optimizer.execute_simulation_groups(symbol_groups, config)
+            
+            # Analyze results and performance
+            successful_groups = [r for r in results if r['status'] == 'completed']
+            total_time = max(r['execution_time_ms'] for r in results)
+            speedup = sum(r['execution_time_ms'] for r in results) / total_time
+            logger.info(f"Achieved {speedup:.2f}x speedup with {len(successful_groups)} groups")
         """
         start_time = self.start_timer("parallel_execution")
         
@@ -735,31 +801,70 @@ class PerformanceOptimizer:
     
     async def get_memory_statistics(self) -> Dict[str, Any]:
         """
-        Get engine memory statistics from the C++ trading engine.
+        Retrieve comprehensive memory usage statistics from the C++ trading engine.
         
-        Returns comprehensive memory usage information for monitoring and optimization.
-        Integrates with the C++ engine's memory reporting system to provide real-time
-        memory usage data across all engine services.
+        This method provides real-time memory monitoring capabilities by interfacing
+        directly with the C++ trading engine's internal memory reporting system.
+        Essential for performance optimization, memory leak detection, and resource
+        planning for large-scale simulations.
+        
+        Memory Monitoring Features:
+        - Real-time memory usage across all engine components
+        - Service-specific memory breakdown for detailed analysis
+        - Cache efficiency metrics and optimization opportunities
+        - Memory distribution analysis for resource planning
+        - Integration with performance optimization recommendations
+        
+        Engine Integration:
+        - Direct communication with C++ engine memory subsystem
+        - Comprehensive service-level memory reporting
+        - Cache statistics for optimization analysis
+        - Memory allocation tracking per simulation component
         
         Returns:
-            Dict[str, Any]: Memory statistics containing:
-                - status: "success", "error", or "unavailable"
-                - total_memory_bytes: Total engine memory usage
-                - portfolio_memory_bytes: Portfolio service memory usage
-                - market_data_cache_bytes: Market data cache memory usage
-                - execution_service_bytes: Execution service memory usage
-                - data_processor_bytes: Data processor memory usage
-                - portfolio_allocator_bytes: Portfolio allocator memory usage
-                - price_cache_symbols: Number of symbols in price cache
-                - memory_optimization_available: Whether optimization is possible
-                - detailed_report: Full memory report from engine (if successful)
-                - error: Error message (if failed)
+            Dict[str, Any]: Comprehensive memory analysis containing:
+                - status: Operation result ("success", "error", "unavailable")
+                - total_memory_bytes: Aggregate engine memory consumption
+                - total_memory_mb: Memory usage in megabytes for readability
+                - portfolio_memory_bytes: Portfolio management service memory
+                - market_data_cache_bytes: Market data cache memory allocation
+                - execution_service_bytes: Trade execution service memory
+                - data_processor_bytes: Data processing pipeline memory
+                - portfolio_allocator_bytes: Portfolio allocation service memory
+                - price_cache_symbols: Number of symbols cached in memory
+                - cache_bytes_per_symbol: Average memory usage per cached symbol
+                - memory_distribution: Percentage breakdown by service
+                - memory_optimization_available: Whether optimization is beneficial
+                - detailed_report: Raw engine memory report for debugging
+                - error: Detailed error information (if operation failed)
+                - error_code: Machine-readable error classification
         
-        Example:
-            memory_stats = await performance_optimizer.get_memory_statistics()
+        Performance Impact:
+            - Low overhead memory query operation
+            - Non-blocking async implementation
+            - Cached results to avoid engine overload
+            - Graceful degradation if engine unavailable
+        
+        Example Usage:
+            # Monitor memory usage during simulation
+            memory_stats = await optimizer.get_memory_statistics()
+            
             if memory_stats["status"] == "success":
-                total_mb = memory_stats["total_memory_bytes"] / (1024 * 1024)
-                print(f"Engine using {total_mb:.2f} MB")
+                total_mb = memory_stats["total_memory_mb"]
+                cache_efficiency = memory_stats["cache_bytes_per_symbol"]
+                
+                logger.info(f"Engine memory usage: {total_mb:.2f} MB")
+                
+                # Check for optimization opportunities
+                if memory_stats["memory_optimization_available"]:
+                    logger.info("Memory optimization recommended")
+                    
+                # Analyse memory distribution
+                distribution = memory_stats["memory_distribution"]
+                for service, percentage in distribution.items():
+                    logger.debug(f"{service}: {percentage}% of total memory")
+            else:
+                logger.warning(f"Memory statistics unavailable: {memory_stats['error']}")
         """
         try:
             # Import ExecutionService locally to avoid circular imports
@@ -835,31 +940,95 @@ class PerformanceOptimizer:
     
     async def get_performance_summary(self) -> Dict[str, Any]:
         """
-        Enhanced performance summary with comprehensive analytics.
+        Generate comprehensive performance analytics dashboard for system monitoring.
         
-        Provides a complete dashboard of Performance Optimizer metrics including:
-        - Cache performance statistics
-        - Operation timing analytics
-        - Parallel execution performance metrics
-        - Strategy decision analytics
-        - Symbol grouping efficiency metrics
-        - Performance regression tracking
-        - System configuration status
+        This method provides a complete performance overview by aggregating metrics
+        from all optimizer subsystems. Essential for performance monitoring,
+        optimization analysis, and system health assessment.
+        
+        Analytics Categories:
+        - Cache Performance: Hit rates, efficiency metrics, optimization opportunities
+        - Operation Timing: Detailed timing analytics with statistical analysis
+        - Parallel Execution: Speedup analysis, efficiency metrics, worker utilization
+        - Strategy Analytics: Decision patterns, mode preferences, optimization trends
+        - Memory Management: Usage patterns, optimization effectiveness, resource planning
+        - System Configuration: Feature flags, capability assessment, optimization settings
+        
+        Performance Insights:
+        - Historical trend analysis for performance regression detection
+        - Efficiency benchmarking against baseline performance
+        - Resource utilization optimization recommendations
+        - Parallel execution effectiveness assessment
+        - Cache optimization opportunities identification
         
         Returns:
-            Dict[str, Any]: Comprehensive performance analytics containing:
-                cache_stats: Cache hit rates and performance metrics
-                operation_times: Average, min, max times for all operations
-                parallel_execution_stats: Parallel task counts, speedup, efficiency
-                strategy_analytics: Strategy decisions and execution mode statistics
-                grouping_metrics: Symbol grouping efficiency and balance scores
-                performance_tracking: Baseline performance and regression detection
-                optimization_enabled: System configuration and feature flags
+            Dict[str, Any]: Multi-dimensional performance analytics containing:
+                
+                cache_stats: Cache performance metrics
+                  - hit_rate_percent: Cache effectiveness percentage
+                  - total_requests: Total cache operations
+                  - optimization_opportunities: Cache improvement suggestions
+                
+                operation_times: Statistical timing analysis
+                  - avg_ms: Average operation duration
+                  - min_ms/max_ms: Performance bounds
+                  - count: Operation frequency statistics
+                
+                memory_usage: Real-time memory analytics
+                  - current_usage: Live memory consumption data
+                  - optimization_status: Memory efficiency assessment
+                  - distribution_analysis: Service-level memory breakdown
+                
+                parallel_execution_stats: Parallel processing analytics
+                  - parallel_tasks_executed: Total parallel operations
+                  - parallel_speedup_achieved: Actual speedup measurements
+                  - parallel_efficiency: Efficiency percentage
+                  - worker_utilization: Resource utilization effectiveness
+                
+                strategy_analytics: Optimization decision analysis
+                  - strategy_decisions: Decision pattern tracking
+                  - execution_mode_counts: Sequential vs parallel usage
+                  - execution_mode_percentages: Usage distribution analysis
+                
+                grouping_metrics: Symbol grouping optimization analysis
+                  - symbol_groups_created: Group creation statistics
+                  - optimal_group_size: Load balancing effectiveness
+                  - group_balance_score: Distribution quality metrics
+                
+                performance_tracking: Regression detection and baseline analysis
+                  - baseline_performance: Historical performance benchmarks
+                  - regression_detected: Performance degradation alerts
+                  - optimization_time_ms: Optimization overhead analysis
+                
+                optimization_enabled: System capability and configuration status
+                  - caching: Cache system status
+                  - parallel_processing: Parallel execution capability
+                  - max_workers: Resource allocation configuration
+                  - strategy_engine_active: Optimization engine status
         
-        Example:
-            summary = performance_optimizer.get_performance_summary()
-            print(f"Parallel efficiency: {summary['parallel_execution_stats']['parallel_efficiency']}%")
-            print(f"Cache hit rate: {summary['cache_stats']['hit_rate_percent']}%")
+        Example Usage:
+            # Generate comprehensive performance report
+            summary = await optimizer.get_performance_summary()
+            
+            # Analyse parallel execution effectiveness
+            parallel_stats = summary['parallel_execution_stats']
+            efficiency = parallel_stats['parallel_efficiency']
+            
+            if efficiency < 70:
+                logger.warning(f"Low parallel efficiency: {efficiency}%")
+                # Investigate bottlenecks and optimization opportunities
+            
+            # Monitor cache performance
+            cache_stats = summary['cache_stats']
+            hit_rate = cache_stats['hit_rate_percent']
+            
+            if hit_rate < 80:
+                logger.info(f"Cache hit rate could be improved: {hit_rate}%")
+            
+            # Check for performance regression
+            tracking = summary['performance_tracking']
+            if tracking['regression_detected']:
+                logger.alert("Performance regression detected - investigation required")
         """
         avg_times = {}
         for operation, times in self.operation_times.items():
@@ -930,5 +1099,7 @@ class PerformanceOptimizer:
         self.process_executor.shutdown(wait=True)
         logger.info("Performance optimizer cleaned up")
 
-# Global optimizer instance
+# Global performance optimizer instance
+# Singleton pattern ensures consistent optimization state across the entire application
+# Used by simulation engine, routers, and performance monitoring endpoints
 performance_optimizer = PerformanceOptimizer()

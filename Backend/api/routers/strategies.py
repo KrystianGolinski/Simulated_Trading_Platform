@@ -1,11 +1,43 @@
-# Dynamic Strategy Management API Router
+# Strategies Router - Trading Strategy Management and Discovery Endpoints
+# This module provides API endpoints for trading strategy management and configuration
+# Key responsibilities:
+# - Trading strategy discovery and metadata retrieval
+# - Strategy configuration validation and parameter management
+# - Strategy registry refresh and plugin discovery
+# - Strategy categorization and filtering support
+# - Strategy factory integration for dynamic strategy loading
+# - Configuration validation with detailed error reporting
+# - Strategy metadata exposure for client applications
+#
+# Architecture Features:
+# - RouterBase pattern for consistent endpoint structure and logging
+# - Integration with StrategyFactory for strategy management operations
+# - Dynamic strategy discovery and plugin support
+# - Comprehensive parameter validation with detailed error messages
+# - Strategy categorization for organized strategy selection
+# - Real-time strategy registry refresh capability
+# - Structured response formatting for strategy metadata
+#
+# Endpoints Provided:
+# - /strategies: Get all available strategies with metadata
+# - /strategies/{strategy_id}: Get detailed metadata for specific strategy
+# - /strategies/{strategy_id}/validate: Validate strategy configuration parameters
+# - /strategies/refresh: Refresh strategy registry for new plugin discovery
+# - /strategies/categories: Get strategy categories for filtering and organization
+#
+# Integration Points:
+# - Uses StrategyFactory for strategy management and validation operations
+# - Integrates with strategy registry for plugin discovery
+# - Supports RouterBase pattern for consistent response formatting
+# - Provides validation integration for simulation configuration
+
 from fastapi import APIRouter
 from typing import Dict, Any, List
 from strategy_factory import get_strategy_factory
 from models import StandardResponse, ApiError
 from routing import get_router_service_factory
 
-# Create router using RouterBase pattern
+# Create router using RouterBase pattern for consistent strategy endpoint structure
 router_factory = get_router_service_factory()
 router_base = router_factory.create_router_base("strategies")
 router = router_base.get_router()
@@ -13,7 +45,9 @@ router.tags = ["strategies"]
 
 @router.get("/strategies")
 async def get_available_strategies() -> StandardResponse[Dict[str, Any]]:
-    # Get all available trading strategies with metadata
+    # Get comprehensive list of all available trading strategies with detailed metadata
+    # Returns strategy information including parameters, categories, and requirements
+    # Used by client applications for strategy selection and configuration
     router_base.router_logger.log_request("/strategies", {})
     
     factory = get_strategy_factory()
@@ -28,7 +62,9 @@ async def get_available_strategies() -> StandardResponse[Dict[str, Any]]:
 
 @router.get("/strategies/{strategy_id}")
 async def get_strategy_metadata(strategy_id: str) -> StandardResponse[Dict[str, Any]]:
-    # Get detailed metadata for a specific strategy
+    # Get comprehensive metadata for a specific trading strategy
+    # Returns detailed information including parameters, validation rules, and requirements
+    # Used for strategy configuration UI and parameter validation
     router_base.router_logger.log_request(f"/strategies/{strategy_id}", {"strategy_id": strategy_id})
     
     factory = get_strategy_factory()
@@ -47,7 +83,9 @@ async def validate_strategy_configuration(
     strategy_id: str, 
     parameters: Dict[str, Any]
 ) -> StandardResponse[Dict[str, Any]]:
-    # Validate strategy configuration parameters
+    # Validate strategy configuration parameters against strategy requirements
+    # Performs comprehensive parameter validation including type checking and business rules
+    # Returns validation results with detailed error messages for invalid configurations
     router_base.router_logger.log_request(f"/strategies/{strategy_id}/validate", 
                                         {"strategy_id": strategy_id, "param_count": len(parameters)})
     
@@ -64,7 +102,9 @@ async def validate_strategy_configuration(
 
 @router.post("/strategies/refresh")
 async def refresh_strategy_registry() -> StandardResponse[Dict[str, Any]]:
-    # Refresh strategy registry to discover new strategies
+    # Refresh strategy registry to discover newly added strategies and plugins
+    # Scans strategy directories and plugin locations for new strategy implementations
+    # Used for dynamic strategy loading without system restart
     router_base.router_logger.log_request("/strategies/refresh", {})
     
     factory = get_strategy_factory()
@@ -80,14 +120,17 @@ async def refresh_strategy_registry() -> StandardResponse[Dict[str, Any]]:
 
 @router.get("/strategies/categories")
 async def get_strategy_categories() -> StandardResponse[Dict[str, Any]]:
-    # Get strategy categories for filtering and organization
+    # Get strategy categories with organized strategy groupings for filtering and selection
+    # Returns categorized strategies with counts and metadata for UI organization
+    # Enables strategy filtering by category (trend_following, momentum, mean_reversion, etc.)
     factory = get_strategy_factory()
     strategies_result = factory.get_available_strategies()
     
+    # Validate strategy data retrieval and format
     if not strategies_result.success or not strategies_result.data:
         return strategies_result
     
-    # Check if strategies key exists in the response data
+    # Validate response structure for proper category processing
     if "strategies" not in strategies_result.data:
         response = router_base.response_formatter.create_error_response(
             "Missing 'strategies' key in response data",
@@ -97,6 +140,7 @@ async def get_strategy_categories() -> StandardResponse[Dict[str, Any]]:
                                           Exception("Invalid response format"), "INVALID_RESPONSE_FORMAT")
         return response
     
+    # Process strategies into organized category structure
     categories = {}
     for strategy in strategies_result.data["strategies"]:
         category = strategy["category"]
@@ -107,6 +151,7 @@ async def get_strategy_categories() -> StandardResponse[Dict[str, Any]]:
                 "count": 0
             }
         
+        # Add strategy summary to category with essential information
         categories[category]["strategies"].append({
             "id": strategy["id"],
             "name": strategy["name"],
@@ -114,6 +159,7 @@ async def get_strategy_categories() -> StandardResponse[Dict[str, Any]]:
         })
         categories[category]["count"] += 1
     
+    # Format and return categorized strategy response with metadata
     router_base.router_logger.log_request("/strategies/categories", {})
     response = router_base.response_formatter.create_success_with_metadata(
         {"categories": list(categories.values())},

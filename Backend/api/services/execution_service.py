@@ -1,3 +1,47 @@
+# Execution Service - Advanced C++ Engine Execution and Management System
+# This module provides comprehensive C++ engine execution capabilities for the Trading Platform API
+# 
+# Architecture Overview:
+# The ExecutionService implements sophisticated execution management for the C++ trading engine,
+# providing asynchronous process execution, real-time progress monitoring, resource validation,
+# and comprehensive error handling. It serves as the primary interface between the Python API
+# and the C++ trading engine.
+#
+# Key Responsibilities:
+# 1. C++ engine validation and configuration management
+# 2. Asynchronous simulation execution with progress tracking
+# 3. Real-time process monitoring and health checking
+# 4. Dynamic configuration file generation for C++ engine
+# 5. Resource management and cleanup operations
+# 6. Memory usage monitoring and reporting
+# 7. Simulation lifecycle management (start, monitor, cancel)
+#
+# Execution Pipeline:
+# 1. Validate C++ engine availability and permissions
+# 2. Generate dynamic configuration file from simulation parameters
+# 3. Build command-line arguments for C++ engine execution
+# 4. Execute simulation asynchronously with environment setup
+# 5. Monitor process streams for progress updates and heartbeat
+# 6. Handle process completion and resource cleanup
+# 7. Parse and return execution results with error handling
+#
+# Integration with Trading Platform:
+# - Interfaces with C++ trading engine via process execution
+# - Integrates with strategy factory for dynamic strategy configuration
+# - Supports performance optimization and monitoring
+# - Provides real-time simulation progress and health monitoring
+# - Handles Docker container communication and volume management
+# - Supports parallel execution coordination
+#
+# Process Management Features:
+# - Asynchronous process execution with asyncio
+# - Real-time stdout/stderr stream processing
+# - Progress tracking via JSON-based heartbeat system
+# - Health monitoring with timeout and status checking
+# - Graceful termination and force-kill capabilities
+# - Resource cleanup and temporary file management
+# - Memory usage reporting and analysis
+
 import asyncio
 import json
 import logging
@@ -13,11 +57,77 @@ from performance_optimizer import performance_optimizer
 logger = logging.getLogger(__name__)
 
 class ExecutionService:
+    """
+    Advanced C++ Engine Execution and Management System for the Trading Platform.
+    
+    This class provides comprehensive execution management for the C++ trading engine,
+    implementing sophisticated process execution, real-time monitoring, and resource
+    management capabilities. It serves as the primary interface between the Python API
+    and the C++ trading engine, handling all aspects of simulation execution.
+    
+    Key Features:
+    - Asynchronous C++ engine execution with real-time monitoring
+    - Dynamic configuration file generation for flexible strategy execution
+    - Comprehensive process health monitoring and timeout handling
+    - Real-time progress tracking via JSON-based heartbeat system
+    - Memory usage monitoring and reporting capabilities
+    - Graceful process termination and resource cleanup
+    - Support for parallel execution coordination
+    
+    Architecture Integration:
+    The ExecutionService integrates with multiple platform components:
+    - Strategy factory for dynamic strategy configuration
+    - Performance optimizer for execution timing analysis
+    - Docker environment for containerized execution
+    - Database connectivity for C++ engine data access
+    
+    Process Management:
+    The service manages the complete lifecycle of simulation processes:
+    1. Engine validation and configuration setup
+    2. Dynamic configuration file generation
+    3. Asynchronous process execution with environment setup
+    4. Real-time stream processing and progress monitoring
+    5. Health checking and timeout management
+    6. Graceful termination and cleanup
+    """
+    
     def __init__(self, cpp_engine_path: Path):
+        """
+        Initialize the ExecutionService with C++ engine configuration.
+        
+        Args:
+            cpp_engine_path: Path to the C++ trading engine executable
+            
+        The service maintains an active simulations registry for process tracking,
+        health monitoring, and resource management throughout execution.
+        """
         self.cpp_engine_path = cpp_engine_path
         self.active_simulations: Dict[str, Dict[str, Any]] = {}
     
     def validate_cpp_engine(self) -> Dict[str, Any]:
+        """
+        Comprehensive validation of C++ engine availability and configuration.
+        
+        This method performs thorough validation of the C++ trading engine to ensure
+        it's properly configured, accessible, and executable before simulation execution.
+        It provides detailed error information and actionable suggestions for resolution.
+        
+        Returns:
+            Dict[str, Any]: Validation result containing:
+                - is_valid: Boolean indicating if engine is valid and ready
+                - error: Detailed error message (if validation fails)
+                - error_code: Standardized error code for categorization
+                - suggestions: List of actionable resolution suggestions
+                
+        Validation Checks:
+        1. Engine path configuration verification
+        2. File existence and accessibility validation
+        3. Execute permission verification
+        4. Docker container and volume mount validation
+        
+        The method provides specific error codes and suggestions for each failure
+        scenario, enabling targeted troubleshooting and resolution.
+        """
         if self.cpp_engine_path is None:
             return {
                 'is_valid': False,
@@ -56,6 +166,23 @@ class ExecutionService:
         return {'is_valid': True}
     
     def create_config_file(self, config: SimulationConfig) -> str:
+        """
+        Create a temporary JSON config file for the C++ engine.
+
+        This method generates a JSON configuration file based on the provided
+        SimulationConfig. It uses the dynamic strategy factory to create a
+        C++ compatible configuration for the selected strategy and its parameters.
+
+        Args:
+            config: The simulation configuration object.
+
+        Returns:
+            The path to the newly created temporary configuration file.
+            
+        Raises:
+            Exception: If there is an error creating the strategy configuration
+                       or writing the file.
+        """
         # Create a temporary JSON config file for the C++ engine using dynamic strategy system
         try:
             # Import here to avoid circular dependencies
@@ -91,6 +218,21 @@ class ExecutionService:
             raise
     
     def build_cpp_command(self, config: SimulationConfig) -> tuple[List[str], str]:
+        """
+        Build the command-line arguments for executing the C++ engine.
+
+        This method constructs the full command to run the C++ engine, including
+        the path to the executable and the necessary command-line flags. It also
+        creates the temporary configuration file required by the engine.
+
+        Args:
+            config: The simulation configuration object.
+
+        Returns:
+            A tuple containing:
+                - A list of strings representing the command and its arguments.
+                - The path to the temporary configuration file.
+        """
         # Build command using JSON config file approach
         config_file = self.create_config_file(config)
         
@@ -104,9 +246,40 @@ class ExecutionService:
         return cmd, config_file
     
     async def execute_simulation(self, simulation_id: str, config: SimulationConfig) -> Dict[str, Any]:
+        """
+        Execute a trading simulation asynchronously with comprehensive monitoring.
+        
+        This method orchestrates the complete simulation execution process, including
+        configuration generation, process execution, real-time monitoring, and cleanup.
+        It provides comprehensive error handling and resource management throughout
+        the simulation lifecycle.
+        
+        Args:
+            simulation_id: Unique identifier for tracking the simulation
+            config: SimulationConfig object containing simulation parameters
+            
+        Returns:
+            Dict[str, Any]: Execution result containing:
+                - return_code: Process exit code
+                - stdout: Standard output from C++ engine
+                - stderr: Standard error output from C++ engine
+                - command: Command line arguments used for execution
+                
+        Execution Pipeline:
+        1. Generate dynamic configuration file for C++ engine
+        2. Build command-line arguments with performance timing
+        3. Validate working directory and environment setup
+        4. Execute C++ engine process asynchronously
+        5. Monitor process streams for progress and heartbeat
+        6. Handle process completion and collect results
+        7. Perform comprehensive cleanup of resources
+        
+        The method implements comprehensive error handling, resource cleanup,
+        and progress monitoring throughout the execution process.
+        """
         config_file = None
         try:
-            # Build command using JSON config file
+            # Build command using JSON config file with performance monitoring
             start_time = performance_optimizer.start_timer("command_building")
             cmd, config_file = self.build_cpp_command(config)
             
@@ -119,7 +292,7 @@ class ExecutionService:
             
             logger.debug(f"Starting simulation {simulation_id}: {' '.join(cmd)} (build_time: {build_time:.2f}ms)")
             
-            # Prepare environment variables for C++ engine
+            # Prepare comprehensive environment variables for C++ engine
             env = os.environ.copy()  # Copy current environment
             # Ensure database environment variables are available to C++ engine
             db_env_vars = ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD']
@@ -128,7 +301,7 @@ class ExecutionService:
                     env[var] = os.environ[var]
                     logger.debug(f"Passing {var} to C++ engine")
             
-            # Run subprocess with validated working directory and environment
+            # Execute subprocess with validated working directory and environment
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
@@ -137,7 +310,7 @@ class ExecutionService:
                 env=env
             )
             
-            # Store process for status tracking with heartbeat
+            # Register process for comprehensive status tracking with heartbeat monitoring
             self.active_simulations[simulation_id] = {
                 "process": process,
                 "start_time": datetime.now(),
@@ -149,13 +322,13 @@ class ExecutionService:
                 "is_healthy": True
             }
             
-            # Read output streams and handle progress updates
+            # Monitor output streams and handle real-time progress updates
             stdout_data, stderr_data = await self._read_process_streams(process, simulation_id)
             
             # Wait for process completion
             await process.wait()
             
-            # Combine the data
+            # Combine and decode output data
             stdout = b''.join(stdout_data)
             stderr = b''.join(stderr_data)
             
@@ -170,11 +343,11 @@ class ExecutionService:
             logger.error(f"Exception in simulation execution {simulation_id}: {e}")
             raise
         finally:
-            # Clean up
+            # Comprehensive cleanup of simulation resources
             if simulation_id in self.active_simulations:
                 del self.active_simulations[simulation_id]
             
-            # Clean up config file if it wasn't cleaned up by C++ engine
+            # Clean up temporary configuration file if it wasn't cleaned up by C++ engine
             if config_file and os.path.exists(config_file):
                 try:
                     os.remove(config_file)
@@ -183,6 +356,22 @@ class ExecutionService:
                     logger.warning(f"Failed to clean up config file {config_file}: {e}")
     
     async def _read_process_streams(self, process, simulation_id: str):
+        """
+        Read stdout and stderr streams from the process and monitor progress.
+
+        This private helper method reads the output from the C++ engine process
+        in real-time. It captures all stdout and stderr data and also parses
+        stderr for JSON progress updates to track the simulation's progress.
+
+        Args:
+            process: The asyncio subprocess object.
+            simulation_id: The ID of the simulation being monitored.
+
+        Returns:
+            A tuple containing:
+                - A list of bytes from the stdout stream.
+                - A list of bytes from the stderr stream.
+        """
         stdout_data = []
         stderr_data = []
         
@@ -345,6 +534,20 @@ class ExecutionService:
             }
     
     def _parse_memory_report(self, memory_report: str) -> Dict[str, Any]:
+        """
+        Parse the C++ engine memory report into a structured dictionary.
+
+        This private helper method takes the raw string output from the C++ engine's
+        memory report and parses it to extract key memory usage statistics for
+        different components of the engine.
+
+        Args:
+            memory_report: The raw string containing the memory report.
+
+        Returns:
+            A dictionary containing the parsed memory statistics, including total
+            memory, component-specific memory usage, and cache information.
+        """
         # Parse the C++ engine memory report into structured data
         try:
             # Expected format from C++ engine getMemoryReport()

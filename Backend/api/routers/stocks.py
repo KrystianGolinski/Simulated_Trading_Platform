@@ -1,3 +1,38 @@
+# Stocks Router - Stock Data and Temporal Validation Endpoints
+# This module provides comprehensive API endpoints for stock data access and temporal validation
+# Key responsibilities:
+# - Stock symbol listing and pagination for large datasets
+# - Historical stock data retrieval with OHLCV data and date range filtering
+# - Temporal validation for stock trading eligibility (IPO/delisting dates)
+# - Stock metadata and temporal information management
+# - Date range validation and data availability checking
+# - Batch temporal validation for simulation preparation
+# - Stock trading period eligibility assessment
+#
+# Architecture Features:
+# - RouterBase pattern for consistent endpoint structure and logging
+# - Integration with StockDataRepository for comprehensive data access
+# - Dependency injection for repository and service access
+# - Pagination support for large stock datasets and historical data
+# - Comprehensive temporal validation with IPO/delisting awareness
+# - Error handling with detailed validation messages
+# - Date format validation and parsing with proper error reporting
+#
+# Endpoints Provided:
+# - /stocks: Get paginated list of available stock symbols
+# - /stocks/{symbol}/date-range: Get available date range for specific stock
+# - /stocks/{symbol}/data: Get historical OHLCV data with pagination
+# - /stocks/validate-temporal: Validate symbols for trading period eligibility
+# - /stocks/{symbol}/temporal-info: Get comprehensive temporal information
+# - /stocks/check-tradeable: Check if stock was tradeable on specific date
+# - /stocks/eligible-for-period: Get stocks eligible for trading period
+#
+# Integration Points:
+# - Uses StockDataRepository for comprehensive stock data access
+# - Integrates with temporal validation for simulation preparation
+# - Supports RouterBase pattern for consistent response formatting
+# - Provides stock data for simulation configuration and validation
+
 from fastapi import APIRouter, Depends
 from typing import List, Dict, Any
 from datetime import datetime, date
@@ -8,36 +43,42 @@ from repositories.stock_data_repository import StockDataRepository
 from models import StandardResponse, PaginatedResponse, ApiError
 from routing import get_router_service_factory
 
-# Create router using RouterBase pattern
+# Create router using RouterBase pattern for consistent stock endpoint structure
 router_factory = get_router_service_factory()
 router_base = router_factory.create_router_base("stocks")
 router = router_base.get_router()
 router.tags = ["stocks"]
 
-# Request models for temporal validation
+# Request models for temporal validation operations
 class TemporalValidationRequest(BaseModel):
     symbols: List[str]
-    start_date: str  # YYYY-MM-DD format
-    end_date: str    # YYYY-MM-DD format
+    start_date: str  # YYYY-MM-DD format for ISO date parsing
+    end_date: str    # YYYY-MM-DD format for ISO date parsing
 
 class StockTradeableRequest(BaseModel):
     symbol: str
-    check_date: str  # YYYY-MM-DD format
+    check_date: str  # YYYY-MM-DD format for ISO date parsing
 
-# Using RouterBase pattern with service injection
-# router_base provides injected services: validation_service, response_formatter, router_logger
+# RouterBase pattern integration provides injected services:
+# - validation_service: Configuration validation and error handling
+# - response_formatter: Standardized response creation and pagination
+# - router_logger: Comprehensive request/response logging with correlation
 
 @router.get("/stocks")
 async def get_stocks(page: int = 1, page_size: int = 100, 
                     stock_repo: StockDataRepository = Depends(get_stock_data_repository)) -> PaginatedResponse[str]:
-    # Retrieves a paginated list of all available stock symbols from the database.
+    # Get paginated list of all available stock symbols from the database
+    # Supports large datasets with configurable pagination for efficient data retrieval
+    # Returns alphabetically sorted stock symbols with pagination metadata
     router_base.router_logger.log_request("/stocks", {"page": page, "page_size": page_size})
     
+    # Validate pagination parameters for proper data retrieval
     if page < 1:
         raise ValueError("Page number must be 1 or greater")
     if page_size < 1 or page_size > 1000:
         raise ValueError("Page size must be between 1 and 1000")
     
+    # Retrieve paginated stock symbols with total count for pagination metadata
     stocks, total_count = await stock_repo.get_available_stocks(page=page, page_size=page_size)
     
     # Use injected response formatter for pagination
@@ -54,7 +95,9 @@ async def get_stocks(page: int = 1, page_size: int = 100,
 
 @router.get("/stocks/{symbol}/date-range")
 async def get_stock_date_range(symbol: str, stock_repo: StockDataRepository = Depends(get_stock_data_repository)) -> StandardResponse[Dict[str, str]]:
-    # Gets the earliest and latest date of available historical data for a specific stock symbol.
+    # Get the available date range for historical data of a specific stock symbol
+    # Returns earliest and latest available dates for the stock in the database
+    # Used for temporal validation and date range selection in client applications
     router_base.router_logger.log_request(f"/stocks/{symbol}/date-range", {"symbol": symbol})
     
     result = await stock_repo.get_symbol_date_range(symbol)
@@ -83,15 +126,21 @@ async def get_stock_date_range(symbol: str, stock_repo: StockDataRepository = De
 async def get_stock_data(symbol: str, start_date: str, end_date: str, timeframe: str = "daily", 
                         page: int = 1, page_size: int = 1000, 
                         stock_repo: StockDataRepository = Depends(get_stock_data_repository)) -> PaginatedResponse[Dict[str, Any]]:
-    # Get historical stock data
+    # Get historical OHLCV stock data with pagination and date range filtering
+    # Returns time-series stock data for specified symbol and date range with pagination support
+    # Used for chart display, analysis, and simulation data preparation
+    
+    # Validate pagination parameters for efficient data retrieval
     if page < 1:
         raise ValueError("Page number must be 1 or greater")
     if page_size < 1 or page_size > 10000:
         raise ValueError("Page size must be between 1 and 10000")
     
+    # Parse ISO date strings to date objects for repository operations
     start = datetime.fromisoformat(start_date).date()
     end = datetime.fromisoformat(end_date).date()
     
+    # Retrieve paginated historical stock data with comprehensive metadata
     data, total_count, date_range = await stock_repo.get_stock_data(symbol, start, end, timeframe, page=page, page_size=page_size)
     
     # Use injected response formatter for pagination
@@ -109,12 +158,13 @@ async def get_stock_data(symbol: str, start_date: str, end_date: str, timeframe:
     router_base.router_logger.log_success(f"/stocks/{symbol}/data", len(data))
     return response
 
-# Temporal validation endpoints
+# Temporal validation endpoints for trading eligibility assessment
 @router.post("/stocks/validate-temporal")
 async def validate_stocks_for_period(request: TemporalValidationRequest, 
                                    stock_repo: StockDataRepository = Depends(get_stock_data_repository)) -> StandardResponse[Dict[str, Any]]:
-    # Validate if stocks were trading during specified period
-    # Accounts for IPO dates, delisting dates, and trading suspensions
+    # Validate if stocks were trading during specified period with comprehensive temporal checks
+    # Accounts for IPO dates, delisting dates, and trading suspensions for simulation eligibility
+    # Returns categorized results with valid/invalid symbols and detailed error messages
     try:
         start_date = datetime.fromisoformat(request.start_date).date()
         end_date = datetime.fromisoformat(request.end_date).date()
@@ -151,7 +201,9 @@ async def validate_stocks_for_period(request: TemporalValidationRequest,
 
 @router.get("/stocks/{symbol}/temporal-info")
 async def get_stock_temporal_info(symbol: str, stock_repo: StockDataRepository = Depends(get_stock_data_repository)) -> StandardResponse[Dict[str, Any]]:
-    # Get temporal information for a stock (IPO, delisting, trading periods)
+    # Get comprehensive temporal information for a stock including IPO and delisting dates
+    # Returns complete trading history metadata for temporal validation and analysis
+    # Used for understanding stock trading eligibility and historical context
     temporal_info = await stock_repo.get_stock_temporal_info(symbol)
     
     router_base.router_logger.log_request(f"/stocks/{symbol}/temporal-info", {"symbol": symbol})
@@ -174,7 +226,9 @@ async def get_stock_temporal_info(symbol: str, stock_repo: StockDataRepository =
 @router.post("/stocks/check-tradeable")
 async def check_stock_tradeable(request: StockTradeableRequest, 
                               stock_repo: StockDataRepository = Depends(get_stock_data_repository)) -> StandardResponse[Dict[str, Any]]:
-    # Check if a stock was tradeable on a specific date
+    # Check if a stock was tradeable on a specific date with temporal context
+    # Returns trading eligibility status with additional context for non-tradeable stocks
+    # Provides IPO/delisting information when stock is not tradeable
     try:
         check_date = datetime.fromisoformat(request.check_date).date()
         
@@ -186,7 +240,7 @@ async def check_stock_tradeable(request: StockTradeableRequest,
             "is_tradeable": is_tradeable
         }
         
-        # Add temporal context if not tradeable
+        # Add comprehensive temporal context for non-tradeable stocks
         if not is_tradeable:
             temporal_info = await stock_repo.get_stock_temporal_info(request.symbol)
             if temporal_info:
@@ -220,7 +274,9 @@ async def check_stock_tradeable(request: StockTradeableRequest,
 @router.get("/stocks/eligible-for-period")
 async def get_eligible_stocks_for_period(start_date: str, end_date: str, 
                                        stock_repo: StockDataRepository = Depends(get_stock_data_repository)) -> StandardResponse[List[str]]:
-    # Get stocks that were eligible for trading during a specific period
+    # Get comprehensive list of stocks eligible for trading during a specific period
+    # Returns filtered stock list excluding stocks with IPO/delisting issues during the period
+    # Used for simulation preparation and strategy backtesting with valid stock universe
     try:
         start_date_obj = datetime.fromisoformat(start_date).date()
         end_date_obj = datetime.fromisoformat(end_date).date()

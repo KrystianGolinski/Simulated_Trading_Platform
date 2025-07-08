@@ -1,3 +1,42 @@
+# Health Router - System Health Monitoring and Status Endpoints
+# This module provides comprehensive health monitoring endpoints for the Trading Platform API
+# Key responsibilities:
+# - System health monitoring and component status validation
+# - Kubernetes-style readiness and liveness probes for container orchestration
+# - Database connectivity validation through validation system integration
+# - C++ trading engine health monitoring and accessibility checks
+# - System resource monitoring (disk usage, memory usage)
+# - Comprehensive health dashboard with detailed metrics and diagnostics
+# - Service information and environment status reporting
+#
+# Architecture Features:
+# - RouterBase pattern for consistent endpoint structure and logging
+# - Dependency injection integration for validation system access
+# - Multi-component health aggregation with overall status determination
+# - Kubernetes probe endpoint compatibility for container deployment
+# - System resource monitoring with configurable thresholds
+# - Comprehensive error handling and logging for health check failures
+# - Health dashboard for monitoring and debugging purposes
+#
+# Endpoints Provided:
+# - /: Root service information endpoint
+# - /health: Comprehensive health check with all system components
+# - /health/ready: Kubernetes readiness probe for traffic acceptance
+# - /health/live: Kubernetes liveness probe for service availability
+# - /health/dashboard: Detailed health dashboard with metrics and status
+#
+# Health Components Monitored:
+# - Database connectivity and validation system status
+# - C++ trading engine availability and accessibility
+# - System resources (disk usage, memory usage)
+# - Overall service health with degradation detection
+#
+# Integration Points:
+# - Uses SimulationValidator for database connectivity validation
+# - Integrates with engine health checking functions
+# - Utilizes system resource monitoring for comprehensive health assessment
+# - Supports RouterBase pattern for consistent response formatting
+
 from fastapi import APIRouter, Depends
 from typing import Dict, Any
 import os
@@ -9,22 +48,25 @@ from validation import SimulationValidator
 from models import StandardResponse, ApiError
 from routing import get_router_service_factory
 
-# Create router using RouterBase pattern
+# Create router using RouterBase pattern for consistent health endpoint structure
 router_factory = get_router_service_factory()
 router_base = router_factory.create_router_base("health")
 router = router_base.get_router()
 router.tags = ["health"]
 
 async def check_cpp_engine_health() -> Dict[str, Any]:
-    # Check if C++ engine is available and functional
+    # Check C++ trading engine availability and accessibility across deployment scenarios
+    # Validates engine binary existence and execution permissions
+    # Returns structured health status for engine component monitoring
     try:
-        # Check if engine binary exists in expected locations
+        # Check multiple engine binary locations for different deployment scenarios
         engine_paths = [
-            Path("/shared/trading_engine"),  # Docker shared volume
-            Path("/app/cpp-engine/build/trading_engine"),  # Local build
+            Path("/shared/trading_engine"),  # Docker shared volume mount
+            Path("/app/cpp-engine/build/trading_engine"),  # Container local build
             Path(__file__).parent.parent.parent / "cpp-engine" / "build" / "trading_engine",  # Development build
         ]
         
+        # Iterate through possible engine locations to find valid executable
         for engine_path in engine_paths:
             if engine_path.exists() and os.access(engine_path, os.X_OK):
                 return {
@@ -33,6 +75,7 @@ async def check_cpp_engine_health() -> Dict[str, Any]:
                     "executable": True
                 }
         
+        # Return unhealthy status if no valid engine found
         return {
             "status": "unhealthy",
             "engine_path": None,
@@ -40,24 +83,28 @@ async def check_cpp_engine_health() -> Dict[str, Any]:
             "error": "C++ engine binary not found or not executable"
         }
     except Exception as e:
+        # Handle engine health check errors with structured error response
         return {
             "status": "unhealthy",
             "error": str(e)
         }
 
 def get_system_health() -> Dict[str, Any]:
-    # Get system resource health metrics
+    # Get comprehensive system resource health metrics for monitoring
+    # Monitors disk usage, memory usage, and system resource availability
+    # Returns structured metrics for health threshold evaluation
     try:
         import shutil
         import psutil
         
-        # Get disk usage
+        # Calculate disk usage metrics for storage monitoring
         disk_usage = shutil.disk_usage("/")
         disk_usage_pct = (disk_usage.used / disk_usage.total) * 100
         
-        # Get memory usage
+        # Calculate memory usage metrics for resource monitoring
         memory = psutil.virtual_memory()
         
+        # Return comprehensive system metrics for health assessment
         return {
             "disk_usage_pct": round(disk_usage_pct, 2),
             "available_disk_gb": round(disk_usage.free / (1024**3), 2),
@@ -67,12 +114,13 @@ def get_system_health() -> Dict[str, Any]:
             "total_memory_gb": round(memory.total / (1024**3), 2)
         }
     except ImportError:
-        # psutil not available, return basic info
+        # Fallback to basic disk monitoring when psutil not available
         try:
             import shutil
             disk_usage = shutil.disk_usage("/")
             disk_usage_pct = (disk_usage.used / disk_usage.total) * 100
             
+            # Return limited metrics when advanced monitoring unavailable
             return {
                 "disk_usage_pct": round(disk_usage_pct, 2),
                 "available_disk_gb": round(disk_usage.free / (1024**3), 2),
@@ -80,17 +128,21 @@ def get_system_health() -> Dict[str, Any]:
                 "memory_info": "psutil not available"
             }
         except Exception as e:
+            # Handle basic system monitoring errors
             return {
                 "error": f"System health check failed: {str(e)}"
             }
     except Exception as e:
+        # Handle comprehensive system monitoring errors
         return {
             "error": f"System health check failed: {str(e)}"
         }
 
 @router.get("/")
 async def root() -> StandardResponse[Dict[str, str]]:
-    # Root endpoint
+    # Root service information endpoint providing basic service identification
+    # Returns service name, version, and running status for API discovery
+    # Used for service verification and basic connectivity testing
     router_base.router_logger.log_request("/", {})
     
     response = router_base.response_formatter.create_success_response(
@@ -103,11 +155,14 @@ async def root() -> StandardResponse[Dict[str, str]]:
 
 @router.get("/health/ready")
 async def readiness_check(validator: SimulationValidator = Depends(get_simulation_validator)) -> StandardResponse[Dict[str, Any]]:
-    # Kubernetes-style readiness probe - checks if service is ready to accept traffic
+    # Kubernetes readiness probe - validates service readiness to accept traffic
+    # Checks critical dependencies required for request processing
+    # Returns ready/not-ready status for container orchestration systems
     try:
-        # Quick database connection check through validator
+        # Validate database connectivity as critical readiness requirement
         validation_health = await validator.check_database_connection()
         
+        # Evaluate readiness based on database connectivity status
         if validation_health.is_valid:
             response = router_base.response_formatter.create_success_response(
                 {"ready": True, "database": "connected"},
@@ -123,6 +178,7 @@ async def readiness_check(validator: SimulationValidator = Depends(get_simulatio
             router_base.router_logger.log_error("/health/ready", Exception("Database connection failed"), "NOT_READY")
             return response
     except Exception as e:
+        # Handle readiness check errors for Kubernetes probe reliability
         router_base.router_logger.log_error("/health/ready", e, "READINESS_ERROR")
         return router_base.response_formatter.create_error_response(
             "Readiness check failed",
@@ -131,7 +187,9 @@ async def readiness_check(validator: SimulationValidator = Depends(get_simulatio
 
 @router.get("/health/live")
 async def liveness_check() -> StandardResponse[Dict[str, Any]]:
-    # Kubernetes-style liveness probe - checks if service is alive
+    # Kubernetes liveness probe - validates service process is alive and responsive
+    # Simple endpoint that confirms API process is running and can handle requests
+    # Used by container orchestration for restart decision making
     router_base.router_logger.log_request("/health/live", {})
     
     response = router_base.response_formatter.create_success_response(
@@ -144,14 +202,16 @@ async def liveness_check() -> StandardResponse[Dict[str, Any]]:
 
 @router.get("/health")
 async def health_check(validator: SimulationValidator = Depends(get_simulation_validator)) -> StandardResponse[Dict[str, Any]]:
-    # Health check with all system components
+    # Comprehensive health check with all system components and dependencies
+    # Aggregates health status from database, engine, validation system, and resources
+    # Provides detailed diagnostic information for system monitoring and troubleshooting
     try:
         start_time = time.time()
         
-        # Check database connection through validation system
+        # Validate database connectivity through validation system integration
         validation_health = await validator.check_database_connection()
         
-        # Create mock db_health structure for compatibility
+        # Create database health structure for health aggregation
         db_health = {
             "status": "healthy" if validation_health.is_valid else "unhealthy",
             "data_stats": {"symbols_daily": 0, "daily_records": 0},
@@ -159,36 +219,42 @@ async def health_check(validator: SimulationValidator = Depends(get_simulation_v
         }
         
         
-        # Check C++ engine availability
+        # Validate C++ trading engine availability and accessibility
         cpp_engine_health = await check_cpp_engine_health()
         
-        # Check disk space and memory
+        # Monitor system resources for capacity and performance
         system_health = get_system_health()
         
-        # Determine overall status
+        # Aggregate component health status to determine overall system health
         overall_status = "healthy"
         health_issues = []
         
+        # Evaluate database health impact on overall status
         if db_health["status"] != "healthy":
             overall_status = "degraded"
             health_issues.append("Database connection issues")
             
+        # Evaluate validation system health impact
         if not validation_health.is_valid:
             overall_status = "degraded"
             health_issues.append("Validation system errors")
             
+        # Evaluate C++ engine health impact
         if cpp_engine_health["status"] != "healthy":
             if overall_status == "healthy":
                 overall_status = "degraded"
             health_issues.append("C++ engine unavailable")
             
+        # Evaluate system resource health with configurable thresholds
         if system_health["disk_usage_pct"] > 90 or system_health["available_memory_mb"] < 100:
             if overall_status == "healthy":
                 overall_status = "degraded"
             health_issues.append("System resources low")
         
+        # Calculate health check response time for performance monitoring
         response_time = round((time.time() - start_time) * 1000, 2)
         
+        # Compile comprehensive health data for monitoring and diagnostics
         health_data = {
             "service": "trading-api",
             "overall_status": overall_status,
@@ -208,6 +274,7 @@ async def health_check(validator: SimulationValidator = Depends(get_simulation_v
             }
         }
         
+        # Format health response based on overall system status
         if overall_status == "healthy":
             response = router_base.response_formatter.create_success_response(health_data, "All systems healthy")
             router_base.router_logger.log_success("/health")
@@ -220,6 +287,7 @@ async def health_check(validator: SimulationValidator = Depends(get_simulation_v
             router_base.router_logger.log_error("/health", Exception(f"Health issues: {health_issues}"), "HEALTH_CHECK_FAILED")
             return response
     except Exception as e:
+        # Handle comprehensive health check errors with detailed logging
         router_base.router_logger.log_error("/health", e, "HEALTH_CHECK_ERROR")
         return router_base.response_formatter.create_error_response(
             "Health check failed",
@@ -228,8 +296,11 @@ async def health_check(validator: SimulationValidator = Depends(get_simulation_v
 
 @router.get("/health/dashboard")
 async def health_dashboard(validator: SimulationValidator = Depends(get_simulation_validator)) -> StandardResponse[Dict[str, Any]]:
-    # Health dashboard with metrics and status
+    # Comprehensive health dashboard with service metrics, endpoints, and monitoring configuration
+    # Provides detailed health overview for monitoring systems and debugging
+    # Includes service information, health endpoints, and monitoring configuration
     try:
+        # Compile dashboard data with service information and monitoring configuration
         dashboard_data = {
             "service_info": {
                 "name": "Trading Platform API",
@@ -250,7 +321,7 @@ async def health_dashboard(validator: SimulationValidator = Depends(get_simulati
             }
         }
         
-        # Get health data
+        # Include current health status in dashboard data
         health_result = await health_check(validator)
         if health_result.data:
             dashboard_data["current_health"] = health_result.data
@@ -262,6 +333,7 @@ async def health_dashboard(validator: SimulationValidator = Depends(get_simulati
         router_base.router_logger.log_success("/health/dashboard")
         return response
     except Exception as e:
+        # Handle dashboard generation errors with comprehensive error reporting
         router_base.router_logger.log_error("/health/dashboard", e, "DASHBOARD_ERROR")
         return router_base.response_formatter.create_error_response(
             "Failed to generate health dashboard",
