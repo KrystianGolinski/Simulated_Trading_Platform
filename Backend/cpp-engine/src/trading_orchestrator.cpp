@@ -1,17 +1,18 @@
-#include "trading_orchestrator.h"
-#include "trading_engine.h"
-#include "data_conversion.h"
-#include "json_helpers.h"
-#include "logger.h"
-#include "trading_exceptions.h"
-#include "error_utils.h"
-#include <sstream>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <iostream>
-#include <chrono>
-#include <thread>
 #include <set>
+#include <sstream>
+#include <thread>
+
+#include "data_conversion.h"
+#include "error_utils.h"
+#include "json_helpers.h"
+#include "logger.h"
+#include "trading_engine.h"
+#include "trading_exceptions.h"
+#include "trading_orchestrator.h"
 
 // Main orchestration methods
 Result<std::string> TradingOrchestrator::runSimulation(const TradingConfig& config,

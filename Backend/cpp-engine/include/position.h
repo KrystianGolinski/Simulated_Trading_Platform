@@ -7,11 +7,6 @@
  * Tracks the number of shares owned and calculates values based on current price.
  */
 class Position {
-private:
-    std::string symbol_;
-    int shares_;
-    double average_price_;
-    
 public:
     // Constructors
     Position();
@@ -41,4 +36,9 @@ public:
     // Utility
     bool isEmpty() const;
     std::string toString() const;
+
+private:
+    std::string symbol_;
+    int shares_;
+    double average_price_;
 };

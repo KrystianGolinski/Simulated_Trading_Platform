@@ -1,18 +1,15 @@
 #pragma once
 
-#include "result.h"
-#include "trading_exceptions.h"
-#include "portfolio.h"
-#include "trading_strategy.h"
-#include "memory_optimizable.h"
 #include <string>
 #include <vector>
 
+#include "memory_optimizable.h"
+#include "portfolio.h"
+#include "result.h"
+#include "trading_exceptions.h"
+#include "trading_strategy.h"
+
 class ExecutionService : public IMemoryOptimizable {
-private:
-    std::vector<TradingSignal> executed_signals_;
-    int failed_executions_counter_ = 0;
-    
 public:
     ExecutionService() = default;
     ~ExecutionService() = default;
@@ -39,7 +36,15 @@ public:
     int getSuccessfulExecutions() const;
     int getFailedExecutions() const;
     
+    // Memory optimization interface
+    void optimizeMemory() override;
+    size_t getMemoryUsage() const override;
+    std::string getMemoryReport() const override;
+
 private:
+    std::vector<TradingSignal> executed_signals_;
+    int failed_executions_counter_ = 0;
+    
     // Internal execution logic
     Result<void> executeBuySignal(const TradingSignal& signal, 
                                   const std::string& symbol, 
@@ -52,10 +57,4 @@ private:
     
     // Execution validation
     Result<void> validateSignal(const TradingSignal& signal, const std::string& symbol) const;
-    
-public:
-    // Memory optimization interface
-    void optimizeMemory() override;
-    size_t getMemoryUsage() const override;
-    std::string getMemoryReport() const override;
 };

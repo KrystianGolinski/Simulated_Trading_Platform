@@ -1,6 +1,6 @@
 # Routing Package - Advanced Router Architecture with Service Injection
 # This package provides comprehensive router architecture with dependency injection for the Trading Platform API
-# 
+#
 # Architecture Overview:
 # The routing package implements a sophisticated router architecture that goes beyond basic FastAPI routing.
 # It provides a foundation for building routers with consistent service injection, standardized logging,
@@ -25,4 +25,4 @@
 from .router_base import RouterBase
 from .service_factory import RouterServiceFactory, get_router_service_factory
 
-__all__ = ['RouterBase', 'RouterServiceFactory', 'get_router_service_factory']
+__all__ = ["RouterBase", "RouterServiceFactory", "get_router_service_factory"]

@@ -1,9 +1,10 @@
-#include "argument_parser.h"
-#include "trading_engine.h"  // Include for TradingConfig definition
-#include "logger.h"
-#include <sstream>
 #include <algorithm>
 #include <iostream>
+#include <sstream>
+
+#include "argument_parser.h"
+#include "logger.h"
+#include "trading_engine.h"  // Include for TradingConfig definition
 
 ArgumentParser::ArgumentParser() {}
 

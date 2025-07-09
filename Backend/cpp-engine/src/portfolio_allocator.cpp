@@ -1,9 +1,10 @@
-#include "portfolio_allocator.h"
-#include "logger.h"
-#include "trading_exceptions.h"
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+
+#include "logger.h"
+#include "portfolio_allocator.h"
+#include "trading_exceptions.h"
 
 PortfolioAllocator::PortfolioAllocator(const AllocationConfig& config) : config_(config), initial_capital_(0.0) {
     Logger::debug("PortfolioAllocator initialized with strategy: ", static_cast<int>(config_.strategy));

@@ -1,18 +1,14 @@
 #pragma once
 
-#include "result.h"
-#include "trading_exceptions.h"
-#include "portfolio.h"
-#include "technical_indicators.h"
-#include <string>
 #include <functional>
+#include <string>
+
+#include "portfolio.h"
+#include "result.h"
+#include "technical_indicators.h"
+#include "trading_exceptions.h"
 
 class ProgressService {
-private:
-    std::function<void(const std::string&)> progress_callback_;
-    bool enable_progress_reporting_;
-    int progress_interval_;
-    
 public:
     ProgressService() : enable_progress_reporting_(true), progress_interval_(20) {}
     ~ProgressService() = default;
@@ -46,8 +42,12 @@ public:
                                      int total_trades);
     
     void reportError(const std::string& error_message);
-    
+
 private:
+    std::function<void(const std::string&)> progress_callback_;
+    bool enable_progress_reporting_;
+    int progress_interval_;
+    
     // Internal progress calculation
     double calculateProgressPercentage(size_t current, size_t total) const;
     

@@ -1,10 +1,11 @@
 #pragma once
 
-#include "technical_indicators.h"
-#include <vector>
 #include <map>
-#include <string>
 #include <stdexcept>
+#include <string>
+#include <vector>
+
+#include "technical_indicators.h"
 
 namespace DataConversion {
     

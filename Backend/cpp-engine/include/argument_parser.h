@@ -1,8 +1,8 @@
 #pragma once
 
+#include <map>
 #include <string>
 #include <vector>
-#include <map>
 
 // Forward declare TradingConfig - will be included via the implementation file
 struct TradingConfig;

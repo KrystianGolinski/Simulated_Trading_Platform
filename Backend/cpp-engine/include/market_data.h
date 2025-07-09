@@ -1,16 +1,18 @@
 #pragma once
 
-#include <string>
 #include <map>
-#include <vector>
 #include <memory>
 #include <mutex>
+#include <string>
+#include <vector>
+
 #include <nlohmann/json.hpp>
+
 #include "database_connection.h"
-#include "technical_indicators.h"
-#include "result.h"
-#include "trading_exceptions.h"
 #include "memory_optimizable.h"
+#include "result.h"
+#include "technical_indicators.h"
+#include "trading_exceptions.h"
 
 /**
  * MarketData class handles historical price data access from DB.
@@ -18,17 +20,6 @@
  */
 
 class MarketData : public IMemoryOptimizable {
-private:
-    std::unique_ptr<DatabaseConnection> db_connection_;
-    mutable std::map<std::string, double> price_cache_;
-    mutable std::mutex cache_mutex_;
-    bool cache_enabled_;
-    
-    // Helper methods
-    Result<void> ensureConnection() const;
-    void cachePrice(const std::string& symbol, double price) const;
-    Result<double> getCachedPrice(const std::string& symbol) const;
-    
 public:
     // Constructors
     MarketData();
@@ -110,5 +101,16 @@ public:
     void optimizeMemory() override;
     size_t getMemoryUsage() const override;
     std::string getMemoryReport() const override;
+
+private:
+    std::unique_ptr<DatabaseConnection> db_connection_;
+    mutable std::map<std::string, double> price_cache_;
+    mutable std::mutex cache_mutex_;
+    bool cache_enabled_;
+    
+    // Helper methods
+    Result<void> ensureConnection() const;
+    void cachePrice(const std::string& symbol, double price) const;
+    Result<double> getCachedPrice(const std::string& symbol) const;
 };
 

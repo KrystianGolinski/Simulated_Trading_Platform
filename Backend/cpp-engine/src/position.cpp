@@ -1,8 +1,9 @@
-#include "position.h"
-#include <sstream>
 #include <iomanip>
+#include <sstream>
 #include <stdexcept>
 #include <utility>
+
+#include "position.h"
 
 // Default constructor
 Position::Position() : symbol_(""), shares_(0), average_price_(0.0) {}

@@ -2,6 +2,7 @@
 
 #include <stdexcept>
 #include <string>
+
 #include "result.h"
 
 // Base exception class for all trading system exceptions

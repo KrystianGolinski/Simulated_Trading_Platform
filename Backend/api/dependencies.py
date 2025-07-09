@@ -5,15 +5,16 @@
 # - Manage service dependencies and lifecycle
 # - Ensure shared database connections across services
 # - Provide consistent service configuration throughout the application
-# 
+#
 # All dependency functions are async and return configured service instances
 # Used by FastAPI's dependency injection system via Depends()
 
 from database import get_database
 from repositories.stock_data_repository import StockDataRepository
+from services.strategy_service_implementation import StrategyService
 from services.temporal_validation_service import TemporalValidationService
 from validation import SimulationValidator
-from services.strategy_service_implementation import StrategyService
+
 
 async def get_stock_data_repository() -> StockDataRepository:
     # Provides the stock data repository instance for stock-related operations
@@ -23,6 +24,7 @@ async def get_stock_data_repository() -> StockDataRepository:
     db_manager = await get_database()
     return db_manager.stock_data_repository
 
+
 async def get_temporal_validation_service() -> TemporalValidationService:
     # Provides temporal validation service for stock trading period validation
     # Validates if stocks were tradeable during specified date ranges
@@ -31,12 +33,14 @@ async def get_temporal_validation_service() -> TemporalValidationService:
     stock_repo = await get_stock_data_repository()
     return TemporalValidationService(stock_repo)
 
+
 async def get_strategy_service() -> StrategyService:
     # Provides strategy service for trading strategy management
     # Handles strategy discovery, parameter validation, and configuration
     # Integrates with strategy registry for dynamic strategy loading
     # Used by strategy endpoints and simulation validation
     return StrategyService()
+
 
 async def get_simulation_validator() -> SimulationValidator:
     # Provides comprehensive simulation configuration validator

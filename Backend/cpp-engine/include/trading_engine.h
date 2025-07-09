@@ -1,22 +1,23 @@
 #pragma once
 
-#include "portfolio.h"
-#include "market_data.h"
-#include "execution_service.h"
-#include "progress_service.h"
-#include "trading_strategy.h"
-#include "technical_indicators.h"
-#include "portfolio_allocator.h"
-#include "result_calculator.h"
-#include "data_processor.h"
-#include "strategy_manager.h"
-#include "trading_orchestrator.h"
-#include "result.h"
-#include "error_utils.h"
-#include <string>
-#include <memory>
-#include <vector>
 #include <map>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "data_processor.h"
+#include "error_utils.h"
+#include "execution_service.h"
+#include "market_data.h"
+#include "portfolio.h"
+#include "portfolio_allocator.h"
+#include "progress_service.h"
+#include "result.h"
+#include "result_calculator.h"
+#include "strategy_manager.h"
+#include "technical_indicators.h"
+#include "trading_orchestrator.h"
+#include "trading_strategy.h"
 
 // Unified configuration struct
 // Supports both single and multi-symbol operations with flexible parameter management
@@ -60,23 +61,6 @@ struct TradingConfig {
 };
 
 class TradingEngine {
-private:
-    Portfolio portfolio_;
-    
-    // Service components (dependency injection)
-    std::unique_ptr<MarketData> market_data_;
-    std::unique_ptr<ExecutionService> execution_service_;
-    std::unique_ptr<ProgressService> progress_service_;
-    std::unique_ptr<PortfolioAllocator> portfolio_allocator_;
-    std::unique_ptr<ResultCalculator> result_calculator_;
-    std::unique_ptr<DataProcessor> data_processor_;
-    std::unique_ptr<StrategyManager> strategy_manager_;
-    std::unique_ptr<TradingOrchestrator> trading_orchestrator_;
-    
-    // Performance optimization members
-    std::map<std::string, std::vector<PriceData>> price_data_cache_;
-    bool cache_enabled_;
-    
 public:
     TradingEngine();
     explicit TradingEngine(double initial_capital);
@@ -110,7 +94,24 @@ public:
     DataProcessor* getDataProcessor() const;
     ResultCalculator* getResultCalculator() const;
     PortfolioAllocator* getPortfolioAllocator() const;
+
 private:
+    Portfolio portfolio_;
+    
+    // Service components (dependency injection)
+    std::unique_ptr<MarketData> market_data_;
+    std::unique_ptr<ExecutionService> execution_service_;
+    std::unique_ptr<ProgressService> progress_service_;
+    std::unique_ptr<PortfolioAllocator> portfolio_allocator_;
+    std::unique_ptr<ResultCalculator> result_calculator_;
+    std::unique_ptr<DataProcessor> data_processor_;
+    std::unique_ptr<StrategyManager> strategy_manager_;
+    std::unique_ptr<TradingOrchestrator> trading_orchestrator_;
+    
+    // Performance optimization members
+    std::map<std::string, std::vector<PriceData>> price_data_cache_;
+    bool cache_enabled_;
+    
     // Service initialization
     void initializeServices();
 };

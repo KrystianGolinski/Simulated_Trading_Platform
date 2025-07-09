@@ -1,11 +1,12 @@
 #pragma once
 
-#include "result.h"
-#include "trading_exceptions.h"
-#include <vector>
-#include <string>
 #include <map>
 #include <mutex>
+#include <string>
+#include <vector>
+
+#include "result.h"
+#include "trading_exceptions.h"
 
 struct PriceData {
     double open;
@@ -39,11 +40,6 @@ struct TradingSignal {
 };
 
 class TechnicalIndicators {
-private:
-    std::vector<PriceData> price_data_;
-    mutable std::map<std::string, std::vector<double>> indicator_cache_;
-    mutable std::mutex cache_mutex_;
-    
 public:
     TechnicalIndicators() = default;
     explicit TechnicalIndicators(const std::vector<PriceData>& data);
@@ -83,8 +79,12 @@ public:
     const std::vector<PriceData>& getPriceData() const;
     
     void clearCache();
-    
+
 private:
+    std::vector<PriceData> price_data_;
+    mutable std::map<std::string, std::vector<double>> indicator_cache_;
+    mutable std::mutex cache_mutex_;
+    
     Result<void> validatePeriod(int period) const;
     std::string getCacheKey(const std::string& indicator, int period) const;
     bool isCached(const std::string& key) const;

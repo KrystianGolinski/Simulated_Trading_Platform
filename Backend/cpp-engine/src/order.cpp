@@ -1,7 +1,8 @@
-#include "order.h"
-#include <sstream>
 #include <iomanip>
+#include <sstream>
 #include <utility>
+
+#include "order.h"
 
 // Constructors
 Order::Order() : symbol_(""), type_(OrderType::BUY), shares_(0), price_(0.0), 

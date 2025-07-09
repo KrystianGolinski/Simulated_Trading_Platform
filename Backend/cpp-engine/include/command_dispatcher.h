@@ -1,7 +1,8 @@
 #pragma once
 
-#include "argument_parser.h"
 #include <string>
+
+#include "argument_parser.h"
 
 // Forward declarations
 class TradingEngine;

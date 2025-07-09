@@ -1,7 +1,7 @@
 #pragma once
 
-#include <string>
 #include <cstddef>
+#include <string>
 
 /**
  * Interface for classes that support memory optimization.

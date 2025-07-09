@@ -1,10 +1,11 @@
-#include "technical_indicators.h"
-#include "error_utils.h"
 #include <algorithm>
-#include <numeric>
 #include <cmath>
 #include <future>
+#include <numeric>
 #include <thread>
+
+#include "error_utils.h"
+#include "technical_indicators.h"
 
 TechnicalIndicators::TechnicalIndicators(const std::vector<PriceData>& data) 
     : price_data_(data) {}

@@ -1,8 +1,9 @@
-#include "data_processor.h"
-#include "data_conversion.h"
-#include "logger.h"
 #include <algorithm>
 #include <set>
+
+#include "data_conversion.h"
+#include "data_processor.h"
+#include "logger.h"
 
 Result<std::map<std::string, std::vector<PriceData>>> DataProcessor::loadMultiSymbolData(
     const std::vector<std::string>& symbols,

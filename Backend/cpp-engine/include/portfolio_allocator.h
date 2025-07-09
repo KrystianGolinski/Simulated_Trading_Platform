@@ -1,12 +1,13 @@
 #pragma once
 
-#include "portfolio.h"
-#include "trading_strategy.h"
-#include "result.h"
-#include "memory_optimizable.h"
+#include <map>
 #include <string>
 #include <vector>
-#include <map>
+
+#include "memory_optimizable.h"
+#include "portfolio.h"
+#include "result.h"
+#include "trading_strategy.h"
 
 // Portfolio allocation strategies for multi-symbol portfolios
 enum class AllocationStrategy {

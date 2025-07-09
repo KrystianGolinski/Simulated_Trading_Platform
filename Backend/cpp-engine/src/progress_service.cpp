@@ -1,9 +1,10 @@
-#include "progress_service.h"
+#include <iostream>
+#include <map>
+
 #include "error_utils.h"
 #include "json_helpers.h"
 #include "logger.h"
-#include <iostream>
-#include <map>
+#include "progress_service.h"
 
 void ProgressService::setProgressCallback(std::function<void(const std::string&)> callback) {
     progress_callback_ = callback;

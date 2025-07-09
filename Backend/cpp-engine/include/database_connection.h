@@ -1,11 +1,13 @@
 #pragma once
 
+#include <map>
+#include <memory>
 #include <string>
 #include <vector>
-#include <memory>
-#include <map>
+
 #include <libpq-fe.h>
 #include <nlohmann/json.hpp>
+
 #include "result.h"
 #include "trading_exceptions.h"
 
@@ -14,23 +16,6 @@
  * Handles connection management, query execution, and result processing.
  */
 class DatabaseConnection {
-private:
-    PGconn* connection_;
-    std::string connection_string_;
-    bool connected_;
-    
-    // Connection parameters
-    std::string host_;
-    std::string port_;
-    std::string database_;
-    std::string username_;
-    std::string password_;
-    
-    // Helper methods
-    void buildConnectionString();
-    Result<PGresult*> executeQueryInternal(const std::string& query);
-    void handleError(const std::string& operation);
-    
 public:
     // Constructors and destructor
     DatabaseConnection();
@@ -101,15 +86,27 @@ public:
     
     // Static methods for environment-based connection
     static Result<DatabaseConnection> createFromEnvironment();
+
+private:
+    PGconn* connection_;
+    std::string connection_string_;
+    bool connected_;
+    
+    // Connection parameters
+    std::string host_;
+    std::string port_;
+    std::string database_;
+    std::string username_;
+    std::string password_;
+    
+    // Helper methods
+    void buildConnectionString();
+    Result<PGresult*> executeQueryInternal(const std::string& query);
+    void handleError(const std::string& operation);
 };
 
-/*
-RAII wrapper for PGresult to ensure proper cleanup
-*/
+// RAII wrapper for PGresult to ensure proper cleanup
 class PGResultWrapper {
-private:
-    PGresult* result_;
-    
 public:
     explicit PGResultWrapper(PGresult* result) : result_(result) {}
     ~PGResultWrapper() { if (result_) PQclear(result_); }
@@ -138,5 +135,8 @@ public:
         result_ = nullptr; 
         return temp; 
     }
+
+private:
+    PGresult* result_;
 };
 

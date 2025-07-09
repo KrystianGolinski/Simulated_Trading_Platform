@@ -1,9 +1,10 @@
-#include "database_connection.h"
-#include "error_utils.h"
+#include <cstdlib>
 #include <iostream>
 #include <sstream>
-#include <cstdlib>
 #include <stdexcept>
+
+#include "database_connection.h"
+#include "error_utils.h"
 
 // Constructors and destructor
 DatabaseConnection::DatabaseConnection() 

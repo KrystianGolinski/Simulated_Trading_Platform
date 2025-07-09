@@ -1,9 +1,10 @@
-#include "result_calculator.h"
-#include "logger.h"
 #include <algorithm>
-#include <numeric>
 #include <cmath>
+#include <numeric>
 #include <set>
+
+#include "logger.h"
+#include "result_calculator.h"
 
 void ResultCalculator::calculateTradeMetrics(BacktestResult& result) {
     std::vector<double> buy_prices;

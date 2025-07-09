@@ -19,15 +19,6 @@ enum class OrderStatus {
 };
 
 class Order {
-private:
-    std::string symbol_;
-    OrderType type_;
-    int shares_;
-    double price_;
-    OrderStatus status_;
-    std::string timestamp_;
-    std::string reject_reason_;
-    
 public:
     // Constructors
     Order();
@@ -68,4 +59,13 @@ public:
     
     // Validation
     bool isValid() const;
+
+private:
+    std::string symbol_;
+    OrderType type_;
+    int shares_;
+    double price_;
+    OrderStatus status_;
+    std::string timestamp_;
+    std::string reject_reason_;
 };

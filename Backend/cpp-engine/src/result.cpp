@@ -1,5 +1,6 @@
-#include "result.h"
 #include <map>
+
+#include "result.h"
 
 // Implementation of errorCodeToString function
 std::string errorCodeToString(ErrorCode code) {

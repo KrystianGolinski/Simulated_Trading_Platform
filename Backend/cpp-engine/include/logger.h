@@ -1,8 +1,8 @@
 #pragma once
 
 #include <iostream>
-#include <string>
 #include <sstream>
+#include <string>
 
 enum class LogLevel {
     DEBUG = 0,
@@ -12,10 +12,6 @@ enum class LogLevel {
 };
 
 class Logger {
-private:
-    static LogLevel current_level_;
-    static bool enabled_;
-
 public:
     static void setLevel(LogLevel level) {
         current_level_ = level;
@@ -61,6 +57,9 @@ public:
     }
 
 private:
+    static LogLevel current_level_;
+    static bool enabled_;
+    
     static const char* getLevelString(LogLevel level) {
         switch (level) {
             case LogLevel::DEBUG: return "DEBUG";

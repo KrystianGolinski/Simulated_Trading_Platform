@@ -1,8 +1,9 @@
-#include "portfolio.h"
-#include <sstream>
 #include <iomanip>
+#include <sstream>
 #include <stdexcept>
 #include <utility>
+
+#include "portfolio.h"
 
 // Constructors
 Portfolio::Portfolio() : cash_balance_(0.0), initial_capital_(0.0) {}

@@ -1,10 +1,11 @@
-#include "market_data.h"
+#include <algorithm>
+#include <iostream>
+#include <stdexcept>
+
+#include "date_time_utils.h"
 #include "error_utils.h"
 #include "logger.h"
-#include "date_time_utils.h"
-#include <iostream>
-#include <algorithm>
-#include <stdexcept>
+#include "market_data.h"
 
 // MarketData implementation
 MarketData::MarketData() 

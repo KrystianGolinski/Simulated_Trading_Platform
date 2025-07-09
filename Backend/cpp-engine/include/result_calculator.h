@@ -1,9 +1,10 @@
 #pragma once
 
-#include "trading_strategy.h"
-#include "portfolio.h"
-#include <vector>
 #include <map>
+#include <vector>
+
+#include "portfolio.h"
+#include "trading_strategy.h"
 
 // Structs for organized metrics
 struct PerformanceMetrics {

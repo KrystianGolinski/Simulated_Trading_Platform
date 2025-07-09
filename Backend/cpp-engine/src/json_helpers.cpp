@@ -1,7 +1,8 @@
-#include "json_helpers.h"
-#include "trading_strategy.h"
-#include "market_data.h"
 #include <algorithm>
+
+#include "json_helpers.h"
+#include "market_data.h"
+#include "trading_strategy.h"
 
 namespace JsonHelpers {
 

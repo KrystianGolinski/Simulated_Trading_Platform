@@ -1,12 +1,13 @@
 #pragma once
 
-#include "trading_strategy.h"
-#include "market_data.h"
-#include "result.h"
-#include "memory_optimizable.h"
-#include <vector>
 #include <map>
 #include <string>
+#include <vector>
+
+#include "market_data.h"
+#include "memory_optimizable.h"
+#include "result.h"
+#include "trading_strategy.h"
 
 // Helper struct for date range operations
 struct DateRange {
@@ -60,6 +61,11 @@ public:
     std::vector<std::string> createUnifiedTimeline(const std::map<std::string, std::vector<PriceData>>& multi_symbol_data);
     std::map<std::string, std::map<std::string, size_t>> createDateIndices(const std::map<std::string, std::vector<PriceData>>& multi_symbol_data);
     
+    // Memory optimization interface
+    void optimizeMemory() override;
+    size_t getMemoryUsage() const override;
+    std::string getMemoryReport() const override;
+
 private:
     // Helper methods for data processing
     std::string createDataErrorMessage(const std::string& symbol, 
@@ -81,10 +87,4 @@ private:
                                                     const std::string& start_date,
                                                     const std::string& end_date,
                                                     MarketData* market_data) const;
-    
-public:
-    // Memory optimization interface
-    void optimizeMemory() override;
-    size_t getMemoryUsage() const override;
-    std::string getMemoryReport() const override;
 };

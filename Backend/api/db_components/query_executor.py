@@ -31,22 +31,25 @@
 # - Specific handling for "operation is in progress" errors
 # - Comprehensive logging for retry attempts and final failures
 
-import asyncpg
 import asyncio
-from typing import List, Dict, Any, Optional
 import logging
+from typing import Any, Dict, List, Optional
+
+import asyncpg
+
 from db_components.connection_manager import DatabaseConnectionManager
 
 logger = logging.getLogger(__name__)
+
 
 class QueryExecutor:
     # Comprehensive database query execution with retry logic and transaction support
     # Handles all types of SQL operations with robust error handling and performance optimization
     # Integrates with connection pool for high-performance async database operations
-    
+
     def __init__(self, connection_manager: DatabaseConnectionManager):
         self.connection_manager = connection_manager
-    
+
     async def execute_query(self, query: str, *args) -> List[Dict[str, Any]]:
         # Execute SELECT query with retry logic and return results as list of dictionaries
         # Implements exponential backoff for concurrent access issues
@@ -54,7 +57,7 @@ class QueryExecutor:
         pool = self.connection_manager.get_pool()
         if not pool:
             raise RuntimeError("Database not connected")
-        
+
         # Retry logic for concurrent access issues with exponential backoff
         max_retries = 3
         for attempt in range(max_retries):
@@ -65,18 +68,24 @@ class QueryExecutor:
             except Exception as e:
                 if "operation is in progress" in str(e) and attempt < max_retries - 1:
                     # Wait with exponential backoff for concurrent access resolution
-                    wait_time = 0.1 * (2 ** attempt)
-                    logger.debug(f"Retrying query after {wait_time}s due to concurrent access issue (attempt {attempt + 1}/{max_retries})")
+                    wait_time = 0.1 * (2**attempt)
+                    logger.debug(
+                        f"Retrying query after {wait_time}s due to concurrent access issue (attempt {attempt + 1}/{max_retries})"
+                    )
                     await asyncio.sleep(wait_time)
                     continue
                 else:
                     # Log appropriate error level based on error type
                     if "operation is in progress" in str(e):
-                        logger.warning(f"Query failed after {max_retries} retries due to concurrent access: \n{query}\n with args {args}")
+                        logger.warning(
+                            f"Query failed after {max_retries} retries due to concurrent access: \n{query}\n with args {args}"
+                        )
                     else:
-                        logger.error(f"Query execution failed: \n{query}\n with args {args} - Error: {e}")
+                        logger.error(
+                            f"Query execution failed: \n{query}\n with args {args} - Error: {e}"
+                        )
                     raise
-    
+
     async def execute_command(self, query: str, *args) -> str:
         # Execute INSERT/UPDATE/DELETE command with retry logic and return status result
         # Handles data modification operations with proper error handling
@@ -84,7 +93,7 @@ class QueryExecutor:
         pool = self.connection_manager.get_pool()
         if not pool:
             raise RuntimeError("Database not connected")
-        
+
         # Retry logic for concurrent access issues with exponential backoff
         max_retries = 3
         for attempt in range(max_retries):
@@ -95,18 +104,24 @@ class QueryExecutor:
             except Exception as e:
                 if "operation is in progress" in str(e) and attempt < max_retries - 1:
                     # Wait with exponential backoff for concurrent access resolution
-                    wait_time = 0.1 * (2 ** attempt)
-                    logger.debug(f"Retrying command after {wait_time}s due to concurrent access issue (attempt {attempt + 1}/{max_retries})")
+                    wait_time = 0.1 * (2**attempt)
+                    logger.debug(
+                        f"Retrying command after {wait_time}s due to concurrent access issue (attempt {attempt + 1}/{max_retries})"
+                    )
                     await asyncio.sleep(wait_time)
                     continue
                 else:
                     # Log appropriate error level based on error type
                     if "operation is in progress" in str(e):
-                        logger.warning(f"Command failed after {max_retries} retries due to concurrent access: \n{query}\n with args {args}")
+                        logger.warning(
+                            f"Command failed after {max_retries} retries due to concurrent access: \n{query}\n with args {args}"
+                        )
                     else:
-                        logger.error(f"Command execution failed: \n{query}\n with args {args} - Error: {e}")
+                        logger.error(
+                            f"Command execution failed: \n{query}\n with args {args} - Error: {e}"
+                        )
                     raise
-    
+
     async def execute_fetchval(self, query: str, *args) -> Any:
         # Execute query and return single value for aggregate operations and INSERT RETURNING
         # Used for COUNT queries, MAX/MIN operations, and retrieving generated IDs
@@ -114,7 +129,7 @@ class QueryExecutor:
         pool = self.connection_manager.get_pool()
         if not pool:
             raise RuntimeError("Database not connected")
-        
+
         # Retry logic for concurrent access issues with exponential backoff
         max_retries = 3
         for attempt in range(max_retries):
@@ -125,18 +140,24 @@ class QueryExecutor:
             except Exception as e:
                 if "operation is in progress" in str(e) and attempt < max_retries - 1:
                     # Wait with exponential backoff for concurrent access resolution
-                    wait_time = 0.1 * (2 ** attempt)
-                    logger.debug(f"Retrying fetchval after {wait_time}s due to concurrent access issue (attempt {attempt + 1}/{max_retries})")
+                    wait_time = 0.1 * (2**attempt)
+                    logger.debug(
+                        f"Retrying fetchval after {wait_time}s due to concurrent access issue (attempt {attempt + 1}/{max_retries})"
+                    )
                     await asyncio.sleep(wait_time)
                     continue
                 else:
                     # Log appropriate error level based on error type
                     if "operation is in progress" in str(e):
-                        logger.warning(f"Fetchval failed after {max_retries} retries due to concurrent access: \n{query}\n with args {args}")
+                        logger.warning(
+                            f"Fetchval failed after {max_retries} retries due to concurrent access: \n{query}\n with args {args}"
+                        )
                     else:
-                        logger.error(f"Fetchval execution failed: \n{query}\n with args {args} - Error: {e}")
+                        logger.error(
+                            f"Fetchval execution failed: \n{query}\n with args {args} - Error: {e}"
+                        )
                     raise
-    
+
     async def execute_transaction(self, queries: List[tuple]) -> bool:
         # Execute multiple queries in atomic transaction with automatic rollback on failure
         # Takes list of (query_string, *args) tuples for complex multi-step operations
@@ -144,7 +165,7 @@ class QueryExecutor:
         pool = self.connection_manager.get_pool()
         if not pool:
             raise RuntimeError("Database not connected")
-        
+
         try:
             async with pool.acquire(timeout=10.0) as conn:
                 async with conn.transaction():
@@ -156,7 +177,7 @@ class QueryExecutor:
         except Exception as e:
             logger.error(f"Transaction execution failed: {e}")
             raise
-    
+
     async def execute_batch(self, query: str, args_list: List[tuple]) -> List[str]:
         # Execute same query with multiple parameter sets for bulk operations
         # Optimized for bulk INSERT/UPDATE operations with consistent query pattern
@@ -164,7 +185,7 @@ class QueryExecutor:
         pool = self.connection_manager.get_pool()
         if not pool:
             raise RuntimeError("Database not connected")
-        
+
         try:
             async with pool.acquire(timeout=10.0) as conn:
                 results = []

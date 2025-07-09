@@ -1,8 +1,9 @@
 #pragma once
 
-#include <functional>
 #include <exception>
+#include <functional>
 #include <string>
+
 #include "result.h"
 #include "trading_exceptions.h"
 

@@ -1,16 +1,17 @@
-#include "trading_engine.h"
-#include "data_conversion.h"
-#include "json_helpers.h"
-#include "logger.h"
-#include "trading_exceptions.h"
-#include "error_utils.h"
-#include <sstream>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <iostream>
-#include <chrono>
-#include <thread>
 #include <set>
+#include <sstream>
+#include <thread>
+
+#include "data_conversion.h"
+#include "error_utils.h"
+#include "json_helpers.h"
+#include "logger.h"
+#include "trading_engine.h"
+#include "trading_exceptions.h"
 
 // Constructors
 TradingEngine::TradingEngine() : portfolio_(10000.0), cache_enabled_(false) {

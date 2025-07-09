@@ -1,9 +1,9 @@
 #pragma once
 
-#include <string>
 #include <optional>
-#include <variant>
 #include <stdexcept>
+#include <string>
+#include <variant>
 
 // Error code categories for structured error handling
 enum class ErrorCode {

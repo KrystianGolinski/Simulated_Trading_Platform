@@ -1,8 +1,9 @@
-#include "strategy_manager.h"
-#include "trading_engine.h"
-#include "logger.h"
 #include <algorithm>
 #include <cctype>
+
+#include "logger.h"
+#include "strategy_manager.h"
+#include "trading_engine.h"
 
 // Strategy factory methods
 std::unique_ptr<TradingStrategy> StrategyManager::createMovingAverageStrategy(int short_period, int long_period) {

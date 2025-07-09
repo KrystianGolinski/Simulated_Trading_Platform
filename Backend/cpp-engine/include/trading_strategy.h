@@ -1,12 +1,13 @@
 #pragma once
 
-#include "technical_indicators.h"
-#include "portfolio.h"
-#include "market_data.h"
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
-#include <map>
+
+#include "market_data.h"
+#include "portfolio.h"
+#include "technical_indicators.h"
 
 struct StrategyConfig {
     std::map<std::string, double> parameters;
@@ -116,10 +117,6 @@ struct BacktestResult {
 };
 
 class TradingStrategy {
-protected:
-    StrategyConfig config_;
-    std::string strategy_name_;
-    
 public:
     explicit TradingStrategy(const std::string& name) : strategy_name_(name) {}
     virtual ~TradingStrategy() = default;
@@ -145,17 +142,15 @@ public:
     double calculatePositionSize(double available_capital, double stock_price) const;
     double calculatePositionSize(const Portfolio& portfolio, const std::string& symbol, double stock_price, double portfolio_value) const;
     bool shouldApplyRiskManagement(const Portfolio& portfolio, const std::string& symbol) const;
-    
+
 protected:
+    StrategyConfig config_;
+    std::string strategy_name_;
+    
     double applyRiskManagement(double position_size, const Portfolio& portfolio) const;
 };
 
 class MovingAverageCrossoverStrategy : public TradingStrategy {
-private:
-    int short_period_;
-    int long_period_;
-    std::unique_ptr<TechnicalIndicators> indicators_;
-    
 public:
     MovingAverageCrossoverStrategy();
     explicit MovingAverageCrossoverStrategy(int short_period, int long_period);
@@ -170,20 +165,18 @@ public:
     
     void setMovingAveragePeriods(int short_period, int long_period);
     std::pair<int, int> getMovingAveragePeriods() const;
-    
+
 private:
+    int short_period_;
+    int long_period_;
+    std::unique_ptr<TechnicalIndicators> indicators_;
+    
     void updateIndicators(const std::vector<PriceData>& price_data);
     bool hasValidCrossover(const std::vector<double>& short_ma, 
                           const std::vector<double>& long_ma) const;
 };
 
 class RSIStrategy : public TradingStrategy {
-private:
-    int rsi_period_;
-    double oversold_threshold_;
-    double overbought_threshold_;
-    std::unique_ptr<TechnicalIndicators> indicators_;
-    
 public:
     RSIStrategy();
     explicit RSIStrategy(int period, double oversold = 30.0, double overbought = 70.0);
@@ -197,7 +190,12 @@ public:
     std::string getDescription() const override;
     
     void setRSIParameters(int period, double oversold, double overbought);
-    
+
 private:
+    int rsi_period_;
+    double oversold_threshold_;
+    double overbought_threshold_;
+    std::unique_ptr<TechnicalIndicators> indicators_;
+    
     void updateIndicators(const std::vector<PriceData>& price_data);
 };

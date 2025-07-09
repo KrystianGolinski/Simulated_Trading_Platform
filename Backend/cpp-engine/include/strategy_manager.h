@@ -1,10 +1,11 @@
 #pragma once
 
-#include "trading_strategy.h"
-#include "result.h"
+#include <map>
 #include <memory>
 #include <string>
-#include <map>
+
+#include "result.h"
+#include "trading_strategy.h"
 
 // Forward declaration
 struct TradingConfig;

@@ -1,6 +1,6 @@
 # Services Package - Comprehensive Business Logic and Error Handling Services
 # This package provides specialized services for the Trading Platform API with clear separation of concerns
-# 
+#
 # Architecture Overview:
 # The services package implements a sophisticated service layer that handles core business logic,
 # error management, and data processing for the trading platform. It provides specialized services
@@ -33,33 +33,38 @@
 # - Preserves detailed context information for debugging and monitoring
 # - Provides actionable suggestions for error resolution
 # - Maintains error history for pattern analysis and system health monitoring
-from .result_processor import ResultProcessor
-from .error_handler import ErrorHandler
-from .error_types import SimulationError, ErrorCode, ErrorSeverity
-from .performance_calculator import PerformanceCalculator
-from .trade_converter import TradeConverter
 from .equity_processor import EquityProcessor
 from .error_categorizers import (
-    ErrorCategorizer, TimeoutErrorCategorizer, PermissionErrorCategorizer,
-    MemoryErrorCategorizer, DiskSpaceErrorCategorizer, FileNotFoundErrorCategorizer,
-    GenericErrorCategorizer, CppErrorExtractor
+    CppErrorExtractor,
+    DiskSpaceErrorCategorizer,
+    ErrorCategorizer,
+    FileNotFoundErrorCategorizer,
+    GenericErrorCategorizer,
+    MemoryErrorCategorizer,
+    PermissionErrorCategorizer,
+    TimeoutErrorCategorizer,
 )
+from .error_handler import ErrorHandler
+from .error_types import ErrorCode, ErrorSeverity, SimulationError
+from .performance_calculator import PerformanceCalculator
+from .result_processor import ResultProcessor
+from .trade_converter import TradeConverter
 
 __all__ = [
-    'ResultProcessor',
-    'ErrorHandler', 
-    'SimulationError',
-    'ErrorCode',
-    'ErrorSeverity',
-    'PerformanceCalculator',
-    'TradeConverter',
-    'EquityProcessor',
-    'ErrorCategorizer',
-    'TimeoutErrorCategorizer',
-    'PermissionErrorCategorizer',
-    'MemoryErrorCategorizer',
-    'DiskSpaceErrorCategorizer',
-    'FileNotFoundErrorCategorizer',
-    'GenericErrorCategorizer',
-    'CppErrorExtractor'
+    "ResultProcessor",
+    "ErrorHandler",
+    "SimulationError",
+    "ErrorCode",
+    "ErrorSeverity",
+    "PerformanceCalculator",
+    "TradeConverter",
+    "EquityProcessor",
+    "ErrorCategorizer",
+    "TimeoutErrorCategorizer",
+    "PermissionErrorCategorizer",
+    "MemoryErrorCategorizer",
+    "DiskSpaceErrorCategorizer",
+    "FileNotFoundErrorCategorizer",
+    "GenericErrorCategorizer",
+    "CppErrorExtractor",
 ]

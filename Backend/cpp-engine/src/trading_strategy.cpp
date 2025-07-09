@@ -1,7 +1,8 @@
-#include "trading_strategy.h"
-#include "logger.h"
 #include <algorithm>
 #include <cmath>
+
+#include "logger.h"
+#include "trading_strategy.h"
 
 // Base TradingStrategy implementation
 double TradingStrategy::calculatePositionSize(double available_capital, double stock_price) const {

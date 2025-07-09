@@ -1,7 +1,8 @@
-#include "execution_service.h"
-#include "error_utils.h"
-#include "logger.h"
 #include <map>
+
+#include "error_utils.h"
+#include "execution_service.h"
+#include "logger.h"
 
 Result<void> ExecutionService::executeSignal(const TradingSignal& signal, 
                                             const std::string& symbol, 

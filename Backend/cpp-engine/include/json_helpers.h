@@ -1,8 +1,9 @@
 #pragma once
 
-#include <nlohmann/json.hpp>
-#include <vector>
 #include <string>
+#include <vector>
+
+#include <nlohmann/json.hpp>
 
 struct BacktestResult;
 struct TradingSignal;

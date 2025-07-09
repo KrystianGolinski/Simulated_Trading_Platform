@@ -29,12 +29,13 @@
 # - Provides performance data for monitoring dashboards and optimization analysis
 # - Supports system health monitoring through performance metrics
 
-from fastapi import APIRouter
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any, Dict
 
+from fastapi import APIRouter
+
+from models import ApiError, StandardResponse
 from performance_optimizer import performance_optimizer
-from models import StandardResponse, ApiError
 from routing import get_router_service_factory
 
 # Create router using RouterBase pattern for consistent performance endpoint structure
@@ -43,25 +44,29 @@ router_base = router_factory.create_router_base("performance")
 router = router_base.get_router()
 router.tags = ["performance"]
 
+
 @router.get("/performance/stats")
 async def get_performance_stats() -> StandardResponse[Dict[str, Any]]:
     # Get comprehensive performance statistics including optimization metrics and memory usage
     # Returns detailed analytics for parallel execution, cache performance, and system optimization
     # Used by monitoring dashboards and performance analysis tools
-    
+
     # Retrieve comprehensive performance summary from optimizer
     optimizer_stats = await performance_optimizer.get_performance_summary()
-    
+
     # Compile performance data with timestamp for monitoring
     stats_data = {
         "optimization": optimizer_stats,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
-    
-    router_base.router_logger.log_request("/performance/stats", {})
-    response = router_base.response_formatter.create_success_response(stats_data, "Performance statistics retrieved successfully")
-    router_base.router_logger.log_success("/performance/stats")
-    return response
+
+    router_base.log_request("/performance/stats")
+    return router_base.success_response(
+        "/performance/stats",
+        stats_data,
+        "Performance statistics retrieved successfully",
+    )
+
 
 @router.post("/performance/clear-cache")
 async def clear_performance_cache() -> StandardResponse[Dict[str, str]]:
@@ -73,21 +78,23 @@ async def clear_performance_cache() -> StandardResponse[Dict[str, str]]:
         performance_optimizer.metrics.cache_hits = 0
         performance_optimizer.metrics.cache_misses = 0
         performance_optimizer.operation_times.clear()
-        
-        router_base.router_logger.log_request("/performance/clear-cache", {})
-        response = router_base.response_formatter.create_success_response(
+
+        router_base.log_request("/performance/clear-cache")
+        return router_base.success_response(
+            "/performance/clear-cache",
             {"cache_status": "cleared"},
-            "Performance caches cleared successfully"
+            "Performance caches cleared successfully",
         )
-        router_base.router_logger.log_success("/performance/clear-cache")
-        return response
     except Exception as e:
         # Handle cache clearing errors with detailed error reporting
-        router_base.router_logger.log_error("/performance/clear-cache", e, "CACHE_CLEAR_ERROR")
+        router_base.router_logger.log_error(
+            "/performance/clear-cache", e, "CACHE_CLEAR_ERROR"
+        )
         return router_base.response_formatter.create_error_response(
             "Failed to clear caches",
-            [ApiError(code="CACHE_CLEAR_ERROR", message=str(e))]
+            [ApiError(code="CACHE_CLEAR_ERROR", message=str(e))],
         )
+
 
 @router.get("/performance/cache-stats")
 async def get_cache_stats() -> StandardResponse[Dict[str, Any]]:
@@ -97,21 +104,25 @@ async def get_cache_stats() -> StandardResponse[Dict[str, Any]]:
     try:
         # Retrieve detailed cache statistics from performance optimizer
         cache_stats = performance_optimizer.get_cache_statistics()
-        
+
         # Compile cache data with timestamp for analytics tracking
         cache_data = {
             "optimizer_cache": cache_stats,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
-        
-        router_base.router_logger.log_request("/performance/cache-stats", {})
-        response = router_base.response_formatter.create_success_response(cache_data, "Cache statistics retrieved successfully")
-        router_base.router_logger.log_success("/performance/cache-stats")
-        return response
+
+        router_base.log_request("/performance/cache-stats")
+        return router_base.success_response(
+            "/performance/cache-stats",
+            cache_data,
+            "Cache statistics retrieved successfully",
+        )
     except Exception as e:
         # Handle cache statistics retrieval errors with comprehensive error reporting
-        router_base.router_logger.log_error("/performance/cache-stats", e, "CACHE_STATS_ERROR")
+        router_base.router_logger.log_error(
+            "/performance/cache-stats", e, "CACHE_STATS_ERROR"
+        )
         return router_base.response_formatter.create_error_response(
             "Failed to get cache stats",
-            [ApiError(code="CACHE_STATS_ERROR", message=str(e))]
+            [ApiError(code="CACHE_STATS_ERROR", message=str(e))],
         )

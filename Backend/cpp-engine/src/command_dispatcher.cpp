@@ -1,12 +1,15 @@
-#include "command_dispatcher.h"
-#include "trading_engine.h"
-#include "market_data.h"
-#include "error_utils.h"
-#include "result.h"
-#include <iostream>
-#include <fstream>
 #include <algorithm>
+#include <fstream>
+#include <iostream>
+
 #include <nlohmann/json.hpp>
+
+#include "command_dispatcher.h"
+#include "error_utils.h"
+#include "logger.h"
+#include "market_data.h"
+#include "result.h"
+#include "trading_engine.h"
 
 using json = nlohmann::json;
 
@@ -122,24 +125,23 @@ int CommandDispatcher::executeBacktest(const TradingConfig& config) {
 
 int CommandDispatcher::executeSimulation(const TradingConfig& config) {
     // Print debug information about the simulation configuration
-    std::cerr << "[DEBUG] About to run simulation with:" << std::endl;
-    std::cerr << "[DEBUG]   symbols = { ";
+    Logger::debug("About to run simulation with:");
+    Logger::debug("  symbols = { ");
     for (size_t i = 0; i < config.symbols.size(); ++i) {
-        std::cerr << "'" << config.symbols[i] << "'";
-        if (i < config.symbols.size() - 1) std::cerr << ", ";
+        Logger::debug("'", config.symbols[i], "'", (i < config.symbols.size() - 1) ? ", " : "");
     }
-    std::cerr << " }" << std::endl;
-    std::cerr << "[DEBUG]   start_date = '" << config.start_date << "'" << std::endl;
-    std::cerr << "[DEBUG]   end_date = '" << config.end_date << "'" << std::endl;
-    std::cerr << "[DEBUG]   capital = " << config.starting_capital << std::endl;
-    std::cerr << "[DEBUG]   strategy = '" << config.strategy_name << "'" << std::endl;
+    Logger::debug(" }");
+    Logger::debug("  start_date = '", config.start_date, "'");
+    Logger::debug("  end_date = '", config.end_date, "'");
+    Logger::debug("  capital = ", config.starting_capital);
+    Logger::debug("  strategy = '", config.strategy_name, "'");
     
     // Print all strategy parameters dynamically
-    std::cerr << "[DEBUG]   strategy_parameters = {" << std::endl;
+    Logger::debug("  strategy_parameters = {");
     for (const auto& param : config.strategy_parameters) {
-        std::cerr << "[DEBUG]     " << param.first << " = " << param.second << std::endl;
+        Logger::debug("    ", param.first, " = ", param.second);
     }
-    std::cerr << "[DEBUG]   }" << std::endl;
+    Logger::debug("  }");
     
     // Use common execution method with verbose output
     return executeCommonSimulation(config, true);
@@ -153,26 +155,25 @@ int CommandDispatcher::executeSimulationFromConfig(const std::string& config_fil
         TradingConfig config = loadConfigFromFile(config_file);
         
         // Print debug information about loaded configuration
-        std::cerr << "[DEBUG] Config loaded successfully:" << std::endl;
-        std::cerr << "[DEBUG]   symbols = { ";
+        Logger::debug("Config loaded successfully:");
+        Logger::debug("  symbols = { ");
         for (size_t i = 0; i < config.symbols.size(); ++i) {
-            std::cerr << "'" << config.symbols[i] << "'";
-            if (i < config.symbols.size() - 1) std::cerr << ", ";
+            Logger::debug("'", config.symbols[i], "'", (i < config.symbols.size() - 1) ? ", " : "");
         }
-        std::cerr << " }" << std::endl;
-        std::cerr << "[DEBUG]   start_date = '" << config.start_date << "'" << std::endl;
-        std::cerr << "[DEBUG]   end_date = '" << config.end_date << "'" << std::endl;
-        std::cerr << "[DEBUG]   capital = " << config.starting_capital << std::endl;
-        std::cerr << "[DEBUG]   strategy = '" << config.strategy_name << "'" << std::endl;
+        Logger::debug(" }");
+        Logger::debug("  start_date = '", config.start_date, "'");
+        Logger::debug("  end_date = '", config.end_date, "'");
+        Logger::debug("  capital = ", config.starting_capital);
+        Logger::debug("  strategy = '", config.strategy_name, "'");
         
         // Print strategy-specific parameters
         if (config.strategy_name == "ma_crossover") {
-            std::cerr << "[DEBUG]   short_ma = " << config.getIntParameter("short_ma", 20) << std::endl;
-            std::cerr << "[DEBUG]   long_ma = " << config.getIntParameter("long_ma", 50) << std::endl;
+            Logger::debug("  short_ma = ", config.getIntParameter("short_ma", 20));
+            Logger::debug("  long_ma = ", config.getIntParameter("long_ma", 50));
         } else if (config.strategy_name == "rsi") {
-            std::cerr << "[DEBUG]   rsi_period = " << config.getIntParameter("rsi_period", 14) << std::endl;
-            std::cerr << "[DEBUG]   rsi_oversold = " << config.getDoubleParameter("rsi_oversold", 30.0) << std::endl;
-            std::cerr << "[DEBUG]   rsi_overbought = " << config.getDoubleParameter("rsi_overbought", 70.0) << std::endl;
+            Logger::debug("  rsi_period = ", config.getIntParameter("rsi_period", 14));
+            Logger::debug("  rsi_oversold = ", config.getDoubleParameter("rsi_oversold", 30.0));
+            Logger::debug("  rsi_overbought = ", config.getDoubleParameter("rsi_overbought", 70.0));
         }
         
         // Execute simulation using common method
@@ -187,7 +188,7 @@ int CommandDispatcher::executeSimulationFromConfig(const std::string& config_fil
             
             if (file_config.value("cleanup", true)) {
                 std::remove(config_file.c_str());
-                std::cerr << "[DEBUG] Config file cleaned up" << std::endl;
+                Logger::debug("Config file cleaned up");
             }
         }
         

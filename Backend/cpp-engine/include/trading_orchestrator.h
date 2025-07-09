@@ -1,19 +1,20 @@
 #pragma once
 
-#include "result.h"
-#include "portfolio.h"
-#include "market_data.h"
-#include "execution_service.h"
-#include "progress_service.h"
-#include "portfolio_allocator.h"
-#include "result_calculator.h"
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "data_processor.h"
+#include "execution_service.h"
+#include "market_data.h"
+#include "portfolio.h"
+#include "portfolio_allocator.h"
+#include "progress_service.h"
+#include "result.h"
+#include "result_calculator.h"
 #include "strategy_manager.h"
 #include "trading_strategy.h"
-#include <string>
-#include <memory>
-#include <vector>
-#include <map>
 
 // Forward declarations
 struct TradingConfig;
