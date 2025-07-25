@@ -48,12 +48,13 @@ add_executable(test_comprehensive tests/test_comprehensive.cpp ${CORE_SOURCES})
 find_package(PostgreSQL REQUIRED)
 
 # JSON library (header-only)
-find_package(nlohmann_json 3.12.0 QUIET)
+find_package(nlohmann_json 3.11.0 QUIET)
 if(NOT nlohmann_json_FOUND)
     include(FetchContent)
     FetchContent_Declare(json 
-        URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
-        DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.11.3
+        GIT_SHALLOW TRUE)
     FetchContent_MakeAvailable(json)
     set(nlohmann_json_FOUND TRUE)
 endif()

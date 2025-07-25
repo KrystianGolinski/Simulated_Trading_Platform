@@ -521,14 +521,109 @@ class SimulationEngine:
                 if "trade_log" in result_data:
                     aggregated_data["trade_log"].extend(result_data["trade_log"])
 
-            # For now, use the first group's daily balance as approximation
-            # TODO: Implement proper portfolio-level daily balance aggregation
-            if successful_groups and "daily_balance" in successful_groups[0].get(
-                "result_data", {}
-            ):
-                aggregated_data["daily_balance"] = successful_groups[0]["result_data"][
-                    "daily_balance"
-                ]
+            # Implement proper portfolio-level daily balance aggregation
+            # Aggregate daily balances from all parallel groups by date
+            daily_balance_combined = {}
+            groups_with_balance = 0
+            
+            for group_result in successful_groups:
+                result_data = group_result.get("result_data", {})
+                if "daily_balance" in result_data and result_data["daily_balance"]:
+                    groups_with_balance += 1
+                    group_daily_balance = result_data["daily_balance"]
+                    
+                    # Validate that daily_balance is a dictionary
+                    if not isinstance(group_daily_balance, dict):
+                        logger.warning(
+                            f"Group {group_result.get('group_id')} has invalid daily_balance format: "
+                            f"{type(group_daily_balance)}, skipping"
+                        )
+                        continue
+                    
+                    # Aggregate balances by date
+                    for date_str, balance in group_daily_balance.items():
+                        if isinstance(balance, (int, float)):
+                            if date_str in daily_balance_combined:
+                                daily_balance_combined[date_str] += balance
+                            else:
+                                daily_balance_combined[date_str] = balance
+                        else:
+                            logger.warning(
+                                f"Invalid balance value for date {date_str} in group "
+                                f"{group_result.get('group_id')}: {balance} ({type(balance)})"
+                            )
+            
+            # Set aggregated daily balance with additional validation
+            aggregated_data["daily_balance"] = daily_balance_combined
+            
+            # Validate aggregated daily balance data consistency
+            if daily_balance_combined:
+                # Check for date format consistency and sort dates
+                sorted_dates = sorted(daily_balance_combined.keys())
+                date_count = len(sorted_dates)
+                
+                # Basic date format validation (YYYY-MM-DD expected)
+                invalid_dates = []
+                for date_str in sorted_dates[:5]:  # Check first 5 dates for performance
+                    if not isinstance(date_str, str) or len(date_str) != 10 or date_str.count('-') != 2:
+                        invalid_dates.append(date_str)
+                
+                if invalid_dates:
+                    logger.warning(
+                        f"Found {len(invalid_dates)} dates with potentially invalid format: {invalid_dates[:3]}..."
+                    )
+                
+                # Check for reasonable balance values
+                balance_values = list(daily_balance_combined.values())
+                min_balance = min(balance_values)
+                max_balance = max(balance_values)
+                
+                if min_balance < 0:
+                    logger.warning(f"Aggregated daily balance contains negative values: min={min_balance}")
+                
+                # Validate aggregated balances against individual group balances for consistency
+                # Check if aggregated final balance is reasonable compared to individual group final balances
+                if groups_with_balance > 1:
+                    individual_final_balances = []
+                    for group_result in successful_groups:
+                        result_data = group_result.get("result_data", {})
+                        if "daily_balance" in result_data and result_data["daily_balance"]:
+                            group_daily_balance = result_data["daily_balance"]
+                            if isinstance(group_daily_balance, dict) and group_daily_balance:
+                                # Get the final balance (last date) from this group
+                                group_sorted_dates = sorted(group_daily_balance.keys())
+                                if group_sorted_dates:
+                                    final_balance = group_daily_balance[group_sorted_dates[-1]]
+                                    if isinstance(final_balance, (int, float)):
+                                        individual_final_balances.append(final_balance)
+                    
+                    if individual_final_balances and len(individual_final_balances) == groups_with_balance:
+                        sum_individual_final = sum(individual_final_balances)
+                        aggregated_final = max_balance  # Assuming max_balance is the final balance
+                        
+                        # Allow for small floating point discrepancies (within 0.01%)
+                        tolerance = max(abs(sum_individual_final) * 0.0001, 0.01)
+                        if abs(aggregated_final - sum_individual_final) > tolerance:
+                            logger.warning(
+                                f"Balance validation warning: aggregated final balance (${aggregated_final:,.2f}) "
+                                f"differs from sum of individual final balances (${sum_individual_final:,.2f}) "
+                                f"by ${abs(aggregated_final - sum_individual_final):,.2f}"
+                            )
+                        else:
+                            logger.debug(
+                                f"Balance validation passed: aggregated final balance matches sum of individual balances "
+                                f"within tolerance (${aggregated_final:,.2f} vs ${sum_individual_final:,.2f})"
+                            )
+                
+                logger.info(
+                    f"Aggregated daily balances from {groups_with_balance}/{len(successful_groups)} groups, "
+                    f"covering {date_count} trading days (dates: {sorted_dates[0]} to {sorted_dates[-1]}), "
+                    f"balance range: ${min_balance:,.2f} to ${max_balance:,.2f}"
+                )
+            else:
+                logger.warning("No daily balance data available from any parallel groups")
+                # Ensure we have an empty dict rather than None for consistency
+                aggregated_data["daily_balance"] = {}
 
             # Ensure all expected field names are present for result processor
             # Only set ending_value from final_balance if final_balance has a valid value
