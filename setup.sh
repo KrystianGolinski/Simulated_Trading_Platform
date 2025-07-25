@@ -67,6 +67,309 @@ setup_nodejs_environment() {
     fi
 }
 
+# Function to get list of missing required tools
+get_missing_tools() {
+    local missing=()
+    
+    # Check C++ build tools
+    if ! command -v cmake &> /dev/null; then
+        missing+=("cmake")
+    fi
+    
+    if ! command -v make &> /dev/null; then
+        missing+=("make")
+    fi
+    
+    if ! command -v g++ &> /dev/null; then
+        missing+=("g++")
+    fi
+    
+    # Check Node.js
+    if ! command -v node &> /dev/null; then
+        missing+=("node")
+    fi
+    
+    if ! command -v npm &> /dev/null; then
+        missing+=("npm")
+    fi
+    
+    # Check Docker
+    if ! command -v docker &> /dev/null; then
+        missing+=("docker")
+    fi
+    
+    echo "${missing[@]}"
+}
+
+# Function to install packages with the appropriate package manager
+install_packages() {
+    local pkg_manager="$1"
+    shift
+    local packages=("$@")
+    
+    if [ ${#packages[@]} -eq 0 ]; then
+        return 0
+    fi
+    
+    case "$pkg_manager" in
+        "apt")
+            if ! sudo apt install -y -qq "${packages[@]}"; then
+                print_error "Package installation failed"
+                exit 1
+            fi
+            ;;
+        "yum"|"dnf")
+            if ! sudo $pkg_manager install -y "${packages[@]}"; then
+                print_error "Package installation failed"
+                exit 1
+            fi
+            ;;
+        "pacman")
+            if ! sudo pacman -S --noconfirm "${packages[@]}"; then
+                print_error "Package installation failed"
+                exit 1
+            fi
+            ;;
+        *)
+            print_error "Unsupported package manager: $pkg_manager"
+            exit 1
+            ;;
+    esac
+}
+
+# Function to get package name for specific package manager
+get_package_name() {
+    local pkg_manager="$1"
+    local package_type="$2"
+    
+    case "$package_type" in
+        "g++")
+            case "$pkg_manager" in
+                "apt") echo "g++" ;;
+                "yum"|"dnf") echo "gcc-c++" ;;
+                "pacman") echo "gcc" ;;
+                *) echo "" ;;
+            esac
+            ;;
+        "libpq")
+            case "$pkg_manager" in
+                "apt") echo "libpq-dev" ;;
+                "yum"|"dnf") echo "postgresql-devel" ;;
+                "pacman") echo "postgresql-libs" ;;
+                *) echo "" ;;
+            esac
+            ;;
+        "python-venv")
+            case "$pkg_manager" in
+                "apt") 
+                    if apt-cache show python3.12-venv &>/dev/null 2>&1; then
+                        echo "python3.12-venv"
+                    else
+                        echo "python3-venv"
+                    fi
+                    ;;
+                "yum"|"dnf") echo "python3-venv" ;;
+                "pacman") echo "python-venv" ;;
+                *) echo "" ;;
+            esac
+            ;;
+        *) echo "" ;;
+    esac
+}
+
+# Function to detect OS and package manager
+detect_os() {
+    if command -v apt &> /dev/null; then
+        echo "apt"
+    elif command -v yum &> /dev/null; then
+        echo "yum"
+    elif command -v dnf &> /dev/null; then
+        echo "dnf"
+    elif command -v pacman &> /dev/null; then
+        echo "pacman"
+    else
+        echo "unknown"
+    fi
+}
+
+# Function to check sudo privileges
+check_sudo_privileges() {
+    if ! sudo -n true 2>/dev/null; then
+        print_error "This script requires sudo privileges to install system dependencies."
+        print_error "Please run: sudo -v"
+        print_error "Or install manually: cmake libpq-dev python3-venv make g++ docker"
+        exit 1
+    fi
+}
+
+# Function to install build tools and dependencies
+install_build_tools() {
+    local pkg_manager="$1"
+    
+    # Update package lists with error handling
+    print_status "Updating packages:"
+    case "$pkg_manager" in
+        "apt")
+            sudo apt -qq update 2>/dev/null || print_warning "Package update failed, continuing anyway:"
+            ;;
+        "yum"|"dnf")
+            sudo $pkg_manager check-update 2>/dev/null || print_warning "Package update check failed, continuing anyway:"
+            ;;
+    esac
+    
+    # Install required packages
+    local packages_to_install=()
+    
+    # Check and install cmake
+    if ! command -v cmake &> /dev/null; then
+        packages_to_install+=("cmake")
+    fi
+    
+    # Check and install make and g++
+    if ! command -v make &> /dev/null; then
+        packages_to_install+=("make")
+    fi
+    
+    if ! command -v g++ &> /dev/null; then
+        local gpp_package=$(get_package_name "$pkg_manager" "g++")
+        if [ -n "$gpp_package" ]; then
+            packages_to_install+=("$gpp_package")
+        fi
+    fi
+    
+    # Check and install PostgreSQL client library
+    if ! pkg-config --exists libpq 2>/dev/null; then
+        local libpq_package=$(get_package_name "$pkg_manager" "libpq")
+        if [ -n "$libpq_package" ]; then
+            packages_to_install+=("$libpq_package")
+        fi
+    fi
+    
+    # Check and install python3-venv (try specific version first, fallback to generic)
+    if ! python3 -c "import venv" 2>/dev/null; then
+        local venv_package=$(get_package_name "$pkg_manager" "python-venv")
+        if [ -n "$venv_package" ]; then
+            packages_to_install+=("$venv_package")
+        fi
+    fi
+    
+    # Install packages if needed
+    if [ ${#packages_to_install[@]} -ne 0 ]; then
+        print_status "Installing packages: ${packages_to_install[*]}"
+        install_packages "$pkg_manager" "${packages_to_install[@]}"
+    else
+        print_status "All required packages are already installed"
+    fi
+}
+
+# Function to install Docker if needed
+install_docker_if_needed() {
+    local pkg_manager="$1"
+    
+    # Install Docker if not present
+    if ! command -v docker &> /dev/null; then
+        print_status "Installing Docker..."
+        case "$pkg_manager" in
+            "apt")
+                # Try snap first, fallback to apt
+                if command -v snap &> /dev/null && sudo snap install docker 2>/dev/null; then
+                    docker_installed=true
+                elif sudo apt install -y docker.io; then
+                    docker_installed=true
+                else
+                    print_error "Docker installation failed"
+                    exit 1
+                fi
+                ;;
+            "yum"|"dnf")
+                if sudo $pkg_manager install -y docker; then
+                    docker_installed=true
+                else
+                    print_error "Docker installation failed"
+                    exit 1
+                fi
+                ;;
+            "pacman")
+                if sudo pacman -S --noconfirm docker; then
+                    docker_installed=true
+                else
+                    print_error "Docker installation failed"
+                    exit 1
+                fi
+                ;;
+        esac
+        
+        if [ "$docker_installed" = true ]; then
+            # Add current user to docker group
+            sudo usermod -aG docker $USER
+            # Try to start docker service
+            sudo systemctl enable docker 2>/dev/null || true
+            sudo systemctl start docker 2>/dev/null || true
+            
+            print_warning "Docker installed. You may need to log out/in or run 'newgrp docker' for group changes:"
+        fi
+    fi
+    
+    # Install Docker Compose if not present
+    if ! docker compose version &> /dev/null && ! command -v docker-compose &> /dev/null; then
+        print_status "Installing Docker Compose..."
+        case "$pkg_manager" in
+            "apt")
+                if sudo apt install -y docker-compose-plugin; then
+                    print_success "Docker Compose plugin installed"
+                else
+                    print_warning "Failed to install docker-compose-plugin, trying standalone docker-compose"
+                    sudo apt install -y docker-compose || print_warning "Docker Compose installation failed - you may need to install it manually"
+                fi
+                ;;
+            "yum"|"dnf")
+                if sudo $pkg_manager install -y docker-compose; then
+                    print_success "Docker Compose installed"
+                else
+                    print_warning "Docker Compose installation failed - you may need to install it manually"
+                fi
+                ;;
+            "pacman")
+                if sudo pacman -S --noconfirm docker-compose; then
+                    print_success "Docker Compose installed"
+                else
+                    print_warning "Docker Compose installation failed - you may need to install it manually"
+                fi
+                ;;
+        esac
+    fi
+}
+
+# Function to install system dependencies
+install_system_dependencies() {
+    print_status "Installing system dependencies:"
+    
+    # Check if user has sudo privileges
+    check_sudo_privileges
+    
+    # Detect OS and package manager
+    local pkg_manager=$(detect_os)
+    
+    if [ "$pkg_manager" = "unknown" ]; then
+        print_error "Unsupported package manager. Please install manually:"
+        print_error "- cmake, make, g++"
+        print_error "- libpq-dev (PostgreSQL client library)"
+        print_error "- python3-venv (or python3.12-venv)"
+        print_error "- docker"
+        exit 1
+    fi
+    
+    print_status "Detected package manager: $pkg_manager"
+    
+    # Install build tools and dependencies
+    install_build_tools "$pkg_manager"
+    
+    # Install Docker if needed
+    install_docker_if_needed "$pkg_manager"
+    
+    print_success "System dependencies installation complete"
+}
+
 # Function to check dependencies
 check_dependencies() {
     print_status "Checking system dependencies:"
@@ -75,38 +378,20 @@ check_dependencies() {
     setup_nodejs_environment
     
     # Check for required tools
-    local missing_tools=()
-    
-    # Check C++ build tools
-    if ! command -v cmake &> /dev/null; then
-        missing_tools+=("cmake")
-    fi
-    
-    if ! command -v make &> /dev/null; then
-        missing_tools+=("make")
-    fi
-    
-    if ! command -v g++ &> /dev/null; then
-        missing_tools+=("g++")
-    fi
-    
-    # Check Node.js
-    if ! command -v node &> /dev/null; then
-        missing_tools+=("node")
-    fi
-    
-    if ! command -v npm &> /dev/null; then
-        missing_tools+=("npm")
-    fi
-    
-    # Check Docker
-    if ! command -v docker &> /dev/null; then
-        missing_tools+=("docker")
-    fi
+    local missing_tools=($(get_missing_tools))
     
     if [ ${#missing_tools[@]} -ne 0 ]; then
-        print_error "Missing required tools: ${missing_tools[*]}"
-        exit 1
+        print_warning "Missing required tools: ${missing_tools[*]}"
+        print_status "Attempting to install missing dependencies..."
+        install_system_dependencies
+        
+        # Re-check dependencies after installation
+        missing_tools=($(get_missing_tools))
+        
+        if [ ${#missing_tools[@]} -ne 0 ]; then
+            print_error "Still missing required tools after installation: ${missing_tools[*]}"
+            exit 1
+        fi
     fi
     
     print_success "All dependencies found"
@@ -137,8 +422,9 @@ build_cpp_engine() {
     
     # Check if already built and up to date
     if [ -f "build/trading_engine" ] && [ -f "build/test_comprehensive" ]; then
-        # Check if source files are newer than binaries
-        if [ "$(find src include -name '*.cpp' -o -name '*.h' -newer build/trading_engine | wc -l)" -eq 0 ]; then
+        # Check if any source files or build configuration are newer than binaries
+        if [ -z "$(find src include CMakeLists.txt -newer build/trading_engine 2>/dev/null)" ] && \
+           [ -z "$(find src include CMakeLists.txt -newer build/test_comprehensive 2>/dev/null)" ]; then
             print_status "C++ engine is already up to date, skipping build"
             cd ../..
             return 0
@@ -272,48 +558,13 @@ setup_api_dependencies() {
     # Upgrade pip in virtual environment
     python -m pip install --upgrade pip -q --disable-pip-version-check
     
-    # Check if dependencies are already installed in venv
-    print_status "Checking Python dependencies in virtual environment:"
-    
-    # Check if dependencies need to be installed or updated
-    deps_missing=false
-    deps_outdated=false
-    
-    # Check if requirements.txt is newer than the last pip install
-    if [ -f "requirements.txt" ]; then
-        if [ "requirements.txt" -nt "venv/pyvenv.cfg" ]; then
-            deps_outdated=true
-            print_status "requirements.txt has been updated"
-        fi
-    fi
-    
-    # Check each package individually (some have different import names)
-    if ! python -c "import fastapi" 2>/dev/null; then deps_missing=true; fi
-    if ! python -c "import uvicorn" 2>/dev/null; then deps_missing=true; fi
-    if ! python -c "import pydantic" 2>/dev/null; then deps_missing=true; fi
-    if ! python -c "import asyncpg" 2>/dev/null; then deps_missing=true; fi
-    if ! python -c "import pytest" 2>/dev/null; then deps_missing=true; fi
-    if ! python -c "import httpx" 2>/dev/null; then deps_missing=true; fi
-    
-    if [ "$deps_missing" = true ] || [ "$deps_outdated" = true ]; then
-        if [ "$deps_missing" = true ]; then
-            print_status "Installing missing Python dependencies in virtual environment:"
-        else
-            print_status "Updating Python dependencies in virtual environment:"
-        fi
-        
-        python -m pip install -r requirements.txt -q --disable-pip-version-check
-        
-        if [ $? -eq 0 ]; then
-            print_success "Python dependencies installed successfully in virtual environment"
-            # Touch venv config to update timestamp for future checks
-            touch venv/pyvenv.cfg
-        else
-            print_error "Failed to install Python dependencies"
-            exit 1
-        fi
+    # Install Python dependencies from requirements.txt
+    print_status "Installing/updating Python dependencies in virtual environment:"
+    if python -m pip install -r requirements.txt -q --disable-pip-version-check; then
+        print_success "Python dependencies are up to date"
     else
-        print_success "Python dependencies are up to date in virtual environment"
+        print_error "Failed to install Python dependencies"
+        exit 1
     fi
     
     # Deactivate virtual environment
@@ -346,8 +597,6 @@ setup_environment() {
         # Check if .env.example is newer than .env (template updated)
         if [ -f .env.example ] && [ ".env.example" -nt ".env" ]; then
             print_warning ".env.example has been updated since .env was created"
-            print_warning "Please review .env.example for new configuration options"
-            print_warning "Consider updating your .env file manually"
         else
             print_status ".env file already exists and is up to date"
         fi
@@ -614,27 +863,14 @@ setup_docker_services() {
         exit 1
     fi
     
-    # Check if services are already running
-    if $COMPOSE_CMD -f Docker/docker-compose.dev.yml ps | grep -q "Up"; then
-        print_status "Docker services are already running"
-        
-        # Check if we need to rebuild (Dockerfile changes)
-        if [ "Backend/cpp-engine/Dockerfile" -nt "$($COMPOSE_CMD -f Docker/docker-compose.dev.yml images -q cpp-engine 2>/dev/null | head -1)" ] 2>/dev/null; then
-            print_status "Dockerfile changes detected, rebuilding containers:"
-            $COMPOSE_CMD -f Docker/docker-compose.dev.yml up --build -d
-        else
-            print_status "Containers are up to date"
-        fi
-    else
-        # Build and start containers
-        print_status "Building and starting containers:"
-        $COMPOSE_CMD -f Docker/docker-compose.dev.yml up --build -d
-        
-        if [ $? -ne 0 ]; then
-            print_error "Failed to start Docker services"
-            print_error "Check logs with: $COMPOSE_CMD -f Docker/docker-compose.dev.yml logs"
-            exit 1
-        fi
+    # Build and start containers (Docker Compose handles rebuild detection automatically)
+    print_status "Building and starting containers (if needed):"
+    $COMPOSE_CMD -f Docker/docker-compose.dev.yml up --build -d
+    
+    if [ $? -ne 0 ]; then
+        print_error "Failed to start Docker services"
+        print_error "Check logs with: $COMPOSE_CMD -f Docker/docker-compose.dev.yml logs"
+        exit 1
     fi
     
     # Wait for database to be ready
@@ -739,6 +975,7 @@ run_confirmation() {
 # Main execution flow
 main() {
     check_docker_environment
+    install_system_dependencies
     check_dependencies
     check_docker_permissions
     setup_environment

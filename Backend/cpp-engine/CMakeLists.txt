@@ -7,8 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -Wall -Wextra -pedantic")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 
-# Include directories
-include_directories(include)
+# Threading support
+find_package(Threads REQUIRED)
 
 # Source files for main executable
 set(CORE_SOURCES
@@ -44,32 +44,33 @@ add_executable(trading_engine src/main.cpp ${CORE_SOURCES})
 # Test executable
 add_executable(test_comprehensive tests/test_comprehensive.cpp ${CORE_SOURCES})
 
-# Find required packages
-find_package(PkgConfig REQUIRED)
-
 # PostgreSQL client library
-pkg_check_modules(LIBPQ REQUIRED libpq)
+find_package(PostgreSQL REQUIRED)
 
 # JSON library (header-only)
-find_package(nlohmann_json 3.2.0 QUIET)
+find_package(nlohmann_json 3.12.0 QUIET)
 if(NOT nlohmann_json_FOUND)
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(NLOHMANN_JSON REQUIRED nlohmann_json)
+    include(FetchContent)
+    FetchContent_Declare(json 
+        URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+    FetchContent_MakeAvailable(json)
+    set(nlohmann_json_FOUND TRUE)
 endif()
 
 # Function to link common libraries to targets (eliminates duplication)
 function(link_common_libraries target_name)
+    # Set include directories
+    target_include_directories(${target_name} PRIVATE include)
+    
     # Link PostgreSQL libraries
-    target_link_libraries(${target_name} ${LIBPQ_LIBRARIES})
-    target_include_directories(${target_name} PRIVATE ${LIBPQ_INCLUDE_DIRS})
-    target_compile_options(${target_name} PRIVATE ${LIBPQ_CFLAGS_OTHER})
+    target_link_libraries(${target_name} PostgreSQL::PostgreSQL)
     
     # Link JSON library
-    if(nlohmann_json_FOUND)
-        target_link_libraries(${target_name} nlohmann_json::nlohmann_json)
-    else()
-        target_include_directories(${target_name} PRIVATE ${NLOHMANN_JSON_INCLUDE_DIRS})
-    endif()
+    target_link_libraries(${target_name} nlohmann_json::nlohmann_json)
+    
+    # Link threading library
+    target_link_libraries(${target_name} Threads::Threads)
 endfunction()
 
 # Link libraries to all executables

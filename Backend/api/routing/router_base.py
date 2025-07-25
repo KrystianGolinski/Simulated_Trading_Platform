@@ -1,5 +1,5 @@
 # RouterBase - Advanced Router Foundation with Service Injection
-# This module provides the core router foundation for the Trading Platform API
+# This module provides the core router foundation for the Platform API
 #
 # Architecture Overview:
 # RouterBase implements a sophisticated base class for all API routers, providing standardized
@@ -142,9 +142,6 @@ class RouterBase:
                 - validation_service: Type name of the validation service
                 - response_formatter: Type name of the response formatter
                 - router_logger: Type name of the router logger
-
-        The service information is particularly useful for testing and debugging
-        to ensure that the correct services have been injected.
         """
         return {
             "router_name": self.router_name,
@@ -156,7 +153,22 @@ class RouterBase:
     def success_response(
         self, endpoint: str, data, message: str = "Success", data_count=None
     ):
-        """Create success response with automatic logging and return."""
+        """
+        Create and return a standardized success response with automatic logging.
+
+        This method generates a consistent success response format using the injected
+        response formatter and automatically logs the successful operation. It provides
+        a standardized way for all routers to return success responses.
+
+        Args:
+            endpoint: The API endpoint name for logging purposes
+            data: The response data to be returned to the client
+            message: Optional success message (defaults to "Success")
+            data_count: Optional count of data items for logging statistics
+
+        Returns:
+            dict: Formatted success response with consistent structure
+        """
         response = self.response_formatter.create_success_response(data, message)
         self.router_logger.log_success(endpoint, data_count)
         return response
@@ -169,12 +181,38 @@ class RouterBase:
         exception=None,
         error_code: str = "ERROR",
     ):
-        """Create error response with automatic logging and return."""
+        """
+        Create and return a standardized error response with comprehensive logging.
+
+        This method generates a consistent error response format using the injected
+        response formatter and automatically logs error details. It provides centralized
+        error handling and logging for all router endpoints.
+
+        Args:
+            endpoint: The API endpoint name where the error occurred
+            message: Primary error message to be returned to the client
+            errors: Optional list of detailed error information
+            exception: Optional exception object for detailed logging
+            error_code: Optional error code for categorization (defaults to "ERROR")
+
+        Returns:
+            dict: Formatted error response with consistent structure and error details
+        """
         response = self.response_formatter.create_error_response(message, errors or [])
         if exception:
             self.router_logger.log_error(endpoint, exception, error_code)
         return response
 
     def log_request(self, endpoint: str, params=None):
-        """Log request with optional parameters."""
+        """
+        Log incoming request details for monitoring and debugging purposes.
+
+        This method provides standardized request logging across all router endpoints.
+        It logs the endpoint being accessed along with optional request parameters,
+        enabling comprehensive monitoring and debugging of API usage.
+
+        Args:
+            endpoint: The API endpoint being accessed
+            params: Optional dictionary of request parameters to log
+        """
         self.router_logger.log_request(endpoint, params or {})
