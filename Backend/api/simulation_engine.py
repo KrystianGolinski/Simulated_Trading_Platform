@@ -521,7 +521,7 @@ class SimulationEngine:
                 if "trade_log" in result_data:
                     aggregated_data["trade_log"].extend(result_data["trade_log"])
 
-            # Implement proper portfolio-level daily balance aggregation
+            # Portfolio-level daily balance aggregation
             # Aggregate daily balances from all parallel groups by date
             daily_balance_combined = {}
             groups_with_balance = 0
