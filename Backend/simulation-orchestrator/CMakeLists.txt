@@ -7,9 +7,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Add cpp-common as subdirectory
 add_subdirectory(../cpp-common cpp-common-build)
 
-# Create executable (basic structure for now)
+# Create executable
 add_executable(simulation-orchestrator
     src/main.cpp
+    src/worker_spawner.cpp
+    src/strategy_analyzer.cpp
+    src/execution_planner.cpp
 )
 
 # Set include directories

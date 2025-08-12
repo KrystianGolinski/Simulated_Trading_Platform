@@ -4,11 +4,14 @@ project(cpp-common)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Create shared library (header-only for now)
-add_library(cpp-common INTERFACE)
+# Create shared library
+add_library(cpp-common SHARED
+    src/simulation_config.cpp
+    src/worker_result.cpp
+)
 
 # Set include directories
-target_include_directories(cpp-common INTERFACE
+target_include_directories(cpp-common PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 

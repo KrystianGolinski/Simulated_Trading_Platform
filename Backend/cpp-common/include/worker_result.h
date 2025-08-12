@@ -2,7 +2,6 @@
 
 #include <string>
 #include <vector>
-#include <nlohmann/json.hpp>
 
 namespace TradingCommon {
     
@@ -11,7 +10,6 @@ namespace TradingCommon {
         int return_code;
         std::string stdout_data;
         std::string stderr_data;
-        nlohmann::json result_data;
         double execution_time_ms;
         
         // Serialization methods
