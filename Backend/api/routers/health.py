@@ -64,9 +64,9 @@ async def check_cpp_engine_health() -> Dict[str, Any]:
         # Check multiple engine binary locations for different deployment scenarios
         engine_paths = [
             Path("/shared/trading_engine"),  # Docker shared volume mount
-            Path("/app/cpp-engine/build/trading_engine"),  # Container local build
+            Path("/app/trading-engine/build/trading_engine"),  # Container local build
             Path(__file__).parent.parent.parent
-            / "cpp-engine"
+            / "trading-engine"
             / "build"
             / "trading_engine",  # Development build
         ]

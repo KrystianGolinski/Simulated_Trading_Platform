@@ -18,7 +18,7 @@ ENV/
 .ENV/
 
 # C++ Build artifacts
-Backend/cpp-engine/build/
+Backend/trading-engine/build/
 *.o
 *.exe
 *.out

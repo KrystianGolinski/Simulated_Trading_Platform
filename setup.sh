@@ -413,12 +413,12 @@ check_docker_permissions() {
 build_cpp_engine() {
     print_status "Building C++ Trading Engine:"
     
-    if [ ! -d "Backend/cpp-engine" ]; then
+    if [ ! -d "Backend/trading-engine" ]; then
         print_error "C++ engine directory not found"
         exit 1
     fi
     
-    cd Backend/cpp-engine
+    cd Backend/trading-engine
     
     # Check if already built and up to date
     if [ -f "build/trading_engine" ] && [ -f "build/test_comprehensive" ]; then
@@ -578,7 +578,7 @@ setup_environment() {
     print_status "Setting up environment:"
     
     # Ensure all required directories exist
-    mkdir -p Backend/cpp-engine/{include,src,tests,build}
+    mkdir -p Backend/trading-engine/{include,src,tests,build}
     mkdir -p Backend/api
     mkdir -p Frontend/trading-platform-ui
     mkdir -p Project_Documentation
@@ -705,18 +705,18 @@ wait_for_database() {
 run_cpp_tests() {
     print_status "Running C++ test suite:"
     
-    if [ ! -f "Backend/cpp-engine/build/test_comprehensive" ]; then
+    if [ ! -f "Backend/trading-engine/build/test_comprehensive" ]; then
         print_error "C++ test suite not found. Build the C++ engine first."
         exit 1
     fi
     
     # Verify test executable is executable
-    if [ ! -x "Backend/cpp-engine/build/test_comprehensive" ]; then
+    if [ ! -x "Backend/trading-engine/build/test_comprehensive" ]; then
         print_error "C++ test executable is not executable"
         exit 1
     fi
     
-    cd Backend/cpp-engine
+    cd Backend/trading-engine
     
     # Load local testing credentials from .env file with validation
     if [ -f "../../.env" ]; then
@@ -903,11 +903,11 @@ verify_setup() {
     local setup_issues=()
     
     # Check C++ engine
-    if [ ! -f "Backend/cpp-engine/build/trading_engine" ]; then
+    if [ ! -f "Backend/trading-engine/build/trading_engine" ]; then
         setup_issues+=("C++ engine executable not found")
     fi
     
-    if [ ! -f "Backend/cpp-engine/build/test_comprehensive" ]; then
+    if [ ! -f "Backend/trading-engine/build/test_comprehensive" ]; then
         setup_issues+=("C++ test executable not found")
     fi
     

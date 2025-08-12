@@ -51,7 +51,7 @@ async def test_engine() -> StandardResponse[Dict[str, Any]]:
     # Execute test simulation with C++ trading engine to validate functionality
     # Runs a sample AAPL simulation to verify engine connectivity and basic operation
     # Returns comprehensive test results including stdout, stderr, and return codes
-    engine_path = Path("/app/cpp-engine/build/trading_engine")
+    engine_path = Path("/app/trading-engine/build/trading_engine")
     router_base.log_request("/engine/test")
 
     # Validate engine binary exists and is accessible
@@ -160,7 +160,7 @@ async def get_engine_status() -> StandardResponse[Dict[str, Any]]:
         # Scan Docker directories for engine files and diagnostic information
         # Docker-aware directory scanning for deployment troubleshooting
         possible_dirs = [
-            Path("/app/cpp-engine"),  # Docker deployment path
+            Path("/app/trading-engine"),  # Docker deployment path
         ]
 
         directory_contents = {}

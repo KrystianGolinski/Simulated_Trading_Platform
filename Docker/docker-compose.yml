@@ -37,7 +37,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      cpp-engine:
+      trading-engine:
         condition: service_healthy
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql://trading_user:trading_password@postgres:5432/simulated_trading_platform}
@@ -53,12 +53,12 @@ services:
       retries: 3
       start_period: 40s
 
-  cpp-engine:
+  trading-engine:
     env_file:
       - ../.env
     container_name: trading-engine
     build:
-      context: ../Backend/cpp-engine
+      context: ../Backend
       dockerfile: Dockerfile
     depends_on:
       postgres:
