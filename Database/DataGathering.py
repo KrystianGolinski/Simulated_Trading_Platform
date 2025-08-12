@@ -2,13 +2,14 @@
 
 import yfinance as yf
 import pandas as pd
+import psycopg2
+from psycopg2.extras import execute_values
 from datetime import datetime, timedelta
 import logging
 import time
 from typing import List, Dict
 import os
 import json
-import glob
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -17,13 +18,164 @@ logger = logging.getLogger(__name__)
 class FreeDataCollector:
     
     # Data collector with data cleaning
-    # Collects data from Yahoo Finance, cleans it, and saves clean data to CSV 
+    # Collects data from Yahoo Finance, cleans it, and saves directly to PostgreSQL database
     
-    def __init__(self):
-        # Initialize data collector
-        self.data_dir = "historical_data"
-        os.makedirs(self.data_dir, exist_ok=True)
-        os.makedirs(os.path.join(self.data_dir, "daily"), exist_ok=True)
+    def __init__(self, db_config: Dict[str, str]):
+        # Initialize data collector with database configuration
+        self.db_config = db_config
+        
+        # Test database connection with retry for initialization
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                conn = psycopg2.connect(**self.db_config)
+                conn.close()
+                logger.info("Database connection test successful")
+                break
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    logger.info(f"Database connection attempt {attempt + 1} failed, retrying in 2 seconds...")
+                    time.sleep(2)
+                else:
+                    logger.error(f"Database connection failed after {max_retries} attempts: {e}")
+                    raise
+
+    def save_stock_info_to_database(self, stock_info: Dict[str, Dict]):
+        # Load stock metadata directly to PostgreSQL
+        conn = psycopg2.connect(**self.db_config)
+        cur = conn.cursor()
+        
+        try:
+            for symbol, info in stock_info.items():
+                # Safely parse date fields
+                ipo_date = info.get('ipo_date') if info.get('ipo_date') else None
+                listing_date = info.get('listing_date') if info.get('listing_date') else None
+                delisting_date = info.get('delisting_date') if info.get('delisting_date') else None
+                first_trading_date = info.get('first_trading_date') if info.get('first_trading_date') else None
+                last_trading_date = info.get('last_trading_date') if info.get('last_trading_date') else None
+                
+                cur.execute("""
+                    INSERT INTO stocks (
+                        symbol, name, sector, exchange, 
+                        ipo_date, listing_date, delisting_date,
+                        trading_status, exchange_status,
+                        first_trading_date, last_trading_date
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (symbol) DO UPDATE SET
+                        name = EXCLUDED.name,
+                        sector = EXCLUDED.sector,
+                        exchange = EXCLUDED.exchange,
+                        ipo_date = EXCLUDED.ipo_date,
+                        listing_date = EXCLUDED.listing_date,
+                        delisting_date = EXCLUDED.delisting_date,
+                        trading_status = EXCLUDED.trading_status,
+                        exchange_status = EXCLUDED.exchange_status,
+                        first_trading_date = EXCLUDED.first_trading_date,
+                        last_trading_date = EXCLUDED.last_trading_date,
+                        updated_at = CURRENT_TIMESTAMP;
+                """, (
+                    symbol, 
+                    info.get('name', symbol), 
+                    info.get('sector', ''), 
+                    info.get('exchange', ''),
+                    ipo_date,
+                    listing_date, 
+                    delisting_date,
+                    info.get('trading_status', 'active'),
+                    info.get('exchange_status', 'listed'),
+                    first_trading_date,
+                    last_trading_date
+                ))
+            
+            conn.commit()
+            logger.info(f"Loaded metadata for {len(stock_info)} stocks to database")
+            
+        except Exception as e:
+            logger.error(f"Error loading stock info to database: {e}")
+            conn.rollback()
+            raise
+        finally:
+            cur.close()
+            conn.close()
+
+    def save_daily_data_to_database(self, df: pd.DataFrame, symbol: str):
+        # Save cleaned DataFrame directly to PostgreSQL
+        if df.empty:
+            return
+            
+        conn = psycopg2.connect(**self.db_config)
+        cur = conn.cursor()
+        
+        try:
+            # Prepare data for insertion
+            records = []
+            for _, row in df.iterrows():
+                records.append((
+                    row['date'],
+                    symbol,
+                    row['open'],
+                    row['high'],
+                    row['low'],
+                    row['close'],
+                    row['volume']
+                ))
+            
+            # Bulk insert
+            execute_values(
+                cur,
+                """
+                INSERT INTO stock_prices_daily 
+                (time, symbol, open, high, low, close, volume)
+                VALUES %s
+                ON CONFLICT (time, symbol) DO UPDATE SET
+                    open = EXCLUDED.open,
+                    high = EXCLUDED.high,
+                    low = EXCLUDED.low,
+                    close = EXCLUDED.close,
+                    volume = EXCLUDED.volume;
+                """,
+                records
+            )
+            
+            conn.commit()
+            logger.info(f"Loaded {len(records)} daily records for {symbol} to database")
+            
+        except Exception as e:
+            logger.error(f"Error loading daily data for {symbol} to database: {e}")
+            conn.rollback()
+            raise
+        finally:
+            cur.close()
+            conn.close()
+
+    def verify_database_data(self):
+        # Verify data was loaded correctly to database
+        conn = psycopg2.connect(**self.db_config)
+        cur = conn.cursor()
+        
+        try:
+            # Check daily data
+            cur.execute("""
+                SELECT 
+                    COUNT(DISTINCT symbol) as symbols,
+                    COUNT(*) as total_records,
+                    MIN(time) as earliest,
+                    MAX(time) as latest
+                FROM stock_prices_daily;
+            """)
+            
+            daily_stats = cur.fetchone()
+            print("\nDatabase Data Statistics")
+            print(f"Symbols: {daily_stats[0]}")
+            print(f"Total Records: {daily_stats[1]:,}")
+            print(f"Date Range: {daily_stats[2]} to {daily_stats[3]}")
+            
+        except Exception as e:
+            logger.error(f"Error verifying database data: {e}")
+        finally:
+            cur.close()
+            conn.close()
 
     def fetch_stock_info_and_data(self, symbols: List[str]) -> Dict[str, Dict]:
         # Fetch stock metadata and historical data from Yahoo Finance
@@ -262,26 +414,8 @@ class FreeDataCollector:
         
         return df
     
-    def save_to_file(self, df: pd.DataFrame, symbol: str, data_type: str = "daily"):
-        # Save cleaned DataFrame to CSV
-        if df.empty:
-            return
-            
-        filename = os.path.join(self.data_dir, data_type, f"{symbol}_{data_type}.csv")
-        
-        # If file exists then append only new data
-        if os.path.exists(filename):
-            existing_df = pd.read_csv(filename, parse_dates=['date' if data_type == 'daily' else 'datetime'])
-            df = pd.concat([existing_df, df]).drop_duplicates(
-                subset=['date' if data_type == 'daily' else 'datetime', 'symbol'],
-                keep='last'
-            ).sort_values('date' if data_type == 'daily' else 'datetime')
-        
-        df.to_csv(filename, index=False)
-        logger.info(f"Saved {len(df)} cleaned records to {filename}")
-    
     def collect_all_data(self, symbols: List[str], start_date: str, end_date: str):
-        # Collect all available data for given symbols
+        # Collect all available data for given symbols and save directly to database
         # Args:
         # symbols: List of stock symbols
         # start_date: Start date for daily data (YYYY-MM-DD)
@@ -291,11 +425,11 @@ class FreeDataCollector:
         logger.info("Fetching stock information and historical data:")
         stock_data = self.fetch_stock_info_and_data(symbols)
         
-        # Extract stock info for JSON serialisation
+        # Extract stock info for database insertion
         stock_info = {symbol: data['info'] for symbol, data in stock_data.items()}
 
-        # Process historical data for each symbol
-        logger.info("Processing historical data for date range:")
+        # Process and save historical data for each symbol
+        logger.info("Processing historical data for date range and saving to database:")
         for symbol in symbols:
             logger.info(f"Processing {symbol}:")
             
@@ -317,7 +451,7 @@ class FreeDataCollector:
                     first_date = daily_df['date'].min()
                     last_date = daily_df['date'].max()
                     
-                    # Convert Timestamps to strings for JSON serialisation
+                    # Convert Timestamps to strings
                     first_date_str = first_date.strftime('%Y-%m-%d')
                     last_date_str = last_date.strftime('%Y-%m-%d')
                     
@@ -331,149 +465,32 @@ class FreeDataCollector:
                         stock_info[symbol]['listing_date'] = stock_info[symbol]['first_trading_date']
                         logger.info(f"Using first trading date as IPO for {symbol}: {stock_info[symbol]['first_trading_date']}")
                 
-                self.save_to_file(daily_df, symbol, "daily")
+                # Save data directly to database instead of CSV
+                self.save_daily_data_to_database(daily_df, symbol)
             
-        # Save updated stock info with temporal data
-        with open(os.path.join(self.data_dir, "stock_info.json"), 'w') as f:
-            json.dump(stock_info, f, indent=2)
+        # Save stock metadata directly to database
+        logger.info("Saving stock metadata to database:")
+        self.save_stock_info_to_database(stock_info)
         
         logger.info("Data collection completed!")
         
-        # Generate summary
-        self.generate_summary()
-        
-        # Run validation on all collected data
-        self.validate_all_data()
-    
-    def generate_summary(self):
-        # Generate a summary of collected CSV data.
-        summary = {"daily": {}}
-        
-        # Check daily files
-        daily_dir = os.path.join(self.data_dir, "daily")
-        if os.path.exists(daily_dir):
-            for file in os.listdir(daily_dir):
-                if file.endswith(".csv"):
-                    df = pd.read_csv(os.path.join(daily_dir, file))
-                    symbol = file.replace("_daily.csv", "")
-                    summary["daily"][symbol] = {
-                        "records": len(df),
-                        "start_date": df['date'].min(),
-                        "end_date": df['date'].max()
-                    }
-    
-        # Save summary
-        with open(os.path.join(self.data_dir, "summary.json"), 'w') as f:
-            json.dump(summary, f, indent=2)
-        
-        # Print summary
-        print("\nData Collection Summary")
-        print(f"Daily data collected for {len(summary['daily'])} symbols")
-
-    def validate_all_data(self):
-        # Validate all collected data files
-        print('\n')
-        logger.info("Running validation on all collected data:")
-        
-        daily_dir = os.path.join(self.data_dir, "daily")
-        csv_files = glob.glob(os.path.join(daily_dir, "*.csv"))
-        
-        validation_results = []
-        
-        for file_path in csv_files:
-            filename = os.path.basename(file_path)
-            symbol = filename.split('_')[0]
-            
-            try:
-                df = pd.read_csv(file_path)
-                
-                # Run validation tests
-                tests = [
-                    self.test_price_positivity(df, symbol),
-                    self.test_volume_validity(df, symbol),
-                    self.test_data_completeness(df, symbol)
-                ]
-                
-                validation_results.extend(tests)
-                
-            except Exception as e:
-                logger.error(f"Error validating {filename}: {str(e)}")
-        
-        # Print validation summary
-        self.print_validation_summary(validation_results)
-    
-    def test_price_positivity(self, df: pd.DataFrame, symbol: str) -> Dict:
-        # Test that all prices are positive
-        price_columns = ['open', 'high', 'low', 'close', 'adj_close']
-        invalid_count = 0
-        
-        for col in price_columns:
-            if col in df.columns:
-                invalid_count += (df[col] <= 0).sum()
-        
-        return {
-            'test_name': f"Price Positivity - {symbol}",
-            'symbol': symbol,
-            'total_rows': len(df),
-            'invalid_rows': invalid_count,
-            'passed': invalid_count == 0
-        }
-    
-    def test_volume_validity(self, df: pd.DataFrame, symbol: str) -> Dict:
-        # Test that volume is non-negative
-        invalid_count = (df['volume'] < 0).sum()
-        
-        return {
-            'test_name': f"Volume Validity - {symbol}",
-            'symbol': symbol,
-            'total_rows': len(df),
-            'invalid_rows': invalid_count,
-            'passed': invalid_count == 0
-        }
-    
-    def test_data_completeness(self, df: pd.DataFrame, symbol: str) -> Dict:
-        # Test for missing values in critical columns
-        critical_columns = ['open', 'high', 'low', 'close', 'volume']
-        missing_count = 0
-        
-        for col in critical_columns:
-            if col in df.columns:
-                missing_count += df[col].isna().sum()
-        
-        return {
-            'test_name': f"Data Completeness - {symbol}",
-            'symbol': symbol,
-            'total_rows': len(df),
-            'invalid_rows': missing_count,
-            'passed': missing_count == 0
-        }
-    
-    def print_validation_summary(self, validation_results: List[Dict]):
-        # Print validation summary
-        print("Data validation summary-")
-        
-        passed_tests = sum(1 for test in validation_results if test['passed'])
-        total_tests = len(validation_results)
-        
-        print(f"Total validation tests: {total_tests}")
-        print(f"Passed: {passed_tests}")
-        print(f"Failed: {total_tests - passed_tests}")
-        print(f"Success rate: {(passed_tests/total_tests)*100:.1f}%")
-        
-        # Show failed tests
-        failed_tests = [test for test in validation_results if not test['passed']]
-        if failed_tests:
-            print("\nFailed tests:")
-            for test in failed_tests:
-                print(f"  - {test['test_name']}: {test['invalid_rows']} invalid rows")
-        else:
-            print("\nAll validation tests passed!")
+        # Verify data was loaded correctly
+        self.verify_database_data()
 
 
 if __name__ == "__main__":
+    # Database configuration - use Unix socket when running during container initialization
+    DB_CONFIG = {
+        "host": "/var/run/postgresql",  # Unix socket directory
+        "database": os.getenv("DB_NAME", "simulated_trading_platform"),
+        "user": os.getenv("DB_USER", "trading_user"), 
+        "password": os.getenv("DB_PASSWORD", "trading_password"),
+        # No port needed for Unix socket connection
+    }
+    
     # List of stocks to collect
     SYMBOLS = [
-        # Large  established companies
+        # Large established companies
         "AAPL", "MSFT", "GOOGL", "AMZN", "META",
         "TSLA", "NVDA", "JPM", "V", "JNJ",
         "WMT", "PG", "UNH", "HD", "DIS",
@@ -506,13 +523,12 @@ if __name__ == "__main__":
     #END_DATE = (datetime.now()- timedelta(days=25*365)).strftime("%Y-%m-%d")
     #START_DATE = (datetime.now() - timedelta(days=40*365)).strftime("%Y-%m-%d")
     
-    
     print(f"Collecting data from {START_DATE} to {END_DATE}")
     
-    # Create collector
-    collector = FreeDataCollector()
+    # Create collector with database configuration
+    collector = FreeDataCollector(DB_CONFIG)
     
-    # Collect all data
+    # Collect all data directly to database
     collector.collect_all_data(SYMBOLS, START_DATE, END_DATE)
     
     print("\nData collection complete!")

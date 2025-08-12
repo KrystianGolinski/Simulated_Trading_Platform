@@ -4,7 +4,9 @@ services:
     env_file:
       - ../.env
     container_name: trading-db
-    image: timescale/timescaledb:latest-pg15
+    build:
+      context: ../Database
+      dockerfile: Dockerfile
     environment:
       POSTGRES_DB: simulated_trading_platform
       POSTGRES_USER: trading_user
@@ -17,11 +19,11 @@ services:
       - trading_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U trading_user -d simulated_trading_platform"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+      test: ["CMD-SHELL", "pg_isready -U trading_user -d simulated_trading_platform && psql -U trading_user -d simulated_trading_platform -c 'SELECT COUNT(*) FROM stocks;' | grep -q '[0-9]'"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
 
   fastapi:
     env_file:
