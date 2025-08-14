@@ -7,6 +7,11 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <chrono>
+#include <cmath>
+#include <uuid/uuid.h>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
 
 namespace TradingOrchestrator {
 
@@ -23,39 +28,78 @@ void WorkerSpawner::setWorkerTimeout(int timeout_seconds) {
 }
 
 std::string WorkerSpawner::buildCommandLine(const TradingCommon::SimulationConfig& config) const {
+    // Create temporary JSON config file
+    std::string config_file = createConfigFile(config);
+    
+    // Build command using --simulate --config format (matches working main branch)
     std::stringstream cmd;
     cmd << worker_path_;
+    cmd << " --simulate --config " << config_file;
     
-    // Use --backtest with direct command line arguments (matches original API usage)
-    cmd << " --backtest";
+    return cmd.str();
+}
+
+std::string WorkerSpawner::createConfigFile(const TradingCommon::SimulationConfig& config) const {
+    // Create JSON config matching the format expected by the working main branch
+    json config_data = json::object();
     
-    // Add symbols (comma-separated for multi-symbol)
-    if (!config.symbols.empty()) {
-        cmd << " --symbol ";
-        for (size_t i = 0; i < config.symbols.size(); i++) {
-            cmd << config.symbols[i];
-            if (i < config.symbols.size() - 1) cmd << ",";
+    // Basic configuration  
+    if (config.symbols.empty()) {
+        config_data["symbols"] = json::array({"AAPL"});
+    } else {
+        config_data["symbols"] = config.symbols;  // nlohmann/json automatically converts std::vector to JSON array
+    }
+    config_data["start_date"] = config.start_date;
+    config_data["end_date"] = config.end_date;
+    config_data["starting_capital"] = config.starting_capital;
+    config_data["cleanup"] = true;
+    
+    // Strategy configuration - API now sends pre-merged strategy parameters
+    if (!config.strategy.empty()) {
+        config_data["strategy"] = config.strategy;
+        
+        // Strategy parameters are already merged in the JSON by the API (like working main branch)
+        // The API now sends strategy params at root level, so orchestrator just passes them through
+        for (const auto& param : config.strategy_parameters) {
+            // Convert string parameters to appropriate types
+            try {
+                // Try to convert to double first (handles both int and float)
+                double value = std::stod(param.second);
+                
+                // Check if it's an integer value
+                if (value == std::floor(value)) {
+                    config_data[param.first] = static_cast<int>(value);
+                } else {
+                    config_data[param.first] = value;
+                }
+            } catch (const std::exception&) {
+                // If conversion fails, keep as string
+                config_data[param.first] = param.second;
+            }
         }
     }
     
-    // Add date range
-    cmd << " --start " << config.start_date;
-    cmd << " --end " << config.end_date;
+    // Generate unique temporary filename
+    uuid_t uuid;
+    uuid_generate(uuid);
+    char uuid_str[37];
+    uuid_unparse(uuid, uuid_str);
     
-    // Add starting capital
-    cmd << " --capital " << config.starting_capital;
+    std::string config_file = "/tmp/sim_config_" + std::string(uuid_str, 8) + ".json";
     
-    // Add strategy configuration
-    if (!config.strategy.empty()) {
-        cmd << " --strategy " << config.strategy;
+    // Write JSON to file
+    try {
+        std::ofstream file(config_file);
+        file << config_data.dump(2);
+        file.close();
+        
+        std::cout << "Created config file: " << config_file << " for strategy: " << config.strategy << std::endl;
+        std::cout << "Config content: " << config_data.dump(2) << std::endl;
+        return config_file;
+    } catch (const std::exception& e) {
+        std::cerr << "Failed to create config file: " << e.what() << std::endl;
+        throw;
     }
-    
-    // Add strategy parameters if available
-    for (const auto& param : config.strategy_parameters) {
-        cmd << " --" << param.first << " " << param.second;
-    }
-    
-    return cmd.str();
 }
 
 TradingCommon::WorkerResult WorkerSpawner::executeWorker(const std::string& command) const {

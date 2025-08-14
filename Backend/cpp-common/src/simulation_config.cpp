@@ -3,6 +3,7 @@
 #include <iostream>
 #include <ctime>
 #include <chrono>
+#include <set>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -76,9 +77,33 @@ SimulationConfig SimulationConfig::fromJson(const std::string& json_str) {
             config.strategy = j["strategy"].get<std::string>();
         }
         
-        // Parse strategy parameters
+        // Parse strategy parameters from root level (like working main branch)
+        // The API now merges strategy parameters directly into the root JSON object
+        config.strategy_parameters.clear();
+        
+        // Define known base configuration keys to exclude from strategy parameters
+        std::set<std::string> base_keys = {
+            "symbols", "start_date", "end_date", "starting_capital", 
+            "strategy", "cleanup", "strategy_parameters"
+        };
+        
+        // Extract any other keys as strategy parameters
+        for (const auto& item : j.items()) {
+            if (base_keys.find(item.key()) == base_keys.end()) {
+                // This is a strategy parameter - handle different value types
+                if (item.value().is_string()) {
+                    config.strategy_parameters[item.key()] = item.value().get<std::string>();
+                } else if (item.value().is_number()) {
+                    config.strategy_parameters[item.key()] = std::to_string(item.value().get<double>());
+                } else {
+                    // Convert any other type to string representation
+                    config.strategy_parameters[item.key()] = item.value().dump();
+                }
+            }
+        }
+        
+        // Also handle legacy nested strategy_parameters for backward compatibility
         if (j.contains("strategy_parameters") && j["strategy_parameters"].is_object()) {
-            config.strategy_parameters.clear();
             for (const auto& param : j["strategy_parameters"].items()) {
                 // Handle both string and numeric parameter values
                 if (param.value().is_string()) {

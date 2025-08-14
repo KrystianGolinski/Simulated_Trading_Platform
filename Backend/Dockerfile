@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     git \
     libpq-dev \
     nlohmann-json3-dev \
+    uuid-dev \
     pkg-config \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
@@ -48,6 +49,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Install only runtime dependencies
 RUN apt-get update && apt-get install -y \
     libpq5 \
+    libuuid1 \
     curl \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean

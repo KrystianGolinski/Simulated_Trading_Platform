@@ -24,6 +24,7 @@ target_include_directories(simulation-orchestrator PRIVATE
 # Link libraries
 target_link_libraries(simulation-orchestrator
     cpp-common
+    uuid
 )
 
 # Install rules

@@ -29,6 +29,7 @@ namespace TradingOrchestrator {
         
         // Helper methods
         std::string buildCommandLine(const TradingCommon::SimulationConfig& config) const;
+        std::string createConfigFile(const TradingCommon::SimulationConfig& config) const;
         TradingCommon::WorkerResult executeWorker(const std::string& command) const;
     };
     

@@ -128,15 +128,27 @@ class ExecutionService:
         try:
             logger.info(f"Executing simulation {simulation_id} via C++ orchestrator")
             
-            # Convert config to JSON for orchestrator
-            config_json = json.dumps({
+            # Transform strategy parameters using strategy factory (like working main branch)
+            from strategy_factory import get_strategy_factory
+            factory = get_strategy_factory()
+            strategy_config = factory.create_strategy_config(
+                config.strategy, config.strategy_parameters
+            )
+            
+            # Convert config to JSON for orchestrator - merge strategy config like working main branch
+            config_data = {
                 "symbols": config.symbols,
                 "start_date": config.start_date.isoformat(),
                 "end_date": config.end_date.isoformat(),
                 "starting_capital": config.starting_capital,
                 "strategy": config.strategy,
-                "strategy_parameters": config.strategy_parameters
-            })
+                "cleanup": True
+            }
+            
+            # Merge strategy config directly into root level (like working main branch)
+            config_data.update(strategy_config)
+            
+            config_json = json.dumps(config_data)
             
             # Build orchestrator command
             cmd = [
