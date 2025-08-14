@@ -58,6 +58,10 @@ WORKDIR /app
 COPY --from=builder /app/trading-engine/build/trading_engine /app/trading_engine
 COPY --from=builder /app/trading-engine/build/test_comprehensive /app/test_comprehensive
 COPY --from=builder /app/simulation-orchestrator/build/simulation-orchestrator /app/simulation-orchestrator
+COPY --from=builder /app/cpp-common/build/libcpp-common.so /app/libcpp-common.so
+
+# Set library path for shared library
+ENV LD_LIBRARY_PATH=/app:$LD_LIBRARY_PATH
 
 # Health check for the backend using orchestrator status
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \

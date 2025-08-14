@@ -1,7 +1,9 @@
 #include "worker_spawner.h"
 #include <iostream>
 #include <sstream>
+#include <fstream>
 #include <cstdlib>
+#include <ctime>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <chrono>
@@ -24,10 +26,10 @@ std::string WorkerSpawner::buildCommandLine(const TradingCommon::SimulationConfi
     std::stringstream cmd;
     cmd << worker_path_;
     
-    // Use --simulate mode
-    cmd << " --simulate";
+    // Use --backtest with direct command line arguments (matches original API usage)
+    cmd << " --backtest";
     
-    // Add symbol (trading engine expects --symbol, not --symbols)
+    // Add symbols (comma-separated for multi-symbol)
     if (!config.symbols.empty()) {
         cmd << " --symbol ";
         for (size_t i = 0; i < config.symbols.size(); i++) {
@@ -36,11 +38,19 @@ std::string WorkerSpawner::buildCommandLine(const TradingCommon::SimulationConfi
         }
     }
     
+    // Add date range
     cmd << " --start " << config.start_date;
     cmd << " --end " << config.end_date;
+    
+    // Add starting capital
     cmd << " --capital " << config.starting_capital;
     
-    // Add strategy parameters (if supported by trading engine)
+    // Add strategy configuration
+    if (!config.strategy.empty()) {
+        cmd << " --strategy " << config.strategy;
+    }
+    
+    // Add strategy parameters if available
     for (const auto& param : config.strategy_parameters) {
         cmd << " --" << param.first << " " << param.second;
     }
@@ -53,6 +63,7 @@ TradingCommon::WorkerResult WorkerSpawner::executeWorker(const std::string& comm
     auto start_time = std::chrono::high_resolution_clock::now();
     
     std::cout << "Executing: " << command << std::endl;
+    std::cout << "============= TRADING ENGINE DEBUG =============" << std::endl;
     
     // Create pipes for stdout and stderr
     int stdout_pipe[2], stderr_pipe[2];
@@ -112,6 +123,14 @@ TradingCommon::WorkerResult WorkerSpawner::executeWorker(const std::string& comm
     auto end_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
     result.execution_time_ms = duration.count();
+    
+    // Debug output
+    std::cout << "STDOUT (" << result.stdout_data.length() << " chars):" << std::endl;
+    std::cout << result.stdout_data << std::endl;
+    std::cout << "STDERR (" << result.stderr_data.length() << " chars):" << std::endl;
+    std::cout << result.stderr_data << std::endl;
+    std::cout << "EXIT CODE: " << result.return_code << std::endl;
+    std::cout << "============= END DEBUG =============" << std::endl;
     
     return result;
 }

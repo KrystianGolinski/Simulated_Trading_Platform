@@ -3,6 +3,9 @@
 #include <iostream>
 #include <ctime>
 #include <chrono>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
 
 namespace TradingCommon {
 
@@ -45,18 +48,59 @@ std::string SimulationConfig::toJson() const {
     return ss.str();
 }
 
-SimulationConfig SimulationConfig::fromJson(const std::string& json) {
-    // Simple JSON parsing (placeholder implementation)
-    // In a real implementation, you'd use a proper JSON library
+SimulationConfig SimulationConfig::fromJson(const std::string& json_str) {
     SimulationConfig config;
     
-    // For now, create a basic config with default values
-    // TODO: Implement proper JSON parsing
-    config.symbols = {"AAPL"};
-    config.start_date = "2023-01-01";
-    config.end_date = "2023-12-31";
-    config.starting_capital = 10000.0;
-    config.strategy = "ma_crossover";
+    try {
+        json j = json::parse(json_str);
+        
+        // Parse symbols array
+        if (j.contains("symbols") && j["symbols"].is_array()) {
+            config.symbols.clear();
+            for (const auto& symbol : j["symbols"]) {
+                config.symbols.push_back(symbol.get<std::string>());
+            }
+        }
+        
+        // Parse basic fields
+        if (j.contains("start_date")) {
+            config.start_date = j["start_date"].get<std::string>();
+        }
+        if (j.contains("end_date")) {
+            config.end_date = j["end_date"].get<std::string>();
+        }
+        if (j.contains("starting_capital")) {
+            config.starting_capital = j["starting_capital"].get<double>();
+        }
+        if (j.contains("strategy")) {
+            config.strategy = j["strategy"].get<std::string>();
+        }
+        
+        // Parse strategy parameters
+        if (j.contains("strategy_parameters") && j["strategy_parameters"].is_object()) {
+            config.strategy_parameters.clear();
+            for (const auto& param : j["strategy_parameters"].items()) {
+                // Handle both string and numeric parameter values
+                if (param.value().is_string()) {
+                    config.strategy_parameters[param.key()] = param.value().get<std::string>();
+                } else if (param.value().is_number()) {
+                    config.strategy_parameters[param.key()] = std::to_string(param.value().get<double>());
+                } else {
+                    // Convert any other type to string representation
+                    config.strategy_parameters[param.key()] = param.value().dump();
+                }
+            }
+        }
+        
+    } catch (const json::exception& e) {
+        std::cerr << "JSON parsing error: " << e.what() << std::endl;
+        // Return default configuration on parsing error
+        config.symbols = {"AAPL"};
+        config.start_date = "2023-01-01";
+        config.end_date = "2023-12-31";
+        config.starting_capital = 10000.0;
+        config.strategy = "ma_crossover";
+    }
     
     return config;
 }

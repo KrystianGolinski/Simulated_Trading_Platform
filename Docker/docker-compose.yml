@@ -79,9 +79,12 @@ services:
     command: >
       sh -c "
         mkdir -p /shared &&
-        cp /app/build/trading_engine /shared/ &&
+        cp /app/trading_engine /shared/ &&
+        cp /app/simulation-orchestrator /shared/ &&
+        cp /app/libcpp-common.so /shared/ &&
         chmod +x /shared/trading_engine &&
-        echo 'C++ engine binary copied to /shared/trading_engine' &&
+        chmod +x /shared/simulation-orchestrator &&
+        echo 'C++ binaries and libraries copied to /shared/' &&
         tail -f /dev/null
       "
 

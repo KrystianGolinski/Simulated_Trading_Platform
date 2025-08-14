@@ -146,8 +146,8 @@ async def start_simulation(
         # Log validation warnings for user awareness
         _handle_validation_warnings(validation_result)
 
-        # Start simulation execution with automatic optimization
-        simulation_id = await simulation_engine.start_simulation(config)
+        # Start simulation execution via C++ orchestrator (Phase 3)
+        simulation_id = await simulation_engine.start_simulation_via_orchestrator(config)
 
         # Create simulation response with warning information
         message = "Simulation started successfully"

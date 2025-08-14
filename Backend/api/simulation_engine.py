@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from models import SimulationConfig, SimulationResults, SimulationStatus
-from performance_optimizer import performance_optimizer
+# performance_optimizer import removed - now using C++ orchestrator
 from services.error_handler import ErrorHandler
 from services.execution_service import ExecutionService
 from services.result_processor import ResultProcessor
@@ -101,6 +101,121 @@ class SimulationEngine:
         )
 
         return simulation_id
+
+    async def start_simulation_via_orchestrator(self, config: SimulationConfig) -> str:
+        """
+        Start simulation using C++ orchestrator (Phase 3 simplified implementation).
+        
+        This method replaces the complex Python business logic with a single call
+        to the C++ orchestrator, which handles all complexity analysis, optimization,
+        and execution internally.
+        """
+        # Comprehensive engine validation before simulation start
+        engine_validation = self._validate_cpp_engine()
+        if not engine_validation["is_valid"]:
+            raise RuntimeError(
+                f"C++ trading engine validation failed: {engine_validation['error']}"
+            )
+        
+        # Generate unique simulation identifier for tracking
+        simulation_id = str(uuid.uuid4())
+        
+        # Initialize simulation result storage
+        self.result_processor.initialize_simulation_result(simulation_id, config)
+        
+        logger.info(f"Starting simulation {simulation_id} via C++ orchestrator")
+        
+        # Start orchestrator execution in background
+        asyncio.create_task(
+            self._run_simulation_via_orchestrator(simulation_id, config)
+        )
+        
+        return simulation_id
+
+    async def _run_simulation_via_orchestrator(
+        self, simulation_id: str, config: SimulationConfig
+    ):
+        """
+        Execute simulation using the C++ orchestrator with minimal Python overhead.
+        
+        This replaces the complex _run_simulation method with a single orchestrator call.
+        All business logic (complexity analysis, symbol grouping, parallel coordination)
+        is now handled by the C++ orchestrator.
+        """
+        try:
+            # Update status to running
+            self.result_processor.update_simulation_status(
+                simulation_id, SimulationStatus.RUNNING, datetime.now()
+            )
+            
+            logger.info(f"Executing simulation {simulation_id} via C++ orchestrator")
+            
+            # Execute via orchestrator - this replaces ALL the complex Python logic
+            result = await self.execution_service.execute_simulation_via_orchestrator(
+                simulation_id, config
+            )
+            
+            if result["return_code"] == 0:
+                # Parse orchestrator output for results
+                parsed_results = self._parse_orchestrator_output(result["stdout"])
+                
+                # Process and store successful results
+                self.result_processor.process_simulation_results(
+                    simulation_id, parsed_results
+                )
+                
+                logger.info(f"Simulation {simulation_id} completed successfully via orchestrator")
+                
+            else:
+                # Handle orchestrator failure
+                error_msg = result["stderr"] or "Orchestrator execution failed"
+                
+                self.result_processor.mark_simulation_failed(
+                    simulation_id, error_msg
+                )
+                
+                logger.error(f"Simulation {simulation_id} failed via orchestrator: {error_msg}")
+                
+        except Exception as e:
+            # Handle unexpected errors
+            error_msg = f"Orchestrator execution error: {str(e)}"
+            self.result_processor.mark_simulation_failed(
+                simulation_id, error_msg
+            )
+            logger.error(f"Simulation {simulation_id} failed with error: {error_msg}")
+
+    def _parse_orchestrator_output(self, stdout: str) -> dict:
+        """
+        Parse output from C++ orchestrator.
+        
+        The orchestrator outputs JSON results, so this is much simpler than
+        the complex result processing previously required.
+        """
+        try:
+            # Look for JSON output in stdout
+            lines = stdout.strip().split('\n')
+            for line in lines:
+                line = line.strip()
+                if line.startswith('{') and line.endswith('}'):
+                    try:
+                        return json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+            
+            # Fallback if no JSON found
+            return {
+                "method": "orchestrator",
+                "raw_output": stdout,
+                "message": "Execution completed via C++ orchestrator"
+            }
+            
+        except Exception as e:
+            logger.warning(f"Failed to parse orchestrator output: {str(e)}")
+            return {
+                "method": "orchestrator", 
+                "raw_output": stdout,
+                "parse_error": str(e)
+            }
 
     async def _run_simulation(
         self,

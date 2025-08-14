@@ -23,8 +23,8 @@ SimulationConfig createTestConfig() {
     config.end_date = "2023-12-31";
     config.starting_capital = 10000.0;
     config.strategy = "ma_crossover";
-    config.strategy_parameters["short_window"] = "10";
-    config.strategy_parameters["long_window"] = "50";
+    config.strategy_parameters["short_ma"] = "20";
+    config.strategy_parameters["long_ma"] = "50";
     return config;
 }
 

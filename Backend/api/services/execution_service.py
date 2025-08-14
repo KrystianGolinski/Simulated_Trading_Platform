@@ -52,7 +52,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from models import SimulationConfig
-from performance_optimizer import performance_optimizer
+# performance_optimizer import removed - now using C++ orchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +104,94 @@ class ExecutionService:
         """
         self.cpp_engine_path = cpp_engine_path
         self.active_simulations: Dict[str, Dict[str, Any]] = {}
+        
+        # Path to simulation orchestrator (in shared Docker volume)
+        self.orchestrator_path = Path("/shared/simulation-orchestrator")
+
+    async def execute_simulation_via_orchestrator(
+        self, simulation_id: str, config: SimulationConfig
+    ) -> Dict[str, Any]:
+        """
+        Execute simulation using the C++ orchestrator (Phase 3 implementation).
+        
+        This method replaces the complex Python business logic with a single call
+        to the C++ simulation-orchestrator, which handles complexity analysis,
+        symbol grouping, parallel coordination, and worker management internally.
+        
+        Args:
+            simulation_id: Unique identifier for tracking the simulation
+            config: SimulationConfig object containing simulation parameters
+            
+        Returns:
+            Dict[str, Any]: Execution result from orchestrator
+        """
+        try:
+            logger.info(f"Executing simulation {simulation_id} via C++ orchestrator")
+            
+            # Convert config to JSON for orchestrator
+            config_json = json.dumps({
+                "symbols": config.symbols,
+                "start_date": config.start_date.isoformat(),
+                "end_date": config.end_date.isoformat(),
+                "starting_capital": config.starting_capital,
+                "strategy": config.strategy,
+                "strategy_parameters": config.strategy_parameters
+            })
+            
+            # Build orchestrator command
+            cmd = [
+                str(self.orchestrator_path),
+                "--config-json", config_json,
+                "--worker-path", str(self.cpp_engine_path)
+            ]
+            
+            logger.debug(f"Orchestrator command: {' '.join(cmd)}")
+            
+            # Execute orchestrator with library path environment
+            start_time = datetime.now()
+            env = os.environ.copy()
+            env['LD_LIBRARY_PATH'] = '/shared'
+            
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=self.cpp_engine_path.parent,
+                env=env
+            )
+            
+            stdout, stderr = await process.communicate()
+            end_time = datetime.now()
+            execution_time = (end_time - start_time).total_seconds() * 1000
+            
+            result = {
+                "simulation_id": simulation_id,
+                "return_code": process.returncode,
+                "stdout": stdout.decode() if stdout else "",
+                "stderr": stderr.decode() if stderr else "",
+                "execution_time_ms": execution_time,
+                "command": cmd,
+                "method": "orchestrator"
+            }
+            
+            if process.returncode == 0:
+                logger.info(f"Simulation {simulation_id} completed successfully via orchestrator")
+            else:
+                logger.error(f"Simulation {simulation_id} failed via orchestrator: {result['stderr']}")
+                
+            return result
+            
+        except Exception as e:
+            logger.error(f"Orchestrator execution failed for simulation {simulation_id}: {str(e)}")
+            return {
+                "simulation_id": simulation_id,
+                "return_code": -1,
+                "stdout": "",
+                "stderr": f"Orchestrator execution error: {str(e)}",
+                "execution_time_ms": 0,
+                "command": [],
+                "method": "orchestrator"
+            }
 
     def validate_cpp_engine(self) -> Dict[str, Any]:
         """
