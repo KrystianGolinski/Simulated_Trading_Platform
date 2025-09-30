@@ -121,17 +121,26 @@ CREATE TABLE IF NOT EXISTS trades_log (
 
 Indexes are critical for query performance, especially for time-series and temporal validation queries.
 
-### Performance Indexes
+### Primary Performance Indexes
 -   **Primary Backtesting Index**: `CREATE INDEX IF NOT EXISTS idx_daily_symbol_time ON stock_prices_daily (symbol, time DESC);`
+-   **Trade Symbol Time Index**: `CREATE INDEX IF NOT EXISTS idx_trades_symbol_time ON trades_log (symbol, trade_time);`
 -   **Parallel Query Optimization**: Index supports concurrent access from multiple parallel groups.
 -   **Trade Retrieval**: `CREATE INDEX IF NOT EXISTS idx_trades_session_id ON trades_log (session_id);`
 
 ### Temporal Validation Indexes
 -   **Date-based Lookups**: Separate indexes on `listing_date`, `delisting_date`, and `ipo_date`.
     -   `CREATE INDEX IF NOT EXISTS idx_stocks_listing_date ON stocks (listing_date) WHERE listing_date IS NOT NULL;`
+    -   `CREATE INDEX IF NOT EXISTS idx_stocks_delisting_date ON stocks (delisting_date) WHERE delisting_date IS NOT NULL;`
+    -   `CREATE INDEX IF NOT EXISTS idx_stocks_ipo_date ON stocks (ipo_date) WHERE ipo_date IS NOT NULL;`
 -   **Status Filtering**: `CREATE INDEX IF NOT EXISTS idx_stocks_trading_status ON stocks (trading_status);`
--   **Composite Validation**: `CREATE INDEX IF NOT EXISTS idx_stocks_temporal_validation ON stocks (symbol, trading_status, listing_date, delisting_date);`
+-   **Composite Validation**: `CREATE INDEX IF NOT EXISTS idx_stocks_temporal_validation ON stocks (symbol, trading_status, listing_date, delisting_date) WHERE trading_status = 'active';`
 -   **Period Overlap**: `CREATE INDEX IF NOT EXISTS idx_trading_periods_date_range ON stock_trading_periods USING gist (daterange(start_date, COALESCE(end_date, 'infinity'::date), '[]'));`
+
+### Additional Performance Indexes
+-   **Volume Analysis**: `CREATE INDEX IF NOT EXISTS idx_daily_volume ON stock_prices_daily (volume DESC, time);`
+-   **Price Range Queries**: `CREATE INDEX IF NOT EXISTS idx_daily_price_range ON stock_prices_daily (symbol, high, low, time);`
+-   **Session Performance**: `CREATE INDEX IF NOT EXISTS idx_sessions_date_range ON trading_sessions (start_date, end_date);`
+-   **Multi-symbol Queries**: `CREATE INDEX IF NOT EXISTS idx_daily_multi_symbol ON stock_prices_daily (time, symbol) WHERE symbol = ANY(ARRAY['AAPL','GOOGL','MSFT']);`
 
 ## 4. Stored Procedures and Triggers
 
@@ -165,9 +174,21 @@ The API uses a repository and service pattern to interact with the database.
 
 ### 5.3. Common Query Patterns
 
--   **Historical Price Retrieval**: `SELECT ... FROM stock_prices_daily WHERE symbol = $1 AND time >= $2 AND time <= $3 ORDER BY time ASC`
--   **Symbol Validation**: `SELECT 1 FROM stocks WHERE symbol = $1`
--   **Session Trade Retrieval**: `SELECT ... FROM trades_log WHERE session_id = $1 ORDER BY trade_time ASC`
+**Time-Series Data Queries:**
+-   **Historical Price Retrieval**: `SELECT open, high, low, close, volume FROM stock_prices_daily WHERE symbol = $1 AND time >= $2 AND time <= $3 ORDER BY time ASC`
+-   **Date Range Availability**: `SELECT MIN(time::date), MAX(time::date) FROM stock_prices_daily WHERE symbol = $1`
+-   **Latest Price Data**: `SELECT * FROM stock_prices_daily WHERE symbol = $1 ORDER BY time DESC LIMIT 1`
+
+**Temporal Validation Queries:**
+-   **Symbol Existence**: `SELECT 1 FROM stocks WHERE symbol = $1`
+-   **Trading Status Check**: `SELECT is_stock_tradeable($1, $2)` - Uses stored function for temporal validation
+-   **Eligible Stocks for Period**: `SELECT * FROM get_eligible_stocks_for_period($1, $2)` - Returns table of valid stocks
+-   **Active Stock Filtering**: `SELECT symbol FROM stocks WHERE trading_status = 'active' AND listing_date <= $1`
+
+**Simulation and Trading Queries:**
+-   **Session Trade Retrieval**: `SELECT symbol, trade_time, action, quantity, price FROM trades_log WHERE session_id = $1 ORDER BY trade_time ASC`
+-   **Performance Analysis**: `SELECT * FROM trading_sessions WHERE id = $1`
+-   **Bulk Symbol Validation**: `SELECT symbol FROM stocks WHERE symbol = ANY($1) AND trading_status = 'active'`
 
 ## 6. Operations and Configuration
 
@@ -185,7 +206,7 @@ Connection details are managed via environment variables.
 ### 6.2. Data Loading and Migration
 
 -   **Initial Schema**: The `init.sql` script in the `/Database` directory creates all tables, indexes, and functions when the Docker container is first started.
--   **Bulk Data Loading**: The `Database/CSVtoPostgres.py` script is used for bulk-importing historical data from CSV files into the `stock_prices_daily` table, using an `ON CONFLICT` clause to handle updates.
+-   **Bulk Data Loading**: The `Database/DataGathering.py` script is used for bulk-importing historical data from CSV files into the `stock_prices_daily` table, using an `ON CONFLICT` clause to handle updates.
 
 ### 6.3. Health and Monitoring
 

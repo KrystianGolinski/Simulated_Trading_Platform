@@ -4,6 +4,11 @@
 
 This document provides a technical overview of the FastAPI-based API for the Simulated Trading Platform. It is intended for developers working on maintaining or extending the API's functionality. The focus is on architecture, conventions, and practical guides for common development tasks.
 
+**Current Version:** 1.0.0  
+**Framework:** FastAPI with Python 3.12  
+**Container:** Docker with health checks and dependency management  
+**Database Integration:** Async PostgreSQL/TimescaleDB via asyncpg
+
 ### 1.1. Core Design Principles
 
 The API is built on a set of core principles to ensure consistency, maintainability, and scalability:
@@ -11,8 +16,11 @@ The API is built on a set of core principles to ensure consistency, maintainabil
 -   **Layered Architecture**: A clear separation of concerns between presentation, business logic, data access, and database layers.
 -   **Dependency Injection**: FastAPI's DI system is used to manage dependencies and decouple components, particularly for injecting services and repositories into the API routers.
 -   **Standardized I/O**: All API endpoints use a consistent JSON structure for requests and responses, including a standardized format for errors and pagination.
+-   **RouterBase Pattern**: All routers inherit from a common base pattern providing consistent logging, response formatting, and error handling.
+-   **Correlation ID Support**: Each request is tracked with a unique correlation ID for distributed tracing across components.
 -   **Configuration-driven**: Key behaviors are managed through configuration, not hard-coded.
--   **Extensibility**: The architecture is designed to be extensible, particularly for adding new trading strategies and API endpoints.
+-   **Extensibility**: The architecture is designed to be extensible, particularly for adding new trading strategies and API endpoints through plugin discovery.
+-   **Global Exception Handling**: Unified exception handling with standardized error responses across all endpoints.
 
 ### 1.2. Key Directory Mapping
 
@@ -64,7 +72,7 @@ The API is built on a set of core principles to ensure consistency, maintainabil
 
 ## 2. Architecture
 
-The API follows a layered architecture, as illustrated in the diagram below.
+The API follows a layered architecture with FastAPI at its core, implementing the RouterBase pattern for consistent endpoint management. The system emphasizes dependency injection, standardized response formatting, and comprehensive error handling.
 
 ### 2.1. Architecture Diagram
 ```
@@ -175,19 +183,28 @@ The API follows a layered architecture, as illustrated in the diagram below.
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 2.2. Data Flow Example: Parallel Simulation Execution
+### 2.2. Request Processing Flow
 
-1.  **HTTP Request**: `POST /simulation/start` arrives with simulation configuration.
-2.  **API Layer**: Request routed to `routers/simulation.py` with validation via `SimulationValidator`.
-3.  **Complexity Analysis**: `PerformanceOptimizer` analyzes symbols count, date range, and strategy complexity.
-4.  **Strategy Selection**: System chooses sequential or parallel execution based on complexity score.
-5.  **Parallel Execution** (if selected):
-    - Symbols grouped into balanced sets using `ParallelExecutionStrategy`
-    - Multiple `ExecutionService` instances execute groups concurrently
-    - Each group reports progress via C++ engine stderr JSON streams
-6.  **Progress Aggregation**: `SimulationEngine` aggregates real-time progress from all parallel groups.
-7.  **Result Processing**: Completed groups' results combined via `_aggregate_parallel_results()`.
-8.  **Response**: Unified simulation results returned with optimization metadata.
+1.  **Request Reception**: FastAPI receives HTTP request with correlation ID middleware
+2.  **CORS Processing**: Cross-origin validation for frontend requests
+3.  **Router Dispatch**: Request routed to appropriate router using RouterBase pattern
+4.  **Dependency Injection**: Services and repositories injected via FastAPI DI system
+5.  **Validation**: Request validated using Pydantic models and custom validators
+6.  **Business Logic**: RouterBase delegates to appropriate service layer
+7.  **Error Handling**: Global exception handlers catch and format errors
+8.  **Response Formatting**: Standardized response format with metadata
+9.  **Correlation Tracking**: Response includes correlation ID for request tracing
+10. **Logging**: Request/response logged with correlation ID for monitoring
+
+### 2.3. Simulation Processing Flow
+
+1.  **Configuration Validation**: `SimulationValidator` validates symbols, dates, and strategy
+2.  **Strategy Discovery**: Dynamic strategy loading from core and plugin registries
+3.  **Optimization Analysis**: `PerformanceOptimizer` determines execution strategy
+4.  **Engine Coordination**: `SimulationEngine` orchestrates C++ engine execution
+5.  **Progress Tracking**: Real-time progress updates via JSON streams
+6.  **Result Processing**: Performance metrics calculation and result aggregation
+7.  **Response Generation**: Standardized simulation response with metadata
 
 ## 3. API Reference
 
@@ -208,7 +225,11 @@ The API follows a layered architecture, as illustrated in the diagram below.
     }
   ],
   "warnings": ["warning messages"],
-  "metadata": {}
+  "metadata": {
+    "correlation_id": "uuid",
+    "timestamp": "iso_datetime",
+    "execution_time_ms": 150
+  }
 }
 ```
 
@@ -268,53 +289,203 @@ The API follows a layered architecture, as illustrated in the diagram below.
 
 ### 3.3. Error Codes
 
--   `VALIDATION_FAILED`: Input validation errors.
--   `SIMULATION_NOT_FOUND`: Simulation ID not found.
--   `ENGINE_NOT_FOUND`: C++ engine unavailable.
--   `SYMBOL_NOT_FOUND`: Stock symbol not in database.
--   `STRATEGY_INVALID`: Invalid strategy configuration.
--   `STOCK_NOT_YET_PUBLIC`: Stock was not tradeable on the requested date (before IPO).
--   `STOCK_DELISTED`: Stock was not tradeable on the requested date (after delisting).
--   `INTERNAL_ERROR`: General system errors.
+#### Validation Errors
+-   `VALIDATION_FAILED`: General input validation failures
+-   `INVALID_INPUT`: Invalid parameter types or formats
+-   `SYMBOL_NOT_FOUND`: Stock symbol not found in database
+-   `STRATEGY_INVALID`: Invalid strategy configuration or parameters
 
-### 3.4. Endpoints
+#### Temporal Validation Errors
+-   `STOCK_NOT_YET_PUBLIC`: Stock not tradeable before IPO date
+-   `STOCK_DELISTED`: Stock not tradeable after delisting date
+-   `DATE_RANGE_INVALID`: Invalid date range (future dates, end before start)
 
-#### Health
--   `GET /`: Root service information.
--   `GET /health`: Complete system health check (DB, C++ engine, etc.).
--   `GET /health/ready`: Kubernetes readiness probe.
--   `GET /health/live`: Kubernetes liveness probe.
--   `GET /health/dashboard`: Health dashboard with detailed metrics.
+#### Simulation Errors
+-   `SIMULATION_NOT_FOUND`: Simulation ID not found in system
+-   `SIMULATION_FAILED`: Simulation execution failure
+-   `ENGINE_NOT_FOUND`: C++ trading engine unavailable
+-   `ENGINE_ERROR`: C++ engine execution error
 
-#### Stock Data
--   `GET /stocks`: Get a paginated list of all stock symbols.
--   `GET /stocks/{symbol}/date-range`: Get the available date range for a stock.
--   `GET /stocks/{symbol}/data`: Get historical OHLCV data for a stock.
+#### System Errors
+-   `OPERATION_ERROR`: Business logic operation failures
+-   `INTERNAL_ERROR`: Unexpected system errors
+-   `DATABASE_ERROR`: Database connectivity or query errors
+-   `CACHE_ERROR`: Cache operation failures
+-   `TIMEOUT_ERROR`: Request timeout or processing timeout
+-   `RESOURCE_EXHAUSTED`: System resource limitations exceeded
+-   `SERVICE_UNAVAILABLE`: Dependent service unavailable
+-   `CONFIGURATION_ERROR`: System configuration issues
 
-#### Temporal Validation
--   `POST /stocks/validate-temporal`: Validate if a list of stocks were trading during a specified period.
--   `GET /stocks/{symbol}/temporal-info`: Get temporal information for a stock (IPO, delisting dates).
+#### Strategy Errors
+-   `STRATEGY_NOT_FOUND`: Specified strategy not available in registry
+-   `STRATEGY_PARAMETER_INVALID`: Invalid or missing strategy parameters
+-   `STRATEGY_EXECUTION_ERROR`: Error during strategy signal generation
+-   `STRATEGY_PLUGIN_ERROR`: Plugin loading or validation failures
+
+### 3.4. Current API Endpoints
+
+#### Health Management
+-   `GET /`: Root service information with API version and status.
+-   `GET /health`: Complete system health check (DB, C++ engine, service status).
+-   `GET /health/ready`: Kubernetes readiness probe for container orchestration.
+-   `GET /health/live`: Kubernetes liveness probe for container management.
+-   `GET /health/dashboard`: Health dashboard with detailed system metrics.
+
+#### Stock Data & Temporal Validation
+-   `GET /stocks`: Get paginated list of all available stock symbols with metadata.
+-   `GET /stocks/{symbol}/date-range`: Get available historical date range for a stock.
+-   `GET /stocks/{symbol}/data`: Get historical OHLCV data with optional date filtering.
+-   `POST /stocks/validate-temporal`: Validate if stocks were trading during a period.
+-   `GET /stocks/{symbol}/temporal-info`: Get IPO, delisting, and trading period information.
 -   `POST /stocks/check-tradeable`: Check if a stock was tradeable on a specific date.
--   `GET /stocks/eligible-for-period`: Get stocks that were tradeable during an entire period.
+-   `GET /stocks/eligible-for-period`: Get stocks tradeable throughout entire period.
 
-#### Simulation
--   `POST /simulation/validate`: Validate a simulation configuration without running it.
--   `POST /simulation/start`: Start a new simulation with automatic optimization.
--   `GET /simulation/{simulation_id}/status`: Get real-time status and aggregated progress (sequential/parallel).
--   `GET /simulation/{simulation_id}/results`: Get complete results with optimization metadata.
--   `GET /simulation/{simulation_id}/cancel`: Cancel a running simulation (supports parallel cancellation).
--   `GET /simulations`: List all historical simulations with performance metrics.
+#### Simulation Management
+-   `POST /simulation/validate`: Validate simulation configuration without execution.
+-   `POST /simulation/start`: Start new simulation with automatic optimization selection.
+-   `GET /simulation/{simulation_id}/status`: Get real-time status and progress tracking.
+-   `GET /simulation/{simulation_id}/results`: Get complete results with performance metrics.
+-   `GET /simulation/{simulation_id}/memory`: Get memory usage statistics and optimization data.
+-   `POST /simulation/{simulation_id}/cancel`: Cancel running simulation (parallel support).
+-   `GET /simulations`: List historical simulations with status and performance summary.
 
-#### Strategy
--   `GET /strategies`: Get all available, discovered strategies.
--   `GET /strategies/{strategy_id}`: Get details and required parameters for a specific strategy.
--   `POST /strategies/{strategy_id}/validate`: Validate a set of parameters for a given strategy.
--   `POST /strategies/refresh`: Force the system to rediscover and reload all strategy plugins.
--   `GET /strategies/categories`: Get strategy categories for filtering.
+#### Trading Strategy Management
+-   `GET /strategies`: Get all discovered strategies (core + plugins).
+-   `GET /strategies/{strategy_id}`: Get strategy details and required parameters.
+-   `POST /strategies/{strategy_id}/validate`: Validate strategy parameters.
+-   `POST /strategies/refresh`: Force strategy plugin rediscovery.
+-   `GET /strategies/categories`: Get strategy categories for filtering and organization.
 
-#### Performance & Engine
--   `GET /performance/stats`: Parallel execution metrics and optimization analytics.
--   `POST /performance/clear-cache`: Clear all system caches.
--   `GET /performance/cache-stats`: Cache performance and hit rates.
--   `GET /engine/test`: Test C++ engine connection and parallel execution capability.
--   `GET /engine/status`: Engine status with worker availability and resource usage.
+#### Performance Analytics & Engine Interface
+-   `GET /performance/stats`: System performance metrics and optimization analytics.
+-   `POST /performance/clear-cache`: Clear all system and database caches.
+-   `GET /performance/cache-stats`: Cache performance statistics and hit rates.
+-   `GET /engine/test`: Test C++ trading engine connectivity and functionality.
+-   `GET /engine/status`: Engine status with resource usage and availability.
+
+### 3.5. Authentication
+
+#### Current Authentication Status
+- **Authentication Model**: No authentication required
+- **Security Model**: Open access for development and demonstration
+- **Request Validation**: Parameter validation without user authentication
+- **Future Considerations**: JWT or API key authentication can be added via middleware
+
+### 3.6. Simulation Endpoint Documentation
+
+#### POST /simulation/start
+**Parameters**:
+- `symbols`: Array of stock symbols (required, 1-50 symbols)
+- `start_date`: Start date in YYYY-MM-DD format (required)
+- `end_date`: End date in YYYY-MM-DD format (required)
+- `starting_capital`: Initial capital amount (required, min: 1000, max: 10000000)
+- `strategy`: Strategy identifier (required, from available strategies)
+- `strategy_parameters`: Strategy-specific configuration object (optional)
+
+**Response**:
+```json
+{
+  "status": "success",
+  "data": {
+    "simulation_id": "uuid-string",
+    "status": "queued",
+    "estimated_duration": "5m 30s"
+  },
+  "metadata": {
+    "correlation_id": "request-uuid",
+    "timestamp": "2024-01-15T14:30:00Z",
+    "execution_time_ms": 245
+  }
+}
+```
+
+#### GET /simulation/{simulation_id}/status
+**Parameters**:
+- `simulation_id`: UUID of the simulation (path parameter)
+
+**Response**:
+```json
+{
+  "status": "success",
+  "data": {
+    "simulation_id": "uuid-string",
+    "status": "running",
+    "progress_pct": 67.5,
+    "current_date": "2023-08-15",
+    "estimated_remaining": "1m 45s",
+    "trades_executed": 23,
+    "current_balance": 10750.50
+  }
+}
+```
+
+### 3.7. Strategy Plugin Architecture
+
+#### Plugin Discovery System
+- **Core Strategies**: Built-in strategies in `Backend/api/strategies/`
+- **Plugin Directory**: External strategies in `Backend/api/plugins/strategies/`
+- **Dynamic Loading**: Automatic discovery and registration at startup
+- **Validation**: Schema validation for plugin configuration files
+- **Interface Compliance**: All strategies implement `TradingStrategy` base class
+
+#### Strategy Registration Process
+1. **File Discovery**: Scan plugin directories for Python modules
+2. **Module Import**: Dynamic import with error handling
+3. **Interface Validation**: Verify strategy implements required methods
+4. **Parameter Schema**: Extract and validate parameter definitions
+5. **Registry Addition**: Add to central strategy registry
+6. **API Exposure**: Make available via `/strategies` endpoints
+
+#### Plugin Configuration Format
+```json
+{
+  "name": "custom_rsi_strategy",
+  "display_name": "Custom RSI Strategy",
+  "description": "RSI-based trading with custom thresholds",
+  "version": "1.0.0",
+  "author": "Strategy Developer",
+  "parameters": {
+    "rsi_period": {
+      "type": "integer",
+      "default": 14,
+      "min": 5,
+      "max": 50,
+      "description": "RSI calculation period"
+    },
+    "oversold_threshold": {
+      "type": "float",
+      "default": 30.0,
+      "min": 10.0,
+      "max": 40.0
+    }
+  }
+}
+```
+
+### 3.8. Global Features
+
+#### CORS Configuration
+- **Origins**: `http://localhost:3000` (React development server)
+- **Credentials**: Enabled for authentication support
+- **Methods**: All HTTP methods supported
+- **Headers**: All headers including custom correlation ID headers
+
+#### Correlation ID Tracking
+- **Header**: `X-Correlation-ID` for request tracing
+- **Generation**: Auto-generated UUID if not provided
+- **Logging**: Integrated into all log messages for distributed debugging
+- **Response**: Correlation ID returned in response headers
+
+#### Response Metadata Structure
+**Standard Metadata Fields**:
+- `correlation_id`: Unique request identifier (UUID format)
+- `timestamp`: ISO 8601 datetime of response generation
+- `execution_time_ms`: Request processing time in milliseconds
+- `api_version`: Current API version (e.g., "1.0.0")
+- `request_id`: Internal request tracking ID
+
+#### Exception Handling
+- **ValidationError**: HTTP 400 with detailed validation errors
+- **OperationError**: HTTP 500 for business logic failures
+- **ValueError**: HTTP 400 for invalid input parameters
+- **General Exception**: HTTP 500 with generic error message for security
