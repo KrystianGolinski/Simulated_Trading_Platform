@@ -1,8 +1,8 @@
 # Simulated Trading Platform - Current Status Report
 
-**Last Updated:** July 9, 2025  
+**Last Updated:** October 13, 2025  
 
-## Version 1.3 
+### Version 1.4 
 
 ## Description:
 
@@ -35,7 +35,6 @@ If you encounter any issues, the platform uses the following pre-requisites:
 
 Installing/checking the presence of these libraries **could** solve the errors you may encounter.
 
----
 ## Documentation
 
 The documentation for each component of the projects can be found at:
@@ -44,7 +43,9 @@ The documentation for each component of the projects can be found at:
 - **Database**: `Simulated_Trading_Platform/Project_Documentation/DatabaseStructure.md`
 - **Engine**: `Simulated_Trading_Platform/Project_Documentation/EngineStructure.md`
 
----
+## Updates
+
+The next update will focus on refactoring the backend to move concurrency and performance optimisation logic from the API into the Engine layer.
 
 Legal Notice
 
