@@ -12,6 +12,157 @@ export const SimulationResults: React.FC<SimulationResultsProps> = ({
   onStartNew 
 }) => {
 
+  const exportResults = () => {
+    if (!results) return;
+
+    const timestamp = new Date().toLocaleString();
+    const startingCapital = results.starting_capital || 0;
+    const finalPortfolioValue = results.ending_value || startingCapital;
+    const totalReturnPercentage = results.total_return_pct || 0;
+    const performanceMetrics = results.performance_metrics;
+    const profitLoss = finalPortfolioValue - startingCapital;
+
+    let exportText = `SIMULATION RESULTS EXPORT
+Generated: ${timestamp}
+Simulation ID: ${results.simulation_id}
+
+CONFIGURATION
+
+Strategy: ${results.config.strategy}
+Symbols: ${results.config.symbols.join(', ')}
+Date Range: ${results.config.start_date} to ${results.config.end_date}
+Starting Capital: $${startingCapital.toLocaleString()}
+Created: ${new Date(results.created_at).toLocaleString()}
+Started: ${results.started_at ? new Date(results.started_at).toLocaleString() : 'N/A'}
+Completed: ${results.completed_at ? new Date(results.completed_at).toLocaleString() : 'N/A'}
+
+Strategy Parameters:`;
+
+    // Add strategy-specific parameters
+    if (results.config.strategy === 'ma_crossover') {
+      exportText += `
+- Short MA: ${results.config.strategy_parameters.short_ma} days
+- Long MA: ${results.config.strategy_parameters.long_ma} days`;
+    } else if (results.config.strategy === 'rsi') {
+      exportText += `
+- RSI Period: ${results.config.strategy_parameters.rsi_period} days
+- Oversold Threshold: ${results.config.strategy_parameters.rsi_oversold}
+- Overbought Threshold: ${results.config.strategy_parameters.rsi_overbought}`;
+    } else {
+      exportText += `
+${Object.entries(results.config.strategy_parameters)
+  .map(([key, value]) => `- ${key}: ${value}`)
+  .join('\n')}`;
+    }
+
+    exportText += `
+
+PERFORMANCE SUMMARY
+
+Final Portfolio Value: $${finalPortfolioValue.toLocaleString()}
+Total Return: ${totalReturnPercentage >= 0 ? '+' : ''}${totalReturnPercentage.toFixed(2)}%
+Profit/Loss: ${profitLoss >= 0 ? '+' : ''}$${profitLoss.toLocaleString()}`;
+
+    if (performanceMetrics) {
+      exportText += `
+
+DETAILED PERFORMANCE METRICS
+
+Total Trades: ${performanceMetrics.total_trades || 0}
+Winning Trades: ${performanceMetrics.winning_trades || 0}
+Losing Trades: ${performanceMetrics.losing_trades || 0}
+Win Rate: ${performanceMetrics.total_trades > 0 ? ((performanceMetrics.winning_trades / performanceMetrics.total_trades) * 100).toFixed(1) : '0'}%`;
+
+      if (performanceMetrics.profit_factor) {
+        exportText += `\nProfit Factor: ${performanceMetrics.profit_factor.toFixed(2)}`;
+      }
+      if (performanceMetrics.average_win) {
+        exportText += `\nAverage Win: $${performanceMetrics.average_win.toFixed(2)}`;
+      }
+      if (performanceMetrics.average_loss) {
+        exportText += `\nAverage Loss: $${performanceMetrics.average_loss.toFixed(2)}`;
+      }
+      if (performanceMetrics.annualized_return) {
+        exportText += `\nAnnualized Return: ${performanceMetrics.annualized_return >= 0 ? '+' : ''}${performanceMetrics.annualized_return.toFixed(2)}%`;
+      }
+      if (performanceMetrics.volatility) {
+        exportText += `\nVolatility: ${performanceMetrics.volatility.toFixed(2)}%`;
+      }
+      if (performanceMetrics.sharpe_ratio) {
+        exportText += `\nSharpe Ratio: ${performanceMetrics.sharpe_ratio.toFixed(2)}`;
+      }
+      if (performanceMetrics.max_drawdown_pct) {
+        exportText += `\nMaximum Drawdown: ${performanceMetrics.max_drawdown_pct.toFixed(2)}%`;
+      }
+      if (performanceMetrics.signals_generated) {
+        exportText += `\nSignals Generated: ${performanceMetrics.signals_generated}`;
+      }
+    }
+
+    // Add trade records if available
+    if (results.trades && results.trades.length > 0) {
+      exportText += `
+
+TRADE HISTORY (${results.trades.length} trades)`;
+      
+      results.trades.forEach((trade, index) => {
+        // Parse the complex trade data structure
+        const isOpenPosition = trade.date.includes('(OPEN)');
+        
+        if (isOpenPosition) {
+          // Handle open positions
+          const openDate = trade.date.replace(' (OPEN)', '');
+          const formattedOpenDate = new Date(openDate).toLocaleDateString();
+          
+          exportText += `\n\nTrade #${index + 1} - OPEN POSITION
+Entry Date: ${formattedOpenDate}
+Symbol: ${trade.symbol}
+Action: ${trade.action}
+Shares: ${trade.shares}
+Entry Price: $${trade.price.toFixed(2)}
+Position Value: $${(trade.shares * trade.price).toFixed(2)}
+Status: Position still open at simulation end`;
+          
+        } else {
+          // Handle completed trades with entry/exit dates
+          const dateRange = trade.date.split(' -> ');
+          const entryDate = dateRange[0] ? new Date(dateRange[0]).toLocaleDateString() : 'Unknown';
+          const exitDate = dateRange[1] ? new Date(dateRange[1]).toLocaleDateString() : 'Unknown';
+          
+          // Parse the action field for buy/sell prices and performance
+          const actionParts = trade.action.match(/BUY@([\d.]+) -> SELL@([\d.]+) \(([\+\-][\d.]+%)\)/);
+          const buyPrice = actionParts ? parseFloat(actionParts[1]) : trade.price;
+          const sellPrice = actionParts ? parseFloat(actionParts[2]) : 0;
+          const performance = actionParts ? actionParts[3] : '';
+          
+          const totalReturn = trade.total_value;
+          const isProfit = totalReturn > 0;
+          
+          exportText += `\n\nTrade #${index + 1} - COMPLETED
+Entry Date: ${entryDate}
+Exit Date: ${exitDate}
+Symbol: ${trade.symbol}
+Entry Price: $${buyPrice.toFixed(2)}
+Exit Price: $${sellPrice.toFixed(2)}
+Shares: ${trade.shares}
+Performance: ${performance}
+Total Return: ${isProfit ? '+' : ''}$${totalReturn.toFixed(2)}`;
+        }
+      });
+    }
+
+    // Create and download the file
+    const blob = new Blob([exportText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `simulation_results_${results.simulation_id}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   if (!results) {
     return (
       <div style={{ padding: '12px' }}>
@@ -372,6 +523,7 @@ export const SimulationResults: React.FC<SimulationResultsProps> = ({
                   </button>
                 )}
                 <button 
+                  onClick={exportResults}
                   style={{
                     backgroundColor: '#6b7280',
                     color: 'white',

@@ -4,7 +4,6 @@
 
 This document provides a technical overview of the FastAPI-based API for the Simulated Trading Platform. It is intended for developers working on maintaining or extending the API's functionality. The focus is on architecture, conventions, and practical guides for common development tasks.
 
-**Current Version:** 1.0.0  
 **Framework:** FastAPI with Python 3.12  
 **Container:** Docker with health checks and dependency management  
 **Database Integration:** Async PostgreSQL/TimescaleDB via asyncpg

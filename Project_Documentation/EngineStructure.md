@@ -4,7 +4,6 @@
 
 This document provides a technical overview of the C++ Trading Engine, a high-performance backtesting system.
 
-**Engine Version:** 1.0.0  
 **Language Standard:** C++17 with modern STL features  
 **Build System:** CMake with multi-target configuration  
 **Container Integration:** Docker with shared volume access  
