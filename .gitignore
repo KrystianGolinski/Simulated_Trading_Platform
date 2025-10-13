@@ -70,3 +70,6 @@ logs/
 htmlcov/
 .pytest_cache/
 .tox/
+
+# Miscellaneous
+todo.md
