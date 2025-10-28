@@ -1,6 +1,6 @@
 # Simulated Trading Platform - Current Status Report
 
-**Last Updated:** October 13, 2025  
+**Last Updated:** October 28, 2025  
 
 ### Version 1.4 
 
@@ -17,15 +17,12 @@ The platform is designed to handle any Linux system. Internet access is required
 - 3: Execute `sudo bash setup.sh` to run setup script
 - 4: If ran **Not Successfully**:
   - 4.1: The script should inform you what went wrong.
-- 5: Once ran **Successfully**:
-  - 6: Change directory to Database `(Simulated_Trading_Platform/Database)`
-  - 7: Execute `sudo bash DBsetup.sh` to populate platform database
-  - 8: If ran **Not Successfully**:
-    - 8.1: The script should inform you what went wrong
-  - 9: If ran **Successfully**:
-      - 10: Frontend will be available at localhost:3000/
-      - 11: API will be available at localhost:8000/
-- 12: To end docker services use `sudo docker compose -f Docker/docker-compose.dev.yml down`
+- 5: If ran **Successfully**:
+  - 6: Frontend will be available at localhost:3000/
+  - 7: API will be available at localhost:8000/
+- 8: If ran **Not Successfully**:
+  - 8.1: The script should inform you what went wrong
+- 9: To end docker services use `sudo docker compose -f Docker/docker-compose.dev.yml down`
 ---
 
 If you encounter any issues, the platform uses the following pre-requisites:
